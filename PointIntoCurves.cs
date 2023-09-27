@@ -18,7 +18,7 @@ namespace BaseFunction
         {
             if (objects.Count == 0) return PositionType.fault;
             //получаем проекцию точки на проскость XY
-            point = point.Project(new Plane(), Vector3d.ZAxis);
+            point = point.Z0();
             //создаем список для кривых
             List<Curve> curves = new List<Curve>();
             foreach (Object obj in objects)
@@ -29,7 +29,7 @@ namespace BaseFunction
                     //если кривая в виде ObjectId то получаем ее из базы данных
                     using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
                     {
-                        curve = tr.GetObject(id, OpenMode.ForRead, false, true) as Curve;
+                        curve = tr.GetObject(id, OpenMode.ForRead, false, true).Clone() as Curve;
                         tr.Commit();
                     }
                 }
@@ -46,11 +46,12 @@ namespace BaseFunction
                     curves.Add(curve);
                 }
             }
+            if (curves.Count == 0) return PositionType.fault;
             //если контур один и он замкнут пробуем определить положение точки используя mpolygon
             if (curves.Count == 1)
             {
                 Curve curve = curves[0];
-                if (curve.IsPlanar & (curve.Closed | curve.StartPoint.IsEqualTo(curve.EndPoint)))
+                if (curve.Closed || curve.StartPoint.IsEqualTo(curve.EndPoint))
                 {
                     try
                     {
