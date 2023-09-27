@@ -1,15 +1,8 @@
-﻿using Autodesk.AutoCAD.ApplicationServices;
-using Autodesk.AutoCAD.Colors;
-using Autodesk.AutoCAD.DatabaseServices;
-using Autodesk.AutoCAD.EditorInput;
+﻿using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.Geometry;
-using Autodesk.AutoCAD.LayerManager;
 using Autodesk.AutoCAD.Runtime;
 using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Linq;
-using System.Windows.Forms;
 
 namespace BaseFunction
 {
