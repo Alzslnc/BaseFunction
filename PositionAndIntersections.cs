@@ -40,7 +40,14 @@ namespace BaseFunction
             }
             if (intersections.Count > 0) return true; return false;            
         }
-
+        public static PositionType GetPositionType(this Point3d point, Curve c)
+        { 
+            return point.GetPositionType(new List<object> { c });
+        }
+        public static PositionType GetPositionType(this Point3d point, ObjectId c)
+        {
+            return point.GetPositionType(new List<object> { c });
+        }
         /// <summary>
         /// определяет положение точки относительно кривых в плоскости XY Autocad
         /// </summary>
