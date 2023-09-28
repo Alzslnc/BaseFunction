@@ -43,6 +43,55 @@ namespace BaseFunction
                 return true;
             }
         }
+
+        public static bool AddEntityInCurrentBTR(this Entity entity)
+        {
+            return entity.AddEntityInCurrentBTR(out _);
+        }
+        public static bool AddEntityInCurrentBTR(this Entity entity, out ObjectId id)
+        {
+            id = ObjectId.Null;
+            if (entity.Id != ObjectId.Null) return false;
+            try
+            {
+                using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+                {
+                    using (BlockTableRecord ms = tr.GetObject(HostApplicationServices.WorkingDatabase.CurrentSpaceId, OpenMode.ForWrite) as BlockTableRecord)
+                    {
+                        id = ms.AppendEntity(entity);
+                        tr.AddNewlyCreatedDBObject(entity, true);
+                    }
+                    tr.Commit();
+                }
+                return true;
+            }
+            catch { return false; }
+        }
+        public static bool AddEntityInCurrentBTR(this List<Entity> entities)
+        {
+            return entities.AddEntityInCurrentBTR(out _);
+        }
+        public static bool AddEntityInCurrentBTR(this List<Entity> entities, out List<ObjectId> ids)
+        {
+            ids = new List<ObjectId>();
+            try
+            {
+                using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+                {
+                    using (BlockTableRecord ms = tr.GetObject(HostApplicationServices.WorkingDatabase.CurrentSpaceId, OpenMode.ForWrite) as BlockTableRecord)
+                    {
+                        foreach (Entity e in entities)
+                        { 
+                            ids.Add(ms.AppendEntity(e));
+                            tr.AddNewlyCreatedDBObject(e, true);
+                        }    
+                    }
+                    tr.Commit();
+                }
+                return true;
+            }
+            catch { return false; }        
+        }
         public static Polyline Convert3dPolylineToPolyline(ObjectId id, bool erase)
         {
             Polyline polyline = new Polyline();

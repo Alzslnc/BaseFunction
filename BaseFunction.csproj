@@ -71,8 +71,9 @@
     <Compile Include="BaseGetObjectClass.cs" />
     <Compile Include="EntityJigInsert.cs" />
     <Compile Include="F.cs" />
-    <Compile Include="PointIntoCurves.cs" />
+    <Compile Include="PositionAndIntersections.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Test.cs" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

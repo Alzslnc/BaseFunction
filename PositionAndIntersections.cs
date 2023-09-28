@@ -6,8 +6,41 @@ using System.Linq;
 
 namespace BaseFunction
 {
-    public static class PointIntoCurves
+    public static class PositionAndIntersections
     {
+        public static bool TryGetIntersections(this Curve curve, Curve curve2, out List<Point3d> intersections)
+        { 
+            intersections = new List<Point3d>();
+            using (Curve curvePr = curve.GetProjectedCurve(new Plane(), Vector3d.ZAxis))
+            using (Curve curve2Pr = curve2.GetProjectedCurve(new Plane(), Vector3d.ZAxis))
+            {
+                if (curvePr.GetLength() == 0 || curve2Pr.GetLength() == 0) return false;
+                try
+                {
+                    using (Curve3d icurve3d = curve.GetGeCurve())
+                    using (Curve3d curve3d = curvePr.GetGeCurve())
+                    using (Curve3d curve23d = curve2Pr.GetGeCurve())
+                    using (CurveCurveIntersector3d cci = new CurveCurveIntersector3d(curve3d, curve23d, Vector3d.ZAxis))
+                    {
+                        for (int i = 0; i < cci.NumberOfIntersectionPoints; i++)
+                        {
+                            using (Line3d l3d = new Line3d(cci.GetIntersectionPoint(i), Vector3d.ZAxis))
+                            using (CurveCurveIntersector3d cci2 = new CurveCurveIntersector3d(l3d, icurve3d, Vector3d.ZAxis))
+                            {
+                                for (int j = 0; j < cci2.NumberOfIntersectionPoints; j++)
+                                { 
+                                    intersections.Add(cci2.GetIntersectionPoint(j));
+                                }                            
+                            }
+                        } 
+                    }
+                    intersections.SortOnCurve(curve);
+                }
+                catch { return false; }
+            }
+            if (intersections.Count > 0) return true; return false;            
+        }
+
         /// <summary>
         /// определяет положение точки относительно кривых в плоскости XY Autocad
         /// </summary>
