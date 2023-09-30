@@ -307,7 +307,7 @@ namespace BaseFunction
         /// </summary>    
         public static bool TryGetObjectsIds(out List<ObjectId> result)
         {
-            return TryGetObjectsIds(out result, new List<string>(), "Выберите объект");
+            return TryGetObjectsIds(out result, new List<string>(), "Выберите объекты");
         }
         /// <summary>
         /// Запрашивает у пользователя выбор объектов и возвращает их ObjectId
@@ -321,14 +321,7 @@ namespace BaseFunction
         /// </summary>      
         public static bool TryGetObjectsIds(out List<ObjectId> result, Type type)
         {
-            RXClass rXClass = RXClass.GetClass(type);
-            if (rXClass != null) return TryGetObjectsIds(out result, new List<string> { rXClass.DxfName }, "Выберите объекты");
-            else
-            {
-                result = new List<ObjectId>();
-                return false;
-            }
-
+            return TryGetObjectsIds(out result, type, "Выберите объекты");  
         }
         /// <summary>
         /// Запрашивает у пользователя выбор объектов и возвращает их ObjectId
@@ -342,6 +335,15 @@ namespace BaseFunction
                 result = new List<ObjectId>();
                 return false;
             }
+        }
+        /// <summary>
+        /// Запрашивает у пользователя выбор объектов и возвращает их ObjectId
+        /// </summary>
+        /// <param name="objectTypes">список типов для возможного выбора пользователя, null или пустой списко для выбора любых объектов</param>
+        /// <returns>список ObjectId объекта или ObjectId.Null если произошла отмена выбора</returns>         
+        public static bool TryGetObjectsIds(out List<ObjectId> result, List<Type> objTypes)
+        {
+            return TryGetObjectsIds(out result, objTypes, "Выберите объекты");
         }
         /// <summary>
         /// Запрашивает у пользователя выбор объектов и возвращает их ObjectId
