@@ -1,4 +1,5 @@
-﻿using Autodesk.AutoCAD.Colors;
+﻿using Autodesk.AutoCAD.ApplicationServices;
+using Autodesk.AutoCAD.Colors;
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.LayerManager;
 using System.Collections.Generic;
@@ -36,12 +37,17 @@ namespace BaseFunction
         /// <param name="lineWeight">новый вес линий (null не изменянятся)</param>
         /// <param name="lineType">название нового типа линий (пустая строка или null то не меняется)</param>
         public static TypeChange LayerChangeParametrs(string layer_name, short? colorIndex, LineWeight? lineWeight, string lineType)
-        {
+        {            
             List<TypeChange> variant = new List<TypeChange>();
             //если имя не задано преращаем
             if (string.IsNullOrEmpty(layer_name)) return TypeChange.none;
             //если не задано ни одного параметра для изменения прекращаем
             if (colorIndex == null & lineWeight == null & string.IsNullOrEmpty(lineType)) return TypeChange.none;
+            DocumentLock documentLock = null;
+            if (Application.DocumentManager != null && Application.DocumentManager.MdiActiveDocument != null)
+            {
+                documentLock = Application.DocumentManager.MdiActiveDocument.LockDocument();
+            }
             //используем транзакцию что бы получить данные о слоях 
             using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
             {
@@ -89,17 +95,17 @@ namespace BaseFunction
                 }
                 tr.Commit();
             }
+            documentLock?.Dispose();
             if (variant.Contains(TypeChange.full) && variant.Contains(TypeChange.none)) return TypeChange.fragmentary;
             else if (variant.Contains(TypeChange.full)) return TypeChange.full;
             else return TypeChange.none;
         }
         /// <summary>
         /// Создает новый слой в Autocad
-        /// </summary>              
-
+        /// </summary>       
         public static bool LayerNew(string layer_name)
         {
-            return LayerNew(layer_name, false);
+            return LayerNew(layer_name, false, false);
         }
         /// <summary>
         /// Создает новый слой в Autocad
@@ -107,10 +113,16 @@ namespace BaseFunction
         /// <param name="layer_name">Название слоя</param>
         /// <param name="inGroup">Поместить в текущую группу?</param>
         /// <returns>false - если не удалось создать</returns>       
-        public static bool LayerNew(string layer_name, bool inGroup)
+        public static bool LayerNew(string layer_name, bool inGroup, bool message)
         {
             //если не задано название то прекращаем
             if (string.IsNullOrEmpty(layer_name)) return false;
+            DocumentLock documentLock = null;
+            if (Application.DocumentManager != null && Application.DocumentManager.MdiActiveDocument != null)
+            {
+                documentLock = Application.DocumentManager.MdiActiveDocument.LockDocument();
+            }
+            bool result = true;
             //используем транзакцию что бы получить данные о слоях и если нужного слоя нет то создать его
             using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
             {
@@ -158,9 +170,8 @@ namespace BaseFunction
                         }
                         catch
                         {
-                            System.Windows.Forms.MessageBox.Show("Введено некорректное название слоя");
-                            tr.Commit();
-                            return false;
+                            if (message) System.Windows.Forms.MessageBox.Show("Введено некорректное название слоя");                           
+                            result = false;
                         }
                     }
                     else
@@ -174,9 +185,10 @@ namespace BaseFunction
                         layer.IsLocked = false;
                     }
                 }
-                tr.Commit();
-                return true;
+                tr.Commit();              
             }
+            documentLock.Dispose();
+            return result;
         }
 
         public enum TypeChange
