@@ -4,6 +4,7 @@ using Autodesk.AutoCAD.Geometry;
 using Autodesk.AutoCAD.Runtime;
 using System;
 using System.Collections.Generic;
+using System.Windows.Forms;
 
 namespace BaseFunction
 {
@@ -220,26 +221,21 @@ namespace BaseFunction
         /// </summary>    
         public static bool TryGetobjectId(out ObjectId id, Type type)
         {
-            RXClass rXClass = RXClass.GetClass(type);
-            if (rXClass != null) return TryGetobjectId(out id, new List<string> { rXClass.Name }, "Выберите объект");
-            else
-            {
-                id = ObjectId.Null;
-                return false;
-            }
+            return TryGetobjectId(out id, type, "Выберите объект");
         }
         /// <summary>
         /// возвращает ObjectId выбранного элемента
         /// </summary>    
         public static bool TryGetobjectId(out ObjectId id, Type type, string message)
         {
-            RXClass rXClass = RXClass.GetClass(type);
-            if (rXClass != null) return TryGetobjectId(out id, new List<string> { rXClass.Name }, message);
-            else
-            {
-                id = ObjectId.Null;
-                return false;
-            }
+            return TryGetobjectId(out id, new List<Type> { type }, message);
+        }
+        /// <summary>
+        /// возвращает ObjectId выбранного элемента
+        /// </summary>    
+        public static bool TryGetobjectId(out ObjectId id, List<Type> objTypes)
+        {
+            return TryGetobjectId(out id, objTypes, "Выберите объект");
         }
         /// <summary>
         /// возвращает ObjectId выбранного элемента
