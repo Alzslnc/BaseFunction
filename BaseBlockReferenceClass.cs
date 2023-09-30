@@ -11,20 +11,21 @@ namespace BaseFunction
     {
         #region перенос блоков из других чертежей
         /// <summary>
-        /// переносит отсутствующие в чертеже блоки из выбранного файла
+        /// переносит отсутствующие в чертеже блоки из выбранного файла в используемый файл
         /// </summary>
         /// <param name="blNames">список с названиями нужных блоков</param>
         /// <param name="fileName">файл из которого переносятся блоки</param>
         /// <param name="folders">список местоположений где может находиться файл</param>
         /// <returns>true если блоки перенесены успешно</returns>
-        public static bool AddBlockTableRecord(List<string> blNames, string fileName, List<string> folders)
+        public static bool BlockMigrate(List<string> blNames, string fileName, List<string> folders)
         {
+            if (blNames.Count == 0) return true;           
             foreach (string folder in folders)
             {
                 if (System.IO.Directory.Exists(folder))
                 {
                     string[] allFoundFiles = Directory.GetFiles(folder, fileName, SearchOption.AllDirectories);
-                    if (allFoundFiles.Count() > 0) return AddBlockTableRecord(blNames, allFoundFiles[0]);
+                    if (allFoundFiles.Count() > 0) return BlockMigrate(blNames, allFoundFiles[0]);
                 }
             }
             System.Windows.Forms.MessageBox.Show("Файл ресурсов не найден");
@@ -36,118 +37,141 @@ namespace BaseFunction
         /// <param name="blNames">список с названиями нужных блоков</param>
         /// <param name="fullFileName">файл из которого переносятся блоки (полное название с путем)</param>
         /// <returns>true если блоки перенесены успешно</returns>
-        public static bool AddBlockTableRecord(List<string> blNames, string fullFileName)
+        public static bool BlockMigrate(List<string> blNames, string fullFileName)
         {
-            if (string.IsNullOrEmpty(fullFileName) || blNames.Count == 0) return false;
-            Document adoc = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument;
-            Database targetDb = adoc.Database;
-            //объявляем переменную для хранения недостающих блоков
-            List<string> missBlocks = new List<string>();
-            using (adoc.LockDocument())
+            if (blNames.Count == 0) return true;
+            if (string.IsNullOrEmpty(fullFileName)) return false;
+            return BlockMigrate(HostApplicationServices.WorkingDatabase, blNames, fullFileName);
+        }
+        public static bool BlockMigrate(Database targetDb, List<string> blNames, string fullFileName)
+        {
+            if (blNames.Count == 0) return true;
+            if (string.IsNullOrEmpty(fullFileName)) return false;
+            using (Database db = new Database(false, true))
             {
-                //проверяем наличие блоков в чертеже
-                using (Transaction tr = targetDb.TransactionManager.StartTransaction())
+                try
+                {
+                    db.ReadDwgFile(fullFileName, FileShare.Read, true, String.Empty);
+                    return (BlockMigrate(targetDb, blNames, db));
+                }
+                catch
+                {
+                    System.Windows.Forms.MessageBox.Show("Не удалось считать файл ресурсов");
+                    return false;
+                }               
+            }
+        }
+        public static bool BlockMigrate(Database targetDb, List<string> blNames, Database storageDb)
+        {
+            bool result = true;
+            DocumentLock documentLock = null;
+            if (Application.DocumentManager != null && Application.DocumentManager.MdiActiveDocument != null)
+            {
+                documentLock = Application.DocumentManager.MdiActiveDocument.LockDocument();
+            }
+            //проверяем наличие блоков в чертеже           
+            if (CheckBlocks(targetDb, blNames, out List<string> missBlocks)) return true;
+            //если в списке отсутствующих блоков ничего нет то блоки в чертеже присутствуют           
+            using (ObjectIdCollection missBlocksId = new ObjectIdCollection())
+            {
+                using (Transaction tr = storageDb.TransactionManager.StartTransaction())
                 {
                     //получаем таблицу блоков
-                    using (BlockTable bt = tr.GetObject(targetDb.BlockTableId, OpenMode.ForRead, false, true) as BlockTable)
+                    using (BlockTable bt = tr.GetObject(storageDb.BlockTableId, OpenMode.ForRead, false, true) as BlockTable)
                     {
-                        //проверяем наличие блоков, если нет записываем в список
-                        foreach (string block in blNames)
+                        //проходим по списку нужных блоков, если находим записываем его Id, если нет то возвращаем false                                
+                        foreach (string block in missBlocks)
                         {
-                            if (!bt.Has(block)) missBlocks.Add(block);
+                            if (bt.Has(block))
+                            {
+                                missBlocksId.Add(bt[block]);
+                            }
+                            else
+                            {
+                                tr.Commit();
+                                System.Windows.Forms.MessageBox.Show("В файле ресурсов блоки не найдены");
+                                result = false;
+                            }
                         }
                     }
-                    tr.Commit();
                 }
-                //если в списке отсутствующих блоков ничего нет то блоки в чертеже присутствуют
-                if (missBlocks.Count == 0) return true;
-                using (ObjectIdCollection missBlocksId = new ObjectIdCollection())
+                if (result)
                 {
-                    //если файл найден то считываем его базу данныъ
-                    using (Database db = new Database(false, true))
+                    //записываем блоки
+                    using (IdMapping idMapping = new IdMapping())
                     {
                         try
                         {
-                            //переменная для определения, нашлись ли нужные блоки в файле ресурсов
-                            bool nenaideno = false;
-                            //открываем базу данных файла для чтения
-                            db.ReadDwgFile(fullFileName, FileShare.Read, true, String.Empty);
-                            using (Transaction tr = db.TransactionManager.StartTransaction())
-                            {
-                                //получаем таблицу блоков
-                                using (BlockTable bt = tr.GetObject(db.BlockTableId, OpenMode.ForRead, false, true) as BlockTable)
-                                {
-                                    //проходим по списку нужных блоков, если находим записываем его Id, если нет то возвращаем false                                
-                                    foreach (string block in missBlocks)
-                                    {
-                                        if (bt.Has(block))
-                                        {
-                                            missBlocksId.Add(bt[block]);
-                                        }
-                                        else
-                                        {
-                                            nenaideno = true;
-                                            break;
-                                        }
-                                    }
-                                }
-                                //если хоть один блок не найден возвращаем false
-                                if (nenaideno)
-                                {
-                                    tr.Commit();
-                                    System.Windows.Forms.MessageBox.Show("В файле ресурсов блоки не найдены");
-                                    return false;
-                                }
-                                else
-                                {
-                                    //записываем блоки
-                                    IdMapping idMapping = new IdMapping();
-                                    try
-                                    {
-                                        targetDb.WblockCloneObjects(missBlocksId, targetDb.BlockTableId, idMapping, DuplicateRecordCloning.Ignore, false);
-                                        tr.Commit();
-                                    }
-                                    catch
-                                    {
-                                        tr.Commit();
-                                        System.Windows.Forms.MessageBox.Show("Не удалось перенести блоки из файла ресурсов");
-                                        return false;
-                                    }
-                                }
-                            }
-
+                            targetDb.WblockCloneObjects(missBlocksId, targetDb.BlockTableId, idMapping, DuplicateRecordCloning.Ignore, false);
                         }
                         catch
-                        {
-                            System.Windows.Forms.MessageBox.Show("Что-то пошло не так :(");
-                            return false;
+                        {                         
+                            result = false;
                         }
-                        //на всякий случай проверяем повторно наличие блоков в чертеже 
-                        using (Transaction tr = targetDb.TransactionManager.StartTransaction())
-                        {
-                            //получаем таблицу блоков
-                            using (BlockTable bt = tr.GetObject(targetDb.BlockTableId, OpenMode.ForRead, false, true) as BlockTable)
-                            {
-                                //проверяем наличие блоков
-                                foreach (string block in blNames)
-                                {
-                                    //если не найден то печалька
-                                    if (!bt.Has(block))
-                                    {
-                                        tr.Commit();
-                                        System.Windows.Forms.MessageBox.Show("Что-то пошло не так :(");
-                                        return false;
-                                    }
-                                }
-                            }
-                            tr.Commit();
-                        }
-                        return true;
                     }
+                    if (result) result = CheckBlocks(targetDb, blNames);
                 }
             }
+            documentLock?.Dispose();
+            return result;
+        }
+        /// <summary>
+        /// проверяет список блоков на наличие в базе данных
+        /// </summary>
+        /// <param name="db"></param>
+        /// <param name="blNames"></param>
+        /// <returns></returns>
+        public static bool CheckBlocks(Database db, List<string> blNames)
+        {
+            using (Transaction tr = db.TransactionManager.StartTransaction())
+            {
+                //получаем таблицу блоков
+                using (BlockTable bt = tr.GetObject(db.BlockTableId, OpenMode.ForRead, false, true) as BlockTable)
+                {
+                    //проверяем наличие блоков
+                    foreach (string block in blNames)
+                    {
+                        //если не найден то печалька
+                        if (!bt.Has(block))
+                        {
+                            tr.Commit();                            
+                            return false;
+                        }
+                    }
+                }
+                tr.Commit();
+            }
+            return true;
+        }
+        /// <summary>
+        /// проверяет список блоков на наличие в базе данных и возвращает список отсутствующих
+        /// </summary>
+        /// <param name="db"></param>
+        /// <param name="blNames"></param>
+        /// <param name="missBlocks"></param>
+        /// <returns></returns>
+        public static bool CheckBlocks(Database db, List<string> blNames, out List<string> missBlocks)
+        {            
+            //объявляем переменную для хранения недостающих блоков
+            missBlocks = new List<string>();
+            //проверяем наличие блоков в чертеже
+            using (Transaction tr = db.TransactionManager.StartTransaction())
+            {
+                //получаем таблицу блоков
+                using (BlockTable bt = tr.GetObject(db.BlockTableId, OpenMode.ForRead, false, true) as BlockTable)
+                {
+                    //проверяем наличие блоков, если нет записываем в список
+                    foreach (string block in blNames)
+                    {
+                        if (!bt.Has(block)) missBlocks.Add(block);
+                    }
+                }
+                tr.Commit();
+            }
+            if (missBlocks.Count == 0) return true; return false;
         }
         #endregion
+
         #region изменение атрибутов в блоке
         /// <summary>
         /// изменяет атрибуты блока
@@ -158,9 +182,9 @@ namespace BaseFunction
         {
             if (brId == null || brId == ObjectId.Null) return false;
             Dictionary<string, string> dictionary = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
-            foreach ((string tag, object value) attribute in attributes)
+            foreach ((string tag, object value) in attributes)
             {
-                if (!dictionary.ContainsKey(attribute.tag)) dictionary.Add(attribute.tag, attribute.value.ToString());
+                if (!dictionary.ContainsKey(tag)) dictionary.Add(tag, value.ToString());
             }
             return BlockReferenceChangeAttribute(brId, dictionary);
         }
@@ -198,6 +222,11 @@ namespace BaseFunction
         public static bool BlockReferenceChangeAttribute(ObjectId brId, Dictionary<string, string> attributes, bool allReplace)
         {
             if (brId == null || brId == ObjectId.Null) return false;
+            DocumentLock documentLock = null;
+            if (Application.DocumentManager != null && Application.DocumentManager.MdiActiveDocument != null)
+            {
+                documentLock = Application.DocumentManager.MdiActiveDocument.LockDocument();
+            }
             attributes = new Dictionary<string, string>(attributes, StringComparer.InvariantCultureIgnoreCase);
             List<string> usingTag = new List<string>();
             bool result = false;
@@ -228,9 +257,11 @@ namespace BaseFunction
                 if (result || !allReplace) tr.Commit();
                 else tr.Abort();
             }
+            documentLock?.Dispose();
             return result;
         }
         #endregion
+
         #region добавление атрибутов новому блоку
         /// <summary>
         /// добавляет атрибуты блоку
@@ -239,6 +270,11 @@ namespace BaseFunction
         public static void BlockReferenceSetAttribute(ObjectId brId)
         {
             if (brId == null || brId == ObjectId.Null) return;
+            DocumentLock documentLock = null;
+            if (Application.DocumentManager != null && Application.DocumentManager.MdiActiveDocument != null)
+            {
+                documentLock = Application.DocumentManager.MdiActiveDocument.LockDocument();
+            }
             //запускаем транзакцию
             using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
             {
@@ -279,8 +315,10 @@ namespace BaseFunction
                 }
                 tr.Commit();
             }
+            documentLock?.Dispose();
         }
         #endregion
+
         #region получение атрибутов из блока
         /// <summary>
         /// Получает словарь со всеми парами таг/значение атрибутов блока
@@ -293,6 +331,11 @@ namespace BaseFunction
         {
             result = new Dictionary<string, string>();
             if (br == null) return false;
+            DocumentLock documentLock = null;
+            if (Application.DocumentManager != null && Application.DocumentManager.MdiActiveDocument != null)
+            {
+                documentLock = Application.DocumentManager.MdiActiveDocument.LockDocument();
+            }
             //запускаем транзакцию
             using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
             {
@@ -307,6 +350,7 @@ namespace BaseFunction
                 }
                 tr.Commit();
             }
+            documentLock?.Dispose();
             if (result.Count > 0) return true; return false;
         }
         /// <summary>
@@ -320,6 +364,11 @@ namespace BaseFunction
         {
             result = new Dictionary<string, string>();
             if (brId == null || brId == ObjectId.Null) return false;
+            DocumentLock documentLock = null;
+            if (Application.DocumentManager != null && Application.DocumentManager.MdiActiveDocument != null)
+            {
+                documentLock = Application.DocumentManager.MdiActiveDocument.LockDocument();
+            }
             //запускаем транзакцию
             using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
             {
@@ -341,6 +390,7 @@ namespace BaseFunction
                 }
                 tr.Commit();
             }
+            documentLock?.Dispose();
             if (result.Count > 0) return true; return false;
         }
         /// <summary>
@@ -354,6 +404,11 @@ namespace BaseFunction
         {
             result = string.Empty;
             if (br == null) return false;
+            DocumentLock documentLock = null;
+            if (Application.DocumentManager != null && Application.DocumentManager.MdiActiveDocument != null)
+            {
+                documentLock = Application.DocumentManager.MdiActiveDocument.LockDocument();
+            }
             //запускаем транзакцию
             using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
             {
@@ -369,6 +424,7 @@ namespace BaseFunction
                 }
                 tr.Commit();
             }
+            documentLock?.Dispose();
             if (!string.IsNullOrEmpty(result)) return true; return false;
         }
         /// <summary>
@@ -382,6 +438,11 @@ namespace BaseFunction
         {
             result = string.Empty;
             if (brId == null || brId == ObjectId.Null) return false;
+            DocumentLock documentLock = null;
+            if (Application.DocumentManager != null && Application.DocumentManager.MdiActiveDocument != null)
+            {
+                documentLock = Application.DocumentManager.MdiActiveDocument.LockDocument();
+            }
             //запускаем транзакцию
             using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
             {
@@ -404,6 +465,7 @@ namespace BaseFunction
                 }
                 tr.Commit();
             }
+            documentLock?.Dispose();
             if (!string.IsNullOrEmpty(result)) return true; return false;
         }
         #endregion
