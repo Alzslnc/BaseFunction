@@ -210,6 +210,17 @@ namespace BaseFunction
             return result;
         }
         /// <summary>
+        /// Проверяет, содержит ли список точку
+        /// </summary>
+        /// <param name="points"></param>
+        /// <param name="point"></param>
+        /// <returns></returns>
+        public static bool ContainPoint(this List<Point3d> points, Point3d point)
+        { 
+            foreach (Point3d p in points) { if (p.IsEqualTo(point)) return true; }
+            return false;
+        }
+        /// <summary>
         /// возвращает точку с обнуленной высотой
         /// </summary>
         /// <param name="point"></param>
