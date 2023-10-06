@@ -122,6 +122,16 @@ namespace BaseFunction
             else return false;
         }
         /// <summary>
+        /// сраванивает 2 числа
+        /// </summary>
+        /// <param name="d1"></param>
+        /// <param name="d2"></param>
+        /// <returns></returns>
+        public static bool IsEqualTo(this double d1, double d2)
+        { 
+            if ((d2 - d1) > Tolerance.Global.EqualPoint) return false; return true;        
+        }
+        /// <summary>
         /// сортирует точки по близости к началу кривой
         /// </summary>
         public static void SortOnCurve(this List<Point3d> points, Curve curve)
