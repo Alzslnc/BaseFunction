@@ -187,7 +187,7 @@ namespace BaseFunction
         /// <returns></returns>
         public static bool IsEqualTo(this double d1, double d2)
         { 
-            if ((d2 - d1) > Tolerance.Global.EqualPoint) return false; return true;        
+            if (Math.Abs(d2 - d1) > Tolerance.Global.EqualPoint) return false; return true;        
         }
         /// <summary>
         /// сортирует точки по близости к началу кривой
