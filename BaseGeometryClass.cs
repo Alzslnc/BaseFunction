@@ -8,6 +8,38 @@ namespace BaseFunction
     public static class BaseGeometryClass
     {
         /// <summary>
+        /// очищает список от дублирующихся точек
+        /// </summary>
+        public static List<Point3d> ClearFromDoubles(this List<Point3d> points)
+        {
+            List<Point3d> result = new List<Point3d>();
+            foreach (Point3d point in points)
+            {
+                bool none = true;
+                foreach (Point3d newPoint in result)
+                {
+                    if (newPoint.IsEqualTo(point))
+                    {
+                        none = false;
+                        break;
+                    }
+                }
+                if (none) result.Add(point);
+            }
+            return result;
+        }
+        /// <summary>
+        /// Проверяет, содержит ли список точку
+        /// </summary>
+        /// <param name="points"></param>
+        /// <param name="point"></param>
+        /// <returns></returns>
+        public static bool ContainPoint(this List<Point3d> points, Point3d point)
+        {
+            foreach (Point3d p in points) { if (p.IsEqualTo(point)) return true; }
+            return false;
+        }
+        /// <summary>
         /// возвращает число, округленное до выбранного значения
         /// </summary>
         /// <param name="d">исходное число</param>
@@ -82,6 +114,32 @@ namespace BaseFunction
         {
             if (curve == null || curve.IsDisposed || curve.IsErased) return 0;
             return curve.GetDistanceAtParameter(curve.EndParam) - curve.GetDistanceAtParameter(curve.StartParam);
+        }
+        /// <summary>
+        /// находит ближайшую точку из списка, если списко пустой возвращает точку
+        /// </summary>    
+        public static Point3d GetClosestPoint(this List<Point3d> points, Point3d point)
+        {
+            return GetClosestPoint(points, point, double.MaxValue);
+        }
+        /// <summary>
+        /// находит ближайшую точку из списка, если списко пустой возвращает точку
+        /// </summary>   
+        public static Point3d GetClosestPoint(this List<Point3d> points, Point3d point, double mindist)
+        { 
+            if (points == null || points.Count == 0) return point;
+            Point3d closest = point;
+            double dist = mindist;
+            foreach (Point3d p in points)
+            {
+                if (p.Z0().DistanceTo(point.Z0()).IsEqualTo(0)) return p;
+                else if (p.Z0().DistanceTo(point.Z0()) < dist)
+                { 
+                    closest = p;
+                    dist = closest.Z0().DistanceTo(point.Z0());
+                }
+            }
+            return closest;
         }
         /// <summary>
         /// возвращает 2д точку полученную из 3д точки путем откидывания Z
@@ -197,39 +255,7 @@ namespace BaseFunction
             List<Point3d> result = new List<Point3d>();
             foreach (Point3d point in points) result.Add(point);
             return result;
-        }
-        /// <summary>
-        /// очищает список от дублирующихся точек
-        /// </summary>
-        public static List<Point3d> ClearFromDoubles(this List<Point3d> points)
-        {
-            List<Point3d> result = new List<Point3d>();
-            foreach (Point3d point in points)
-            {
-                bool none = true;
-                foreach (Point3d newPoint in result)
-                {
-                    if (newPoint.IsEqualTo(point))
-                    {
-                        none = false;
-                        break;
-                    }
-                }
-                if (none) result.Add(point);
-            }
-            return result;
-        }
-        /// <summary>
-        /// Проверяет, содержит ли список точку
-        /// </summary>
-        /// <param name="points"></param>
-        /// <param name="point"></param>
-        /// <returns></returns>
-        public static bool ContainPoint(this List<Point3d> points, Point3d point)
-        { 
-            foreach (Point3d p in points) { if (p.IsEqualTo(point)) return true; }
-            return false;
-        }
+        }      
         /// <summary>
         /// возвращает точку с обнуленной высотой
         /// </summary>
