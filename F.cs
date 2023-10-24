@@ -8,6 +8,24 @@ namespace BaseFunction
 {
     public static class F
     {
+        public static void ExtensionDictionaryErase(List<ObjectId> ids)
+        {              
+            using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+            {
+                foreach (ObjectId id in ids)
+                {
+                    using (Entity d = tr.GetObject(id, OpenMode.ForWrite) as Entity)
+                    {
+                        if (d == null || d.ExtensionDictionary == null || d.ExtensionDictionary == ObjectId.Null || d.ExtensionDictionary.IsErased) continue;
+                        using (DBDictionary dd = tr.GetObject(d.ExtensionDictionary, OpenMode.ForWrite, true, true) as DBDictionary)
+                        {
+                            dd?.Erase();
+                        }
+                    }
+                }
+                tr.Commit();
+            }
+        }
 
         /// <summary>
         /// Добавляет в чертеж типы линий из списка
