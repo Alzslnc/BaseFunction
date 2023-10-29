@@ -10,6 +10,8 @@ namespace BaseFunction
     {
         public static bool TryGetIntersections(this Curve curve, Curve curve2, out List<Point3d> intersections)
         { 
+            if (curve.Equals(curve2)) return curve.TryGetSelfIntersect(out intersections);
+
             intersections = new List<Point3d>();
             using (Curve curvePr = curve.GetProjectedCurve(new Plane(), Vector3d.ZAxis))
             using (Curve curve2Pr = curve2.GetProjectedCurve(new Plane(), Vector3d.ZAxis))
@@ -40,13 +42,78 @@ namespace BaseFunction
             }
             if (intersections.Count > 0) return true; return false;            
         }
-        public static PositionType GetPositionType(this Point3d point, Curve c)
-        { 
-            return point.GetPositionType(new List<object> { c });
+        public static bool TryGetSelfIntersect(this Curve curve, out List<Point3d> intersections)
+        {
+            intersections = new List<Point3d>();
+            if (curve is Line || curve is Circle || curve is Arc) return false;
+            if (curve is Spline)
+            {
+                intersections.AddRange(Intersectionts(curve, curve));
+            }
+            else
+            {
+                using (DBObjectCollection coll = new DBObjectCollection())
+                {
+                    if (coll.Count > 1)
+                    {
+                        foreach (Curve c in coll)
+                        {
+                            if (c == null) continue;
+                            foreach (Curve c2 in coll)
+                            {
+                                if (c2.Equals(c)) continue;
+                                intersections.AddRange(Intersectionts(c, c2));
+                            }
+                        }
+                        foreach (Curve c in coll)
+                        {
+                            c?.Dispose();
+                        }
+                    }
+                    else if (coll.Count == 1 && coll[0] is Curve c)
+                    {                      
+                        intersections.AddRange(Intersectionts(c, c));
+                    }
+                }
+            }
+            if (intersections.Count > 0) return true; return false;
+        }
+
+        public static List<Point3d> Intersectionts(this Curve c, Curve c2)
+        {
+            List<Point3d> intersections = new List<Point3d>();
+            using (Point3dCollection coll2 = new Point3dCollection())
+            {
+                c.IntersectWith(c2, Intersect.OnBothOperands, coll2, IntPtr.Zero, IntPtr.Zero);
+                if (coll2.Count > 0)
+                {
+                    foreach (Point3d p in coll2)
+                    {
+                        if ((p.IsEqualTo(c.StartPoint) || p.IsEqualTo(c.EndPoint)) &&
+                            (p.IsEqualTo(c2.StartPoint) || p.IsEqualTo(c2.EndPoint))) continue;
+                        if (!intersections.Contains(p)) intersections.Add(p);
+                    }
+                }
+            }
+            return intersections;
         }
         public static PositionType GetPositionType(this Point3d point, ObjectId c)
         {
             return point.GetPositionType(new List<object> { c });
+        }
+        public static PositionType GetPositionType(this Point3d point, Curve c)
+        {      
+            return point.GetPositionType(new List<object> { c }, null);
+        }
+        public static PositionType GetPositionType(this Point3d point, List<Object> objects)
+        {
+            PositionType position = PositionType.fault;
+            using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+            {
+                position = point.GetPositionType(objects, tr);
+                tr.Commit();
+            }
+            return position;
         }
         /// <summary>
         /// определяет положение точки относительно кривых в плоскости XY Autocad
@@ -54,7 +121,7 @@ namespace BaseFunction
         /// <param name="point"></param>
         /// <param name="objects">список кривых в виде собственно самих кривых или их ObjectId</param>       
         /// <returns></returns>
-        public static PositionType GetPositionType(this Point3d point, List<Object> objects)
+        public static PositionType GetPositionType(this Point3d point, List<Object> objects, Transaction tr)
         {
             if (objects.Count == 0) return PositionType.fault;
             //получаем проекцию точки на проскость XY
@@ -67,11 +134,7 @@ namespace BaseFunction
                 if (obj is ObjectId id)
                 {
                     //если кривая в виде ObjectId то получаем ее из базы данных
-                    using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
-                    {
-                        curve = tr.GetObject(id, OpenMode.ForRead, false, true).Clone() as Curve;
-                        tr.Commit();
-                    }
+                    if (tr != null) curve = tr.GetObject(id, OpenMode.ForRead, false, true).Clone() as Curve;       
                 }
                 //если это кривая то получаем ее как кривую
                 else if (obj is Curve) curve = obj as Curve;
@@ -88,8 +151,9 @@ namespace BaseFunction
             }
             if (curves.Count == 0) return PositionType.fault;
             //если контур один и он замкнут пробуем определить положение точки используя mpolygon
-            if (curves.Count == 1)
+            if (curves.Count == 1 && curves[0] is Polyline poly && poly.StartPoint.IsEqualTo(poly.EndPoint))
             {
+                if (poly.Area == 0) return PositionType.onBound;
                 Curve curve = curves[0];
                 if (curve.Closed || curve.StartPoint.IsEqualTo(curve.EndPoint))
                 {
@@ -99,13 +163,17 @@ namespace BaseFunction
                         {
                             using (Polyline polyline = curve.Clone() as Polyline)
                             {
+                               
                                 if (polyline != null)
                                 {
                                     polyline.Closed = true;
-                                    mp.AppendLoopFromBoundary(polyline, true, Tolerance.Global.EqualPoint);
-                                    if (mp.IsPointOnLoopBoundary(point, 0, Tolerance.Global.EqualPoint)) return PositionType.onBound;
-                                    if (mp.IsPointInsideMPolygon(point, Tolerance.Global.EqualPoint).Count > 0) return PositionType.inner;
-                                    else return PositionType.outer;
+                                    if (!poly.TryGetSelfIntersect(out _))
+                                    {
+                                        mp.AppendLoopFromBoundary(polyline, true, Tolerance.Global.EqualPoint);
+                                        if (mp.IsPointOnLoopBoundary(point, 0, Tolerance.Global.EqualPoint)) return PositionType.onBound;
+                                        if (mp.IsPointInsideMPolygon(point, Tolerance.Global.EqualPoint).Count > 0) return PositionType.inner;
+                                        else return PositionType.outer;
+                                    }
                                 }
                             }
                         }

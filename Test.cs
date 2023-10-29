@@ -16,12 +16,15 @@ namespace BaseFunction
 {
     public class Test
     {
-        //[CommandMethod("test01", CommandFlags.Session)]
-        //public void Test01()
-        //{
-        //    if (!TryGetobjectId(out ObjectId id, typeof(BlockReference))) return;
-        //    BlockReferenceChangeAttribute(id, "ttest", "121212");
-        //}
+        [CommandMethod("test01", CommandFlags.Session)]
+        public void Test01()
+        {
+            if (!TryGetobjectId(out ObjectId id)) return;
+            using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+            {                
+                tr.Commit();
+            }
+        }
 
     }
 }

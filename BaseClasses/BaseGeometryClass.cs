@@ -195,6 +195,10 @@ namespace BaseFunction
         public static void SortOnCurve(this List<Point3d> points, Curve curve)
         {
             if (points.Count == 0 || curve.GetLength() == 0) return;
+            for (int i = 0; i < points.Count; i++)
+            {
+                points[i] = curve.GetClosestPointTo(points[i], false);
+            }
             List<Point3d> result = new List<Point3d>();
             while (points.Count > 0)
             {
