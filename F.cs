@@ -152,7 +152,11 @@ namespace BaseFunction
                 polyline.LineWeight = pline.LineWeight;
                 polyline.Color = pline.Color;
                 //удаляем 3д полилинию если надо
-                if (erase) pline.Erase();
+                if (erase)
+                {
+                    if (pline.IsReadEnabled) pline.UpgradeOpen();
+                    pline.Erase();
+                }              
                 tr.Commit();
             }
             return polyline;
