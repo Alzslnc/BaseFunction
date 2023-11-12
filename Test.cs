@@ -11,17 +11,46 @@ using static BaseFunction.BaseGetObjectClass;
 using static BaseFunction.PositionAndIntersections;
 using static BaseFunction.BaseBlockReferenceClass;
 using static BaseFunction.F;
+using static BaseFunction.TextMergeClass;
+using static BaseFunction.BaseLayerClass;
 
 namespace BaseFunction
 {
     public class Test
     {
-        [CommandMethod("test01", CommandFlags.Session)]
+        [CommandMethod("test01")]
         public void Test01()
         {
-            if (!TryGetobjectId(out ObjectId id)) return;
+            if (!TryGetObjectsIds(out List<ObjectId> ids, new List<Type> { typeof(MText), typeof(DBText) })) return;
             using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
-            {                
+            {      
+                List<object> texts = new List<object>();
+                foreach (ObjectId id in ids)
+                {
+                    using (Entity e = tr.GetObject(id, OpenMode.ForRead, false, true) as Entity)
+                    { 
+                        if (e is MText || e is DBText) texts.Add(e.Clone());   
+                    }
+                }
+
+                LayerNew("_mtexts");
+                List<MText> mtexts = TextMergeMass(texts, 0.5, 1, "_mtexts", true);
+
+                if (mtexts.Count > 0)
+                {
+                    using (BlockTableRecord ms = tr.GetObject(HostApplicationServices.WorkingDatabase.CurrentSpaceId, OpenMode.ForWrite) as BlockTableRecord)
+                    {
+                        foreach (MText mtext in mtexts)
+                        {
+                            if (mtext.IsNewObject)
+                            { 
+                                ms.AppendEntity(mtext);
+                                tr.AddNewlyCreatedDBObject(mtext, true);
+                            }
+                        }
+                    }
+                }
+
                 tr.Commit();
             }
         }
