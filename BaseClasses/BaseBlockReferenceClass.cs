@@ -418,8 +418,11 @@ namespace BaseFunction
                     //открываем объект как атрибут
                     using (AttributeReference attRef = tr.GetObject(id, OpenMode.ForRead, false, true) as AttributeReference)
                     {
-                        if (attRef != null && attRef.Tag.Equals(tag)) result = attRef.TextString;
-                        break;
+                        if (attRef != null && attRef.Tag.Equals(tag))
+                        {
+                            result = attRef.TextString;
+                            break;
+                        }                            
                     }
                 }
                 tr.Commit();
