@@ -40,6 +40,16 @@ namespace BaseFunction
             return false;
         }
         /// <summary>
+        /// Удаляет из списка точки эквивалентные данной
+        /// </summary>  
+        public static void DeletePoint(this List<Point3d> points, Point3d point)
+        {
+            for (int i = points.Count - 1; i >= 0; i--)
+            {
+                if (points[i].IsEqualTo(point)) points.RemoveAt(i);
+            }
+        }
+        /// <summary>
         /// возвращает число, округленное до выбранного значения
         /// </summary>
         /// <param name="d">исходное число</param>
