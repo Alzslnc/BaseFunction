@@ -1,5 +1,6 @@
 ﻿using Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.DatabaseServices;
+using OldProgram;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -19,7 +20,7 @@ namespace BaseFunction
         /// <returns>true если блоки перенесены успешно</returns>
         public static bool BlockMigrate(List<string> blNames, string fileName, List<string> folders)
         {
-            if (blNames.Count == 0) return true;
+            if (blNames.Count == 0 || CheckBlocks(HostApplicationServices.WorkingDatabase, blNames)) return true;       
             foreach (string folder in folders)
             {
                 if (System.IO.Directory.Exists(folder))
@@ -39,7 +40,7 @@ namespace BaseFunction
         /// <returns>true если блоки перенесены успешно</returns>
         public static bool BlockMigrate(List<string> blNames, string fullFileName)
         {
-            if (blNames.Count == 0) return true;
+            if (blNames.Count == 0 || CheckBlocks(HostApplicationServices.WorkingDatabase, blNames)) return true;
             if (string.IsNullOrEmpty(fullFileName)) return false;
             return BlockMigrate(HostApplicationServices.WorkingDatabase, blNames, fullFileName);
         }
@@ -522,7 +523,12 @@ namespace BaseFunction
                     newReference.Rotation = oldReference.Rotation;
                     newReference.Normal = oldReference.Normal;
 
-                    newReference.EntityCopySettings(oldReference);                    
+                    newReference.Color = oldReference.Color;
+                    newReference.Linetype = oldReference.Linetype;
+                    newReference.LineWeight = oldReference.LineWeight;
+                    newReference.Layer = oldReference.Layer;
+                    newReference.LinetypeScale = oldReference.LinetypeScale;
+                    newReference.Transparency = oldReference.Transparency;
 
                     ObjectId newReferenceId = ms.AppendEntity(newReference);
                     tr.AddNewlyCreatedDBObject(newReference, true);
@@ -535,6 +541,47 @@ namespace BaseFunction
                     }
                 }
             }
+        }
+        #endregion
+
+        #region вставка блока в чертеж
+        public static void InsertBlock(string name, string resourceFileName)
+        {
+            string path = new System.IO.FileInfo(typeof(StampInsertClass).Assembly.Location).DirectoryName;
+
+            if (!System.IO.Directory.Exists(path)) return;
+
+            if (!BlockMigrate(new List<string> { name }, resourceFileName, new List<string> { path })) return;
+
+            BlockReferenceInsert(name);
+        }
+        /// <summary>
+        /// вставляет блок в чертеж по названию блока
+        /// </summary>
+        public static bool BlockReferenceInsert(string name)
+        {
+            ObjectId id = ObjectId.Null;
+            using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+            {
+                using (BlockTable bt = tr.GetObject(HostApplicationServices.WorkingDatabase.BlockTableId, OpenMode.ForRead) as BlockTable)
+                {
+                    if (bt.Has(name)) id = bt[name];
+                }
+                tr.Commit();
+            }
+            if (id == ObjectId.Null) return false;
+           
+            return BlockReferenceInsert(id);
+        }
+        /// <summary>
+        /// вставляет блок в чертеж по ObjectId его BTR
+        /// </summary>
+        public static bool BlockReferenceInsert(ObjectId brefId)
+        {
+            using (BlockReference bref = new BlockReference(Autodesk.AutoCAD.Geometry.Point3d.Origin, brefId))
+            {                
+                return bref.EntityInsert();
+            }        
         }
         #endregion
     }

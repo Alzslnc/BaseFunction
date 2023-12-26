@@ -1,44 +1,12 @@
 ﻿using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Geometry;
-using Autodesk.AutoCAD.Runtime;
-using System.Collections.Generic;
 using static BaseFunction.BaseBlockReferenceClass;
-using static BaseFunction.BaseGetObjectClass;
 
 namespace BaseFunction
 {
     public static class EntityJigInsert
-    {
-        //[CommandMethod("InsertCircle")]
-        public static void test1()
-        {
-            //создаем круг
-            using (Circle c = new Circle(Point3d.Origin, Vector3d.ZAxis, 1))
-            {
-                //вставляем
-                c.EntityInsert();
-            }
-        }
-        //[CommandMethod("ReplaceCircle")]
-        public static void test2()
-        {
-            //получаем ObjectId круга                    
-            if (TryGetobjectId(out ObjectId id, new List<string> { RXObject.GetClass(typeof(Circle)).Name }, ""))
-            {
-                //открываем транзакцию
-                using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
-                {
-                    //открываем объект
-                    using (Entity e = tr.GetObject(id, OpenMode.ForRead) as Entity)
-                    {
-                        //перемещаем
-                        e.EntytyReplace();
-                    }
-                    tr.Commit();
-                }
-            }
-        }
+    {       
         /// <summary>
         /// вставляет объект в выбранное пользователем место в чертеже
         /// </summary>
@@ -46,6 +14,7 @@ namespace BaseFunction
         /// <returns></returns>
         public static bool EntityInsert(this Entity ent)
         {
+            if (!ent.IsNewObject) return false;
             //трай на всякий случай вдруг кто-то применит к уже добавленному в базу данных объекту
             //хотя по идее можно сделать проверку на наличие ObjectId, мысля на будущее
             try
