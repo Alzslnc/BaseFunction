@@ -520,11 +520,9 @@ namespace BaseFunction
                 {
                     newReference.ScaleFactors = oldReference.ScaleFactors;
                     newReference.Rotation = oldReference.Rotation;
-                    newReference.Layer = oldReference.Layer;
-                    newReference.Color = oldReference.Color;
-                    newReference.LinetypeId = oldReference.LinetypeId;
-                    newReference.LineWeight = oldReference.LineWeight;
-                    newReference.Transparency = oldReference.Transparency;
+                    newReference.Normal = oldReference.Normal;
+
+                    newReference.EntityCopySettings(oldReference);                    
 
                     ObjectId newReferenceId = ms.AppendEntity(newReference);
                     tr.AddNewlyCreatedDBObject(newReference, true);
