@@ -66,6 +66,7 @@ namespace BaseFunction
             GetParametr(id);
         }
         #endregion
+
         #region открытые методы
         /// <summary>
         /// Проверяет эквивалентность объекта через его ObjectId в соответствии с выбранными параметрами
@@ -80,13 +81,13 @@ namespace BaseFunction
             {
                 if (UseList)
                 {
-                    foreach ((_, _, _, _, Type tp) in ParametrList)
+                    foreach (ParametrClass parametr in ParametrList)
                     {
-                        if (id.GetType().Equals(tp)) return true;
+                        if (id.GetType().Equals(parametr.Type)) return true;
                     }
                     return false;
                 }
-                else if (id.GetType().Equals(Parametr.tp)) return true;
+                else if (id.GetType().Equals(Parametr.Type)) return true;
                 return false;
             }
             using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
@@ -131,16 +132,16 @@ namespace BaseFunction
                 {
                     if (UseList)
                     {
-                        foreach ((_, _, _, _, Type tp) in ParametrList)
+                        foreach (ParametrClass parametr in ParametrList)
                         {
-                            if (id.GetType().Equals(tp))
+                            if (id.ObjectClass.GetType().Equals(parametr.Type))
                             {
                                 result.Add(id);
                                 break;
                             }
                         }
                     }
-                    else if (id.GetType().Equals(Parametr.tp)) result.Add(id);
+                    else if (id.ObjectClass.GetType().Equals(Parametr.Type)) result.Add(id);
                 }
             }
             else
@@ -161,6 +162,7 @@ namespace BaseFunction
             return true;
         }
         #endregion
+
         #region закрытые методы
         private void GetParametr(ObjectId id)
         {
@@ -171,7 +173,7 @@ namespace BaseFunction
                 {
                     if (e != null)
                     {
-                        Parametr = (e.Color, e.Layer, e.LineWeight, e.Linetype, e.GetType());
+                        Parametr = new ParametrClass(e);
                         Exist = true;
                     }
                 }
@@ -189,8 +191,8 @@ namespace BaseFunction
                     {
                         if (e != null)
                         {
-                            (Color col, string lay, LineWeight lw, string lt, Type tp) parametr = (e.Color, e.Layer, e.LineWeight, e.Linetype, e.GetType());
-                            if (!ParametrList.Contains(parametr)) ParametrList.Add(parametr);
+                            ParametrClass parametr = new ParametrClass(e);
+                            if (!ContainParametr(parametr)) ParametrList.Add(parametr);
                             Exist = true;
                         }
                         else
@@ -206,7 +208,7 @@ namespace BaseFunction
         {
             if (UseList)
             {
-                foreach ((Color col, string lay, LineWeight lw, string lt, Type tp) parametr in ParametrList)
+                foreach (ParametrClass parametr in ParametrList)
                 {
                     if (IsEqual(e, parametr)) return true;
                 }
@@ -217,14 +219,26 @@ namespace BaseFunction
                 return IsEqual(e, Parametr);
             }
         }
-        private bool IsEqual(Entity e, (Color col, string lay, LineWeight lw, string lt, Type tp) parametr)
+        private bool IsEqual(Entity e, ParametrClass parametr)
         {
-            if (UseColor && !e.Color.Equals(parametr.col)) return false;
-            if (UseLayer && !e.Layer.Equals(parametr.lay)) return false;
-            if (UseLineWeight && !e.LineWeight.Equals(parametr.lw)) return false;
-            if (UseLineType && !e.Linetype.Equals(parametr.lt)) return false;
-            if (UseClassType && !e.GetType().Equals(parametr.tp)) return false;
+            if (UseColor && !e.Color.Equals(parametr.Color)) return false;
+            if (UseLayer && !e.Layer.Equals(parametr.Layer)) return false;
+            if (UseLineWeight && !e.LineWeight.Equals(parametr.LineWeight)) return false;
+            if (UseLineType && !e.Linetype.Equals(parametr.LineType)) return false;
+            if (UseClassType && !e.GetType().Equals(parametr.Type)) return false;
             return true;
+        }
+        private bool ContainParametr(ParametrClass parametr)
+        {
+            foreach (ParametrClass checkedParametr in ParametrList)
+            {
+                if (!checkedParametr.Type.Equals(parametr.Type)) continue;
+                if (!checkedParametr.LineType.Equals(parametr.LineType)) continue;
+                if (!checkedParametr.Layer.Equals(parametr.Layer)) continue;
+                if (!checkedParametr.LineWeight.Equals(parametr.LineWeight)) continue;
+                if (!checkedParametr.Color.Equals(parametr.Color)) continue;
+            }
+            return false;
         }
         private void ObjectIdCheck(ObjectId id)
         {
@@ -272,6 +286,7 @@ namespace BaseFunction
             }
         }
         #endregion
+
         #region открытые переменные
         public bool UseColor { get; set; } = true;
         public bool UseLayer { get; set; } = true;
@@ -279,13 +294,31 @@ namespace BaseFunction
         public bool UseLineType { get; set; } = false;
         public bool UseClassType { get; set; } = false;
         public bool Exist { get; set; } = false;
-        #endregion
-        #region закрытые переменные
-        private bool UseList { get; set; } = false;
-        private (Color col, string lay, LineWeight lw, string lt, Type tp) Parametr { get; set; } = (null, string.Empty, LineWeight.ByLineWeightDefault, string.Empty, null);
-        private List<(Color col, string lay, LineWeight lw, string lt, Type tp)> ParametrList { get; set; } = new List<(Color col, string lay, LineWeight lw, string lt, Type tp)>();
-        private bool IsDisposed { get; set; } = false;
-        #endregion
+        public ParametrClass Parametr { get; private set; } = null;
+        public List<ParametrClass> ParametrList { get; private set; } = new List<ParametrClass>();
+        public bool UseList { get; set; } = false;
+        public bool IsDisposed { get; set; } = false;
+        #endregion     
+
+        /// <summary>
+        /// класс для хранения сраваниваемых данных
+        /// </summary>
+        public class ParametrClass
+        {
+            public ParametrClass(Entity e) 
+            { 
+                Color = e.Color;
+                Layer = e.Layer;
+                LineWeight = e.LineWeight;
+                LineType = e.Linetype;
+                Type = e.GetType();
+            }
+            public Color Color { get; private set; }
+            public string Layer { get; private set; }
+            public LineWeight LineWeight { get; private set; }
+            public Type Type { get; private set; }
+            public string LineType { get; private set; }
+        }        
         public void Dispose()
         {
             if (IsDisposed) return;

@@ -9,23 +9,45 @@ namespace BaseFunction
     public static class BaseLayerClass
     {
         /// <summary>
+        /// возвращает список слоев активной базы данных
+        /// </summary>      
+        public static List<string> GetLayerNames()
+        {
+            List<string> result = new List<string>();
+            using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+            {
+                using (LayerTable lt = tr.GetObject(HostApplicationServices.WorkingDatabase.LayerTableId, OpenMode.ForRead) as LayerTable)
+                {
+                    foreach (ObjectId id in lt)
+                    {
+                        using (LayerTableRecord layer = tr.GetObject(id, OpenMode.ForRead, false, true) as LayerTableRecord)
+                        {
+                            result.Add(layer.Name);
+                        }
+                    }
+                }
+                tr.Commit();
+            }
+            return result;
+        }
+        /// <summary>
         /// Изменяет параметры существующего слоя
         /// </summary>
-        public static TypeChange LayerChangeParametrs(string layer_name, short colorIndex)
+        public static LayerTypeChange LayerChangeParametrs(string layer_name, short colorIndex)
         {
             return LayerChangeParametrs(layer_name, colorIndex, null, null);
         }
         /// <summary>
         /// Изменяет параметры существующего слоя
         /// </summary>
-        public static TypeChange LayerChangeParametrs(string layer_name, LineWeight lineWeight)
+        public static LayerTypeChange LayerChangeParametrs(string layer_name, LineWeight lineWeight)
         {
             return LayerChangeParametrs(layer_name, null, lineWeight, null);
         }
         /// <summary>
         /// Изменяет параметры существующего слоя
         /// </summary>
-        public static TypeChange LayerChangeParametrs(string layer_name, string lineType)
+        public static LayerTypeChange LayerChangeParametrs(string layer_name, string lineType)
         {
             return LayerChangeParametrs(layer_name, null, null, lineType);
         }
@@ -36,13 +58,13 @@ namespace BaseFunction
         /// <param name="colorIndex">новый индекс цвета :0 - 256 (если вне диапазона или null то не изменяется)</param>
         /// <param name="lineWeight">новый вес линий (null не изменянятся)</param>
         /// <param name="lineType">название нового типа линий (пустая строка или null то не меняется)</param>
-        public static TypeChange LayerChangeParametrs(string layer_name, short? colorIndex, LineWeight? lineWeight, string lineType)
+        public static LayerTypeChange LayerChangeParametrs(string layer_name, short? colorIndex, LineWeight? lineWeight, string lineType)
         {            
-            List<TypeChange> variant = new List<TypeChange>();
+            List<LayerTypeChange> variant = new List<LayerTypeChange>();
             //если имя не задано преращаем
-            if (string.IsNullOrEmpty(layer_name)) return TypeChange.none;
+            if (string.IsNullOrEmpty(layer_name)) return LayerTypeChange.none;
             //если не задано ни одного параметра для изменения прекращаем
-            if (colorIndex == null & lineWeight == null & string.IsNullOrEmpty(lineType)) return TypeChange.none;
+            if (colorIndex == null & lineWeight == null & string.IsNullOrEmpty(lineType)) return LayerTypeChange.none;
             DocumentLock documentLock = null;
             if (Application.DocumentManager != null && Application.DocumentManager.MdiActiveDocument != null)
             {
@@ -66,9 +88,9 @@ namespace BaseFunction
                                 if (colorIndex.Value >= 0 & colorIndex.Value <= 256)
                                 {
                                     layer.Color = Color.FromColorIndex(ColorMethod.ByAci, colorIndex.Value);
-                                    variant.Add(TypeChange.full);
+                                    variant.Add(LayerTypeChange.full);
                                 }
-                                else variant.Add(TypeChange.none);
+                                else variant.Add(LayerTypeChange.none);
                             }
                             //изменяем тип линии слоя
                             if (!string.IsNullOrEmpty(lineType))
@@ -78,9 +100,9 @@ namespace BaseFunction
                                     if (typeTable.Has(lineType))
                                     {
                                         layer.LinetypeObjectId = typeTable[lineType];
-                                        variant.Add(TypeChange.full);
+                                        variant.Add(LayerTypeChange.full);
                                     }
-                                    else variant.Add(TypeChange.none);
+                                    else variant.Add(LayerTypeChange.none);
 
                                 }
                             }
@@ -88,7 +110,7 @@ namespace BaseFunction
                             if (lineWeight.HasValue)
                             {
                                 layer.LineWeight = lineWeight.Value;
-                                variant.Add(TypeChange.full);
+                                variant.Add(LayerTypeChange.full);
                             }
                         }
                     }
@@ -96,9 +118,9 @@ namespace BaseFunction
                 tr.Commit();
             }
             documentLock?.Dispose();
-            if (variant.Contains(TypeChange.full) && variant.Contains(TypeChange.none)) return TypeChange.fragmentary;
-            else if (variant.Contains(TypeChange.full)) return TypeChange.full;
-            else return TypeChange.none;
+            if (variant.Contains(LayerTypeChange.full) && variant.Contains(LayerTypeChange.none)) return LayerTypeChange.fragmentary;
+            else if (variant.Contains(LayerTypeChange.full)) return LayerTypeChange.full;
+            else return LayerTypeChange.none;
         }
         /// <summary>
         /// Создает новый слой в Autocad
@@ -191,11 +213,12 @@ namespace BaseFunction
             return result;
         }
 
-        public enum TypeChange
-        {
-            none,
-            fragmentary,
-            full
-        }
+        
+    }
+    public enum LayerTypeChange
+    {
+        none,
+        fragmentary,
+        full
     }
 }

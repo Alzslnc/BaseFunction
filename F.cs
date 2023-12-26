@@ -69,7 +69,7 @@ namespace BaseFunction
         public static bool AddEntityInCurrentBTR(this Entity entity, out ObjectId id)
         {
             id = ObjectId.Null;
-            if (entity.Id != ObjectId.Null) return false;
+            if (!entity.IsNewObject) return false;
             try
             {
                 using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
@@ -99,7 +99,8 @@ namespace BaseFunction
                     using (BlockTableRecord ms = tr.GetObject(HostApplicationServices.WorkingDatabase.CurrentSpaceId, OpenMode.ForWrite) as BlockTableRecord)
                     {
                         foreach (Entity e in entities)
-                        { 
+                        {
+                            if (!e.IsNewObject) continue;
                             ids.Add(ms.AppendEntity(e));
                             tr.AddNewlyCreatedDBObject(e, true);
                         }    
@@ -173,6 +174,7 @@ namespace BaseFunction
             e.LineWeight = ie.LineWeight;
             e.Layer = ie.Layer;
             e.LinetypeScale = ie.LinetypeScale;
+            e.Transparency = ie.Transparency;
         }
         /// <summary>
         /// Выключает привязки на объектах из списка (утянул у киану вроде, точно не помню)

@@ -19,7 +19,7 @@ namespace BaseFunction
         /// <returns>true если блоки перенесены успешно</returns>
         public static bool BlockMigrate(List<string> blNames, string fileName, List<string> folders)
         {
-            if (blNames.Count == 0) return true;           
+            if (blNames.Count == 0) return true;
             foreach (string folder in folders)
             {
                 if (System.IO.Directory.Exists(folder))
@@ -58,7 +58,7 @@ namespace BaseFunction
                 {
                     System.Windows.Forms.MessageBox.Show("Не удалось считать файл ресурсов");
                     return false;
-                }               
+                }
             }
         }
         public static bool BlockMigrate(Database targetDb, List<string> blNames, Database storageDb)
@@ -105,7 +105,7 @@ namespace BaseFunction
                             targetDb.WblockCloneObjects(missBlocksId, targetDb.BlockTableId, idMapping, DuplicateRecordCloning.Ignore, false);
                         }
                         catch
-                        {                         
+                        {
                             result = false;
                         }
                     }
@@ -134,7 +134,7 @@ namespace BaseFunction
                         //если не найден то печалька
                         if (!bt.Has(block))
                         {
-                            tr.Commit();                            
+                            tr.Commit();
                             return false;
                         }
                     }
@@ -151,7 +151,7 @@ namespace BaseFunction
         /// <param name="missBlocks"></param>
         /// <returns></returns>
         public static bool CheckBlocks(Database db, List<string> blNames, out List<string> missBlocks)
-        {            
+        {
             //объявляем переменную для хранения недостающих блоков
             missBlocks = new List<string>();
             //проверяем наличие блоков в чертеже
@@ -222,6 +222,24 @@ namespace BaseFunction
         public static bool BlockReferenceChangeAttribute(ObjectId brId, Dictionary<string, string> attributes, bool allReplace)
         {
             if (brId == null || brId == ObjectId.Null) return false;
+
+            bool result = false;
+            //запускаем транзакцию
+            using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+            {
+                //открываем блок
+                using (BlockReference br = tr.GetObject(brId, OpenMode.ForRead, false, true) as BlockReference)
+                {
+                    result = BlockReferenceChangeAttribute(br, tr, attributes);
+                }
+                if (result || !allReplace) tr.Commit();
+                else tr.Abort();
+            }
+            return result;
+        }
+        public static bool BlockReferenceChangeAttribute(BlockReference br, Transaction tr, Dictionary<string, string> attributes)
+        {
+
             DocumentLock documentLock = null;
             if (Application.DocumentManager != null && Application.DocumentManager.MdiActiveDocument != null)
             {
@@ -230,33 +248,20 @@ namespace BaseFunction
             attributes = new Dictionary<string, string>(attributes, StringComparer.InvariantCultureIgnoreCase);
             List<string> usingTag = new List<string>();
             bool result = false;
-            //запускаем транзакцию
-            using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+
+            foreach (ObjectId id in br.AttributeCollection)
             {
-                //открываем блок
-                using (BlockReference br = tr.GetObject(brId, OpenMode.ForRead, false, true) as BlockReference)
+                //открываем объект как атрибут
+                using (AttributeReference attRef = tr.GetObject(id, OpenMode.ForWrite, false, true) as AttributeReference)
                 {
-                    if (br != null)
+                    if (attRef != null && attributes.ContainsKey(attRef.Tag))
                     {
-                        //проходим по всем объектам в коллекции атрибутов
-                        foreach (ObjectId id in br.AttributeCollection)
-                        {
-                            //открываем объект как атрибут
-                            using (AttributeReference attRef = tr.GetObject(id, OpenMode.ForWrite, false, true) as AttributeReference)
-                            {
-                                if (attRef != null && attributes.ContainsKey(attRef.Tag))
-                                {
-                                    attRef.TextString = attributes[attRef.Tag];
-                                    if (!usingTag.Contains(attRef.Tag)) usingTag.Add(attRef.Tag);
-                                }
-                            }
-                        }
+                        attRef.TextString = attributes[attRef.Tag];
+                        if (!usingTag.Contains(attRef.Tag)) usingTag.Add(attRef.Tag);
                     }
                 }
-                if (usingTag.Count.Equals(attributes.Count)) result = true;
-                if (result || !allReplace) tr.Commit();
-                else tr.Abort();
             }
+            if (usingTag.Count.Equals(attributes.Count)) result = true;
             documentLock?.Dispose();
             return result;
         }
@@ -270,51 +275,55 @@ namespace BaseFunction
         public static void BlockReferenceSetAttribute(ObjectId brId)
         {
             if (brId == null || brId == ObjectId.Null) return;
+            using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+            {
+                using (BlockReference br = tr.GetObject(brId, OpenMode.ForWrite, false, true) as BlockReference)
+                {
+                    if (br != null)
+                    {
+                        BlockReferenceSetAttribute(br, tr);
+                    }
+                }
+                tr.Commit();
+            }
+        }
+        public static void BlockReferenceSetAttribute(BlockReference br, Transaction tr)
+        {
             DocumentLock documentLock = null;
             if (Application.DocumentManager != null && Application.DocumentManager.MdiActiveDocument != null)
             {
                 documentLock = Application.DocumentManager.MdiActiveDocument.LockDocument();
             }
             //запускаем транзакцию
-            using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+            //получаем запись о блоке в таблице блоков
+            using (BlockTableRecord btr = tr.GetObject(br.BlockTableRecord, OpenMode.ForRead, false, true) as BlockTableRecord)
             {
-                //получаем вхождение блока
-                using (BlockReference br = tr.GetObject(brId, OpenMode.ForWrite, false, true) as BlockReference)
+                //если блок имеет атрибуты
+                if (btr.HasAttributeDefinitions)
                 {
-                    if (br != null)
+                    //проходим по всем ID в записи блока
+                    foreach (ObjectId id in btr)
                     {
-                        //получаем запись о блоке в таблице блоков
-                        using (BlockTableRecord btr = tr.GetObject(br.BlockTableRecord, OpenMode.ForRead, false, true) as BlockTableRecord)
+                        //пытаемся открыть объект как запись о атрибуте
+                        using (AttributeDefinition attr = tr.GetObject(id, OpenMode.ForRead, false, true) as AttributeDefinition)
                         {
-                            //если блок имеет атрибуты
-                            if (btr.HasAttributeDefinitions)
+                            //если это атрибут и он не константа
+                            if (attr == null || attr.Constant) continue;
+                            //создаем вхождение атрибута
+                            using (AttributeReference attrRef = new AttributeReference())
                             {
-                                //проходим по всем ID в записи блока
-                                foreach (ObjectId id in btr)
-                                {
-                                    //пытаемся открыть объект как запись о атрибуте
-                                    using (AttributeDefinition attr = tr.GetObject(id, OpenMode.ForRead, false, true) as AttributeDefinition)
-                                    {
-                                        //если это атрибут и он не константа
-                                        if (attr == null || attr.Constant) continue;
-                                        //создаем вхождение атрибута
-                                        using (AttributeReference attrRef = new AttributeReference())
-                                        {
-                                            //добавляем вхождение атрибута в вхождение блока
-                                            attrRef.SetAttributeFromBlock(attr, br.BlockTransform);
-                                            br.AttributeCollection.AppendAttribute(attrRef);
-                                            tr.AddNewlyCreatedDBObject(attrRef, true);
-                                            //дублируем после добавления что бы нормально отрабатывали вставки полей 
-                                            attrRef.SetAttributeFromBlock(attr, br.BlockTransform);
-                                        }
-                                    }
-                                }
+                                //добавляем вхождение атрибута в вхождение блока
+                                attrRef.SetAttributeFromBlock(attr, br.BlockTransform);
+                                br.AttributeCollection.AppendAttribute(attrRef);
+                                tr.AddNewlyCreatedDBObject(attrRef, true);
+                                //дублируем после добавления что бы нормально отрабатывали вставки полей 
+                                attrRef.SetAttributeFromBlock(attr, br.BlockTransform);
                             }
                         }
                     }
                 }
-                tr.Commit();
             }
+
             documentLock?.Dispose();
         }
         #endregion
@@ -324,7 +333,28 @@ namespace BaseFunction
         /// Получает словарь со всеми парами таг/значение атрибутов блока
         /// </summary>
         /// <param name="br"></param>
-        /// <param name="tag"></param>
+        /// <param name="result"></param>
+        /// <param name="tr"></param>
+        /// <returns>true если получено хотя бы одно значение</returns>
+        public static bool BlockReferenceGetAttribute(BlockReference br, out Dictionary<string, string> result, Transaction tr)
+        {
+            result = new Dictionary<string, string>();
+            if (br == null) return false;
+            //проходим по всем объектам в коллекции атрибутов
+            foreach (ObjectId id in br.AttributeCollection)
+            {
+                //открываем объект как атрибут
+                using (AttributeReference attRef = tr.GetObject(id, OpenMode.ForRead, false, true) as AttributeReference)
+                {
+                    if (attRef != null && !result.ContainsKey(attRef.Tag)) result.Add(attRef.Tag, attRef.TextString);
+                }
+            }
+            if (result.Count > 0) return true; return false;
+        }
+        /// <summary>
+        /// Получает словарь со всеми парами таг/значение атрибутов блока
+        /// </summary>
+        /// <param name="br"></param>    
         /// <param name="result"></param>
         /// <returns>true если получено хотя бы одно значение</returns>        
         public static bool BlockReferenceGetAttribute(BlockReference br, out Dictionary<string, string> result)
@@ -422,7 +452,7 @@ namespace BaseFunction
                         {
                             result = attRef.TextString;
                             break;
-                        }                            
+                        }
                     }
                 }
                 tr.Commit();
@@ -470,6 +500,43 @@ namespace BaseFunction
             }
             documentLock?.Dispose();
             if (!string.IsNullOrEmpty(result)) return true; return false;
+        }
+        #endregion
+
+        #region замещение одного блока другим
+        public static void BlockReplace(this BlockReference oldReference, ObjectId newBtr)
+        {
+            using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+            {
+                oldReference.BlockReplace(newBtr);
+                tr.Commit();
+            }
+        }
+        public static void BlockReplace(this BlockReference oldReference, ObjectId newBtr, Transaction tr)
+        {
+            using (BlockTableRecord ms = tr.GetObject(oldReference.OwnerId, OpenMode.ForWrite) as BlockTableRecord)
+            {
+                using (BlockReference newReference = new BlockReference(oldReference.Position, newBtr))
+                {
+                    newReference.ScaleFactors = oldReference.ScaleFactors;
+                    newReference.Rotation = oldReference.Rotation;
+                    newReference.Layer = oldReference.Layer;
+                    newReference.Color = oldReference.Color;
+                    newReference.LinetypeId = oldReference.LinetypeId;
+                    newReference.LineWeight = oldReference.LineWeight;
+                    newReference.Transparency = oldReference.Transparency;
+
+                    ObjectId newReferenceId = ms.AppendEntity(newReference);
+                    tr.AddNewlyCreatedDBObject(newReference, true);
+
+                    BlockReferenceSetAttribute(newReference, tr);
+
+                    if (BlockReferenceGetAttribute(oldReference, out Dictionary<string, string> attributes, tr))
+                    {
+                        BlockReferenceChangeAttribute(newReference, tr, attributes);
+                    }
+                }
+            }
         }
         #endregion
     }
