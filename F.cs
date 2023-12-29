@@ -111,53 +111,54 @@ namespace BaseFunction
             }
             catch { return false; }        
         }
-        public static Polyline Convert3dPolylineToPolyline(ObjectId id, bool erase)
+        public static Polyline Convert3dPolylineToPolyline(Polyline3d pline, Transaction tr, bool erase)
         {
+            if (pline == null) return null;
+
             Polyline polyline = new Polyline();
-            using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+            //счетчик вершин полилинии
+            int i = 0;
+            //создаем список вершин 3д полилинии
+            List<Point2d> pline_list = new List<Point2d>();
+            //считываем вершины из 3д полилинии в список
+            foreach (ObjectId objectId in pline)
             {
-                //счетчик вершин полилинии
-                int i = 0;
-                //получаем 3д полилинию
-                Polyline3d pline = tr.GetObject(id, OpenMode.ForRead) as Polyline3d;
-                if (pline == null)
+                //получаем вершину полилинии
+                using (PolylineVertex3d vertex3D = tr.GetObject(objectId, OpenMode.ForRead) as PolylineVertex3d)
                 {
-                    tr.Commit();
-                    return null;
-                }
-                //создаем список вершин 3д полилинии
-                List<Point2d> pline_list = new List<Point2d>();
-                //считываем вершины из 3д полилинии в список
-                foreach (ObjectId objectId in pline)
-                {
-                    //получаем вершину полилинии
-                    using (PolylineVertex3d vertex3D = tr.GetObject(objectId, OpenMode.ForRead) as PolylineVertex3d)
+                    if (vertex3D != null)
                     {
-                        if (vertex3D != null)
-                        {
-                            //добавляем вершину полилинии
-                            polyline.AddVertexAt(i++, vertex3D.Position.GetPoint2d(), 0, 0, 0);
-                        }
+                        //добавляем вершину полилинии
+                        polyline.AddVertexAt(i++, vertex3D.Position.GetPoint2d(), 0, 0, 0);
                     }
                 }
-                //если вершин меньше 2 то возвращаем null
-                if (polyline.NumberOfVertices < 2)
+            }
+            //если вершин меньше 2 то возвращаем null
+            if (polyline.NumberOfVertices < 2) return null;          
+            //пеоеносим параметры
+            polyline.Closed = pline.Closed;
+            polyline.Layer = pline.Layer;
+            polyline.Linetype = pline.Linetype;
+            polyline.LineWeight = pline.LineWeight;
+            polyline.Color = pline.Color;
+            //удаляем 3д полилинию если надо
+            if (erase)
+            {
+                if (pline.IsReadEnabled) pline.UpgradeOpen();
+                pline.Erase();
+            }
+
+            return polyline;
+        }
+        public static Polyline Convert3dPolylineToPolyline(ObjectId id, bool erase)
+        {
+            Polyline polyline;
+            using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+            {
+                using (Polyline3d pline = tr.GetObject(id, OpenMode.ForRead) as Polyline3d)
                 {
-                    tr.Commit();
-                    return null;
+                    polyline = Convert3dPolylineToPolyline(pline, tr, erase);
                 }
-                //пеоеносим параметры
-                polyline.Closed = pline.Closed;
-                polyline.Layer = pline.Layer;
-                polyline.Linetype = pline.Linetype;
-                polyline.LineWeight = pline.LineWeight;
-                polyline.Color = pline.Color;
-                //удаляем 3д полилинию если надо
-                if (erase)
-                {
-                    if (pline.IsReadEnabled) pline.UpgradeOpen();
-                    pline.Erase();
-                }              
                 tr.Commit();
             }
             return polyline;

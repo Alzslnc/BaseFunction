@@ -4,6 +4,7 @@ using Autodesk.AutoCAD.Geometry;
 using Autodesk.AutoCAD.Runtime;
 using System;
 using System.Collections.Generic;
+using System.Windows.Forms;
 
 namespace BaseFunction
 {
@@ -392,6 +393,47 @@ namespace BaseFunction
                 result.AddRange(pResult.Value.GetObjectIds());
                 return true;
             }
+            return false;
+        }
+        #endregion
+
+        #region получение ключевых слов
+        public static bool TryGetKeywords(out string result, List<string> variants, string message)
+        {
+            result = string.Empty;
+            if (variants.Count == 0) return false;
+
+            bool allEmpty = true;
+
+            message += " [";
+
+            foreach (string variant in variants)
+            {
+                if (string.IsNullOrEmpty(variant)) continue;              
+                allEmpty = false;
+                message += variant.ToString().ToUpper() +"/";
+            }
+
+            message = message.Substring(0, message.Length - 1) + "]";
+
+            if (allEmpty) return false;
+
+            PromptKeywordOptions pso = new PromptKeywordOptions(message);
+
+            foreach (string variant in variants)
+            {
+                if (string.IsNullOrEmpty(variant)) continue;
+                pso.Keywords.Add(variant.ToUpper());
+            }
+
+            PromptResult pr = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor.GetKeywords(pso);
+
+            if (pr.Status == PromptStatus.OK)
+            {
+                result = pr.StringResult;
+                return true;
+            }
+
             return false;
         }
         #endregion

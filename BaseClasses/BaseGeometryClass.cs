@@ -100,8 +100,8 @@ namespace BaseFunction
         /// <param name="result">центральная точка</param>
         /// <returns>true если кривая корректна и не нулевой длины</returns>
         public static bool GetCentrPoint(this Curve curve, out Point3d result)
-        {
-            result = new Point3d();
+        {            
+            result = Point3d.Origin;
             if (curve == null || curve.IsDisposed || curve.IsErased || curve.GetLength() == 0) return false;
             result = curve.GetPointAtDist((curve.GetDistanceAtParameter(curve.StartParam) + curve.GetDistanceAtParameter(curve.EndParam)) / 2);
             return true;
@@ -123,7 +123,11 @@ namespace BaseFunction
         public static double GetLength(this Curve curve)
         {
             if (curve == null || curve.IsDisposed || curve.IsErased) return 0;
-            return curve.GetDistanceAtParameter(curve.EndParam) - curve.GetDistanceAtParameter(curve.StartParam);
+            try
+            {
+                return curve.GetDistanceAtParameter(curve.EndParam) - curve.GetDistanceAtParameter(curve.StartParam);
+            }
+            catch { return 0; }
         }
         /// <summary>
         /// находит ближайшую точку из списка, если списко пустой возвращает точку
@@ -199,6 +203,74 @@ namespace BaseFunction
         { 
             if (Math.Abs(d2 - d1) > Tolerance.Global.EqualPoint) return false; return true;        
         }
+        /// <summary>
+        /// проверяет пересекаются ли кривые или нет
+        /// </summary>   
+        public static bool IsIntersect(this Curve curve, Curve curve2, bool apparentIntersections)
+        {
+            List<Point3d> intersections = new List<Point3d>();
+
+            if (apparentIntersections)
+            {
+                curve.TryGetIntersections(curve2, out intersections);
+            }
+            else
+            {
+                using (Point3dCollection coll = new Point3dCollection())
+                {
+                    curve.IntersectWith(curve2, Intersect.OnBothOperands, coll, IntPtr.Zero, IntPtr.Zero);
+                    intersections.AddRange(coll.ToList());
+                }
+            }
+
+            return IsIntersect(curve, curve2, intersections);
+        }
+        /// <summary>
+        /// проверяет пересекаются ли кривые или нет
+        /// </summary>   
+        public static bool IsIntersect(this Curve curve, Curve curve2, List<Point3d> intersections)
+        {           
+            if (intersections.Count == 0) return false;
+
+            using (Plane plane = new Plane())
+            {
+                Tolerance tolerance = new Tolerance(0.00001, 0.00001);
+
+                foreach (Point3d point in intersections)
+                {
+                    Vector2d c1direct = curve.GetFirstDerivative(curve.GetIncrementParametr(point, 0.0001)).Convert2d(plane).GetNormal();
+                    Vector2d c1invers = curve.GetFirstDerivative(curve.GetIncrementParametr(point, -0.0001)).Convert2d(plane).GetNormal();
+
+                    Vector2d c2direct = curve2.GetFirstDerivative(curve2.GetIncrementParametr(point, 0.0001)).Convert2d(plane).GetNormal();
+                    Vector2d c2invers = curve2.GetFirstDerivative(curve2.GetIncrementParametr(point, -0.0001)).Convert2d(plane).GetNormal();
+
+                    if (c1direct.IsEqualTo(c2direct, tolerance) ||
+                        c1direct.IsEqualTo(-c2direct, tolerance) ||
+                        c1direct.IsEqualTo(c2invers, tolerance) ||
+                        c1direct.IsEqualTo(-c2invers, tolerance) ||
+                        c1invers.IsEqualTo(c2direct, tolerance) ||
+                        c1invers.IsEqualTo(-c2direct, tolerance) ||
+                        c1invers.IsEqualTo(c2invers, tolerance) ||
+                        c1invers.IsEqualTo(-c2invers, tolerance)
+                        ) continue;
+
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private static double GetIncrementParametr(this Curve curve ,Point3d point, double increment)
+        {
+            double parametr = curve.GetParameterAtPoint(point);
+
+            if (parametr.IsEqualTo(curve.EndParam) && increment > 0) parametr = curve.StartParam + increment;
+            else if (parametr.IsEqualTo(curve.StartParam) && increment < 0) parametr = curve.EndParam + increment;
+            else parametr += increment;
+
+            return parametr;
+        }
+
         /// <summary>
         /// сортирует точки по близости к началу кривой
         /// </summary>

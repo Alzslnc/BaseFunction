@@ -8,6 +8,14 @@ namespace BaseFunction
 {
     public static class PositionAndIntersections
     {
+        public static PositionType CurveOfCurve(this Curve c1, Curve c2)
+        {
+            if (c1.GetCentrPoint(out Point3d center))
+            {
+                return center.GetPositionType(c2);
+            }
+            return PositionType.fault;
+        }
         public static bool TryGetIntersections(this Curve curve, Curve curve2, out List<Point3d> intersections)
         { 
             if (curve.Equals(curve2)) return curve.TryGetSelfIntersect(out intersections);
