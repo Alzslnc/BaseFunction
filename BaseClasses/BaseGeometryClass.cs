@@ -93,6 +93,13 @@ namespace BaseFunction
             if (angle < 0) angle += Math.PI * 2;
             return angle;
         }
+        public static double GetArcBulge(this Arc arc)
+        {
+            double deltaAng = arc.EndAngle - arc.StartAngle;
+            if (deltaAng < 0)
+                deltaAng += 2 * Math.PI;
+            return Math.Tan(deltaAng * 0.25);
+        }
         /// <summary>
         /// Возвращает центральную точку кривой если кривая корректна и не нулевой длины
         /// </summary>
@@ -242,11 +249,11 @@ namespace BaseFunction
 
                 foreach (Point3d point in intersections)
                 {
-                    Vector2d c1direct = curve.GetFirstDerivative(curve.GetIncrementParametr(point, 0.0001)).Convert2d(plane).GetNormal();
-                    Vector2d c1invers = curve.GetFirstDerivative(curve.GetIncrementParametr(point, -0.0001)).Convert2d(plane).GetNormal();
+                    Vector2d c1direct = curve.GetFirstDerivative(curve.GetIncrementParametr(point, 0.000001)).Convert2d(plane).GetNormal();
+                    Vector2d c1invers = curve.GetFirstDerivative(curve.GetIncrementParametr(point, -0.000001)).Convert2d(plane).GetNormal();
 
-                    Vector2d c2direct = curve2.GetFirstDerivative(curve2.GetIncrementParametr(point, 0.0001)).Convert2d(plane).GetNormal();
-                    Vector2d c2invers = curve2.GetFirstDerivative(curve2.GetIncrementParametr(point, -0.0001)).Convert2d(plane).GetNormal();
+                    Vector2d c2direct = curve2.GetFirstDerivative(curve2.GetIncrementParametr(point, 0.000001)).Convert2d(plane).GetNormal();
+                    Vector2d c2invers = curve2.GetFirstDerivative(curve2.GetIncrementParametr(point, -0.000001)).Convert2d(plane).GetNormal();
 
                     if (c1direct.IsEqualTo(c2direct, tolerance) ||
                         c1direct.IsEqualTo(-c2direct, tolerance) ||
@@ -266,7 +273,7 @@ namespace BaseFunction
 
         private static double GetIncrementParametr(this Curve curve ,Point3d point, double increment)
         {
-            double parametr = curve.GetParameterAtPoint(point);
+            double parametr = curve.GetParameterAtPoint(curve.GetClosestPointTo(point, false));
 
             if (parametr.IsEqualTo(curve.EndParam) && increment > 0) parametr = curve.StartParam + increment;
             else if (parametr.IsEqualTo(curve.StartParam) && increment < 0) parametr = curve.EndParam + increment;

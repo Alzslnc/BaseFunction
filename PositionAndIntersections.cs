@@ -14,11 +14,36 @@ namespace BaseFunction
         public static bool ConnectCurve(this List<Curve> fragments, out List<Curve> result)
         {
             result = new List<Curve>();
-
+               
             while (fragments.Count > 0)
             {
-                Curve contour = fragments[0];
-                fragments.RemoveAt(0);
+                Curve contour = null;
+
+                foreach (Curve c in fragments)
+                {
+                    if (c is Spline)
+                    {
+                        contour = c;
+                        fragments.Remove(c);
+                        break;
+                    }                
+                }
+
+                if (contour == null)
+                {
+                    contour = fragments[0];
+                    fragments.RemoveAt(0);
+                }               
+                
+                if (contour is Arc arc)
+                {
+                    Polyline polyline = new Polyline();
+                    polyline.AddVertexAt(0, new Point2d(arc.StartPoint.X, arc.StartPoint.Y), arc.GetArcBulge(), 0, 0);
+                    polyline.AddVertexAt(1, new Point2d(arc.EndPoint.X, arc.EndPoint.Y), 0, 0, 0);
+                    polyline.Normal = arc.Normal;
+                    polyline.EntityCopySettings(arc);                    
+                    contour = polyline;
+                }
 
                 while (!contour.StartPoint.IsEqualTo(contour.EndPoint))
                 {
@@ -29,9 +54,9 @@ namespace BaseFunction
 
                         try
                         {
-                            if (!fragment.StartPoint.IsEqualTo(contour.EndPoint) && fragment.EndPoint.IsEqualTo(contour.EndPoint)) fragment.ReverseCurve();
+                            //if (!fragment.StartPoint.IsEqualTo(contour.EndPoint) && fragment.EndPoint.IsEqualTo(contour.EndPoint)) fragment.ReverseCurve();
 
-                            if (fragment.StartPoint.IsEqualTo(contour.EndPoint))
+                            if (fragment.StartPoint.IsEqualTo(contour.EndPoint) || fragment.EndPoint.IsEqualTo(contour.EndPoint))
                             {
                                 contour.JoinEntity(fragment);
                                 fragments.RemoveAt(i);
@@ -269,7 +294,7 @@ namespace BaseFunction
         /// <param name="outer">фрагменты снаружи разрезающей кривой</param>
         /// <param name="result">все получившиеся фрагменты</param>
         /// <returns></returns>
-        public static bool SplitCurve(this Curve poly1, Curve poly2,  out List<Curve> inner, out List<Curve> outer, out List<Curve> result)
+        public static bool SplitCurve(this Curve poly1, Curve poly2, bool inPlane, out List<Curve> inner, out List<Curve> outer, out List<Curve> result)
         {
             inner = new List<Curve>();
             outer = new List<Curve>();
@@ -277,6 +302,22 @@ namespace BaseFunction
 
             List<Curve> poly1fragments = new List<Curve>();
             List<Curve> poly2fragments = new List<Curve>();
+
+            Curve intersectCurve = poly2 as Curve;
+
+            //проверяем плоская ли кривая и получаем ее плоскость
+            bool planar = poly1.IsPlanar;
+            Plane plane = null;
+            if (planar) plane = poly1.GetPlane();
+
+            if (inPlane && planar)
+            {
+                intersectCurve = poly2.GetProjectedCurve(plane, Vector3d.ZAxis);
+                if (intersectCurve is Polyline3d p3d && intersectCurve.ObjectId == ObjectId.Null)
+                { 
+                    if (!p3d.AddEntityInCurrentBTR()) return false;
+                }
+            }
 
             //список для фагментов 3д полилиний,
             //их требуется добавить в базу данных иначе с ними нельзя будет полноценно работать дальше
@@ -286,8 +327,9 @@ namespace BaseFunction
 
             using (Point3dCollection coll = new Point3dCollection())
             {
-                poly1.IntersectWith(poly2, Intersect.OnBothOperands, coll, IntPtr.Zero, IntPtr.Zero);
-                if (coll.Count == 0) return false;
+                poly1.IntersectWith(intersectCurve, Intersect.OnBothOperands, coll, IntPtr.Zero, IntPtr.Zero);
+
+                if (coll.Count == 0 || !poly1.IsIntersect(intersectCurve, coll.ToList())) return false;        
 
                 List<double> parametrs = new List<double>();
 
@@ -308,10 +350,10 @@ namespace BaseFunction
                 }
 
                 parametrs.Clear();
-                foreach (Point3d p in coll) parametrs.Add(poly2.GetParameterAtPoint(poly2.GetClosestPointTo(p, false)));
+                foreach (Point3d p in coll) parametrs.Add(intersectCurve.GetParameterAtPoint(intersectCurve.GetClosestPointTo(p, false)));
                 parametrs.Sort();
 
-                using (DBObjectCollection pColl = poly2.GetSplitCurves(new DoubleCollection(parametrs.ToArray())))
+                using (DBObjectCollection pColl = intersectCurve.GetSplitCurves(new DoubleCollection(parametrs.ToArray())))
                 {
                     foreach (DBObject dBObject in pColl)
                     {
@@ -330,21 +372,22 @@ namespace BaseFunction
             {
                 curveToAppend.AddEntityInCurrentBTR();
                 curveToAppend.Clear();
-            } 
+            }
 
             //распределяем
             foreach (Curve curve in poly1fragments)
             {
-                PositionType position = curve.CurveOfCurve(poly2);
+                PositionType position = curve.CurveOfCurve(intersectCurve);
                 if (position == PositionType.inner) inner.Add(curve);
                 else if (position == PositionType.outer) outer.Add(curve);
-                else if (curve.ObjectId != ObjectId.Null) curveToDelete.Add(curve);
-            }
+                else
+                {
+                    if (curve.ObjectId != ObjectId.Null) curveToDelete.Add(curve);
+                    continue;
+                }
 
-            //проверяем плоская ли кривая и получаем ее плоскость
-            bool planar = poly1.IsPlanar;
-            Plane plane = null;
-            if (planar) plane = poly1.GetPlane();
+                curve.EntityCopySettings(poly1);     
+            }          
 
             foreach (Curve curve in poly2fragments)
             {
@@ -362,7 +405,9 @@ namespace BaseFunction
                         inner.Add(curve);
                         Curve clone = curve.Clone() as Curve;
                         outer.Add(clone);
-                        if (clone is Polyline3d) curveToAppend.Add(clone);
+                       
+                        curve.EntityCopySettings(poly1);
+                        clone.EntityCopySettings(poly1);
                     }  
                     else notInPlaneOrIncorrect = true;
                 }
@@ -372,16 +417,25 @@ namespace BaseFunction
 
             //добавляем в базу данных клоны 3д полилинии
             if (curveToAppend.Count > 0) curveToAppend.AddEntityInCurrentBTR();
-
             if (curveToDelete.Count > 0) curveToDelete.DeleteEntity();
 
-            if (!inner.ConnectCurve(out inner)) return false;
-            if (!outer.ConnectCurve(out outer)) return false;
+            bool boolResult;
 
-            result.AddRange(inner);
-            result.AddRange(outer);
+            boolResult = inner.ConnectCurve(out inner);
+
+            if (boolResult) boolResult = outer.ConnectCurve(out outer);
+
+            if (boolResult)
+            {
+                result.AddRange(inner);
+                result.AddRange(outer);
+            }
+            else
+            {
+                curveToAppend.DeleteEntity();
+            }
             
-            return true;
+            return boolResult;
         }
 
         
