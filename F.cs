@@ -163,6 +163,49 @@ namespace BaseFunction
             }
             return polyline;
         }
+
+        public static bool DeleteEntity(this ObjectId id)
+        {
+            return DeleteEntity(new List<ObjectId> { id });
+        }
+        public static bool DeleteEntity(this List<ObjectId> ids)
+        {
+            try
+            {                
+                using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+                {
+                    foreach (ObjectId id in ids)
+                    { 
+                        if (id == null || id == ObjectId.Null || !id.IsValid || id.IsErased) continue;
+                        Entity entity = tr.GetObject(id, OpenMode.ForWrite, false, true) as Entity;
+                        entity?.Dispose();
+                    }
+                    tr.Commit();
+                }
+                return true;
+            }
+            catch { return false; }
+        }
+        public static bool DeleteEntity(this Entity entity)
+        {
+            return DeleteEntity(new List<Entity> { entity });
+        }
+        public static bool DeleteEntity(this List<Entity> entities)
+        {
+            try
+            {
+                foreach (Entity entity in entities)
+                {
+                    if (entity == null || entity.ObjectId == ObjectId.Null || entity.IsDisposed || entity.IsErased) continue;
+                    if (!entity.IsWriteEnabled) entity.UpgradeOpen();
+                    entity.Erase();
+                }
+            }
+            catch { return false; }
+
+            return true;
+        }
+
         /// <summary>
         /// копирует свойства одного объекта другому
         /// </summary>

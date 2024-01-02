@@ -8,6 +8,47 @@ namespace BaseFunction
 {
     public static class PositionAndIntersections
     {
+        /// <summary>
+        /// соединяет фрагменты кривой и возвращает список с результатом соединения. Возвращает false если произошла ошибка.
+        /// </summary>   
+        public static bool ConnectCurve(this List<Curve> fragments, out List<Curve> result)
+        {
+            result = new List<Curve>();
+
+            while (fragments.Count > 0)
+            {
+                Curve contour = fragments[0];
+                fragments.RemoveAt(0);
+
+                while (!contour.StartPoint.IsEqualTo(contour.EndPoint))
+                {
+                    bool stop = true;
+                    for (int i = fragments.Count - 1; i >= 0; i--)
+                    {
+                        Curve fragment = fragments[i];
+
+                        try
+                        {
+                            if (!fragment.StartPoint.IsEqualTo(contour.EndPoint) && fragment.EndPoint.IsEqualTo(contour.EndPoint)) fragment.ReverseCurve();
+
+                            if (fragment.StartPoint.IsEqualTo(contour.EndPoint))
+                            {
+                                contour.JoinEntity(fragment);
+                                fragments.RemoveAt(i);
+                                stop = false;
+                            }
+                        }
+                        catch
+                        {
+                            return false;
+                        }
+                    }
+                    if (stop) break;
+                }
+                result.Add(contour);
+            }
+            return true;
+        }
         public static PositionType CurveOfCurve(this Curve c1, Curve c2)
         {
             if (c1.GetCentrPoint(out Point3d center))
@@ -219,6 +260,131 @@ namespace BaseFunction
             if (per.Average() > 0.5) return PositionType.inner;
             return PositionType.outer;
         }
+        /// <summary>
+        /// разделяет замкнутую кривую другой замкнутой кривой и возвращает получившиеся фрагменты
+        /// </summary>
+        /// <param name="poly1">разрезаемая кривая</param>
+        /// <param name="poly2">разрезающая кривая</param>
+        /// <param name="inner">фрагменты внутри разрезающей кривой</param>
+        /// <param name="outer">фрагменты снаружи разрезающей кривой</param>
+        /// <param name="result">все получившиеся фрагменты</param>
+        /// <returns></returns>
+        public static bool SplitCurve(this Curve poly1, Curve poly2,  out List<Curve> inner, out List<Curve> outer, out List<Curve> result)
+        {
+            inner = new List<Curve>();
+            outer = new List<Curve>();
+            result = new List<Curve>();
+
+            List<Curve> poly1fragments = new List<Curve>();
+            List<Curve> poly2fragments = new List<Curve>();
+
+            //список для фагментов 3д полилиний,
+            //их требуется добавить в базу данных иначе с ними нельзя будет полноценно работать дальше
+            List<Entity> curveToAppend = new List<Entity>();
+            //список для лишних фрагментов 3д полилиний, которые требуется удалить
+            List<Entity> curveToDelete = new List<Entity>();
+
+            using (Point3dCollection coll = new Point3dCollection())
+            {
+                poly1.IntersectWith(poly2, Intersect.OnBothOperands, coll, IntPtr.Zero, IntPtr.Zero);
+                if (coll.Count == 0) return false;
+
+                List<double> parametrs = new List<double>();
+
+                foreach (Point3d p in coll) parametrs.Add(poly1.GetParameterAtPoint(poly1.GetClosestPointTo(p, false)));
+                parametrs.Sort();
+
+                using (DBObjectCollection pColl = poly1.GetSplitCurves(new DoubleCollection(parametrs.ToArray())))
+                {
+                    foreach (DBObject dBObject in pColl)
+                    {
+                        if (dBObject is Curve curve)
+                        {
+                            poly1fragments.Add(curve);
+                            if (curve is Polyline3d) curveToAppend.Add(curve);                       
+                        }
+                        else dBObject?.Dispose();
+                    }
+                }
+
+                parametrs.Clear();
+                foreach (Point3d p in coll) parametrs.Add(poly2.GetParameterAtPoint(poly2.GetClosestPointTo(p, false)));
+                parametrs.Sort();
+
+                using (DBObjectCollection pColl = poly2.GetSplitCurves(new DoubleCollection(parametrs.ToArray())))
+                {
+                    foreach (DBObject dBObject in pColl)
+                    {
+                        if (dBObject is Curve curve)
+                        {
+                            poly2fragments.Add(curve);
+                            if (curve is Polyline3d) curveToAppend.Add(curve);
+                        }
+                        else dBObject?.Dispose();
+                    }
+                }
+            }
+
+            //добавляем в базу данных 3д полилинии
+            if (curveToAppend.Count > 0)
+            {
+                curveToAppend.AddEntityInCurrentBTR();
+                curveToAppend.Clear();
+            } 
+
+            //распределяем
+            foreach (Curve curve in poly1fragments)
+            {
+                PositionType position = curve.CurveOfCurve(poly2);
+                if (position == PositionType.inner) inner.Add(curve);
+                else if (position == PositionType.outer) outer.Add(curve);
+                else if (curve.ObjectId != ObjectId.Null) curveToDelete.Add(curve);
+            }
+
+            //проверяем плоская ли кривая и получаем ее плоскость
+            bool planar = poly1.IsPlanar;
+            Plane plane = null;
+            if (planar) plane = poly1.GetPlane();
+
+            foreach (Curve curve in poly2fragments)
+            {
+                bool notInPlaneOrIncorrect = false;
+                //проверяем лежит ли фрагмент в плоскости если кривая плоская
+                if (planar &&
+                    (!curve.GetCentrPoint(out Point3d center) || !plane.DistanceTo(center).IsEqualTo(0))
+                    ) notInPlaneOrIncorrect = true;
+
+                if (!notInPlaneOrIncorrect)
+                {
+                    PositionType position = curve.CurveOfCurve(poly1);
+                    if (position == PositionType.inner || position == PositionType.onBound)
+                    {
+                        inner.Add(curve);
+                        Curve clone = curve.Clone() as Curve;
+                        outer.Add(clone);
+                        if (clone is Polyline3d) curveToAppend.Add(clone);
+                    }  
+                    else notInPlaneOrIncorrect = true;
+                }
+            
+                if (notInPlaneOrIncorrect && curve.ObjectId != ObjectId.Null) curveToDelete.Add(curve);
+            }
+
+            //добавляем в базу данных клоны 3д полилинии
+            if (curveToAppend.Count > 0) curveToAppend.AddEntityInCurrentBTR();
+
+            if (curveToDelete.Count > 0) curveToDelete.DeleteEntity();
+
+            if (!inner.ConnectCurve(out inner)) return false;
+            if (!outer.ConnectCurve(out outer)) return false;
+
+            result.AddRange(inner);
+            result.AddRange(outer);
+            
+            return true;
+        }
+
+        
         public enum PositionType : int
         {
             //внутри

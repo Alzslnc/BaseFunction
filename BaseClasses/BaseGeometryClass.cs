@@ -102,9 +102,13 @@ namespace BaseFunction
         public static bool GetCentrPoint(this Curve curve, out Point3d result)
         {            
             result = Point3d.Origin;
-            if (curve == null || curve.IsDisposed || curve.IsErased || curve.GetLength() == 0) return false;
-            result = curve.GetPointAtDist((curve.GetDistanceAtParameter(curve.StartParam) + curve.GetDistanceAtParameter(curve.EndParam)) / 2);
-            return true;
+            try
+            {
+                if (curve == null || curve.IsDisposed || curve.IsErased || curve.GetLength() == 0) return false;
+                result = curve.GetPointAtDist((curve.GetDistanceAtParameter(curve.StartParam) + curve.GetDistanceAtParameter(curve.EndParam)) / 2);
+                return true;
+            }
+            catch { return false; }
         }
         /// <summary>
         /// возвращает точку между двумя точками
