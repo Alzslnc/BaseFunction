@@ -316,20 +316,28 @@ namespace BaseFunction
         /// </summary>      
         public static bool TryGetObjectsIds(out List<ObjectId> result, Type type)
         {
-            return TryGetObjectsIds(out result, type, "Выберите объекты");  
+            return TryGetObjectsIds(out result, type, "Выберите объекты");
+        }
+        /// <summary>
+        /// Запрашивает у пользователя выбор объектов и возвращает их ObjectId
+        /// </summary>      
+        public static bool TryGetObjectsIds(out List<ObjectId> result, Type type, bool preSelect)
+        {
+            return TryGetObjectsIds(out result, type, "Выберите объекты", preSelect);
+        }
+        /// <summary>
+        /// Запрашивает у пользователя выбор объектов и возвращает их ObjectId
+        /// </summary>      
+        public static bool TryGetObjectsIds(out List<ObjectId> result, Type type, string message, bool preSelect)
+        {
+            return TryGetObjectsIds(out result, new List<Type> { type }, message, preSelect);
         }
         /// <summary>
         /// Запрашивает у пользователя выбор объектов и возвращает их ObjectId
         /// </summary>    
         public static bool TryGetObjectsIds(out List<ObjectId> result, Type type, string message)
         {
-            RXClass rXClass = RXClass.GetClass(type);
-            if (rXClass != null) return TryGetObjectsIds(out result, new List<string> { rXClass.DxfName }, message);
-            else
-            {
-                result = new List<ObjectId>();
-                return false;
-            }
+            return TryGetObjectsIds(out result, new List<Type> { type }, message);
         }
         /// <summary>
         /// Запрашивает у пользователя выбор объектов и возвращает их ObjectId
@@ -394,9 +402,55 @@ namespace BaseFunction
             }
             return false;
         }
+        /// <summary>
+        /// получение списка с предварительным выбором
+        /// </summary>
+        /// <param name="result"></param>
+        /// <returns></returns>
+        public static bool TryGetObjectsIds(out List<ObjectId> result, List<Type> objTypes, bool preSelect)
+        {
+            return TryGetObjectsIds(out result, objTypes, "Выберите объекты", preSelect);
+        }
+        /// <summary>
+        /// получение списка с предварительным выбором
+        /// </summary>
+        /// <param name="result"></param>
+        /// <returns></returns>
+        public static bool TryGetObjectsIds(out List<ObjectId> result, List<Type> objTypes, string message, bool preSelect)
+        {
+            result = new List<ObjectId>();
+
+            if (!preSelect) return TryGetObjectsIds(out result, objTypes, message);
+
+            List<RXClass> classes = new List<RXClass>();
+
+            if (objTypes != null)
+            {
+                foreach (Type type in objTypes) classes.Add(RXClass.GetClass(type));
+            }
+
+            Editor ed = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor;
+            PromptSelectionResult selRes = ed.SelectImplied();
+            if (selRes.Value != null) result.AddRange(selRes.Value.GetObjectIds());
+
+            if (result.Count > 0 && (objTypes == null || classes.Count == 0)) return true;
+
+            for (int i = result.Count - 1; i >= 0; i--)
+            {
+                if (classes.Contains(result[i].ObjectClass)) continue;
+                result.RemoveAt(i);
+            }
+
+            if (result.Count > 0) return true;
+
+            return TryGetObjectsIds(out result, objTypes, message);
+        }
         #endregion
 
         #region получение ключевых слов
+        /// <summary>
+        /// Возвращает true если пользователь выбрал ключевое слово из списка (само слово возвращается в верхнем регистре)
+        /// </summary>
         public static bool TryGetKeywords(out string result, List<string> variants, string message)
         {
             result = string.Empty;
@@ -408,9 +462,9 @@ namespace BaseFunction
 
             foreach (string variant in variants)
             {
-                if (string.IsNullOrEmpty(variant)) continue;              
+                if (string.IsNullOrEmpty(variant)) continue;
                 allEmpty = false;
-                message += variant.ToString().ToUpper() +"/";
+                message += variant.ToString().ToUpper() + "/";
             }
 
             message = message.Substring(0, message.Length - 1) + "]";

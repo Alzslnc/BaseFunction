@@ -1,6 +1,8 @@
 ﻿using System;
 using System.Linq;
 using System.Windows.Forms;
+using System.Globalization;
+using System.Runtime;
 
 namespace BaseFunction
 {
@@ -171,6 +173,59 @@ namespace BaseFunction
                 return;
             }
             e.Handled = true;
+        }
+        public static bool TryGetIntFromTextBox(TextBox textBox, out int result, int min, int max, string message)
+        {
+            ParseResult parseResult = TryGetIntFromTextBox(textBox, out result, min, max);
+            if (parseResult == ParseResult.Ok) return true;
+            else
+            {
+                if (parseResult == ParseResult.none) MessageBox.Show(message + " введен не корректно");
+                else if (parseResult == ParseResult.ToSmall) MessageBox.Show(message + " не может быть меньше " + min);
+                else if (parseResult == ParseResult.ToBig) MessageBox.Show(message + " не может быть больше " + max);
+                return false;
+            }
+        }
+        public static ParseResult TryGetIntFromTextBox(TextBox textBox, out int result, int min, int max)
+        {         
+            if (!int.TryParse(textBox.Text, NumberStyles.Integer, CultureInfo.InvariantCulture, out result)) return ParseResult.none;
+
+            if (result > max) return ParseResult.ToBig;
+            if (result < min) return ParseResult.ToSmall;
+
+            return ParseResult.Ok;
+        }
+
+        public static bool TryGetDoubleFromTextBox(TextBox textBox, out double result, double min, double max, string message)
+        {
+            ParseResult parseResult = TryGetDoubleFromTextBox(textBox, out result, min, max);
+            if (parseResult == ParseResult.Ok) return true;
+            else
+            {
+                if (parseResult == ParseResult.none) MessageBox.Show(message + " введен не корректно");
+                else if (parseResult == ParseResult.ToSmall) MessageBox.Show(message + " не может быть меньше " + min);
+                else if (parseResult == ParseResult.ToBig) MessageBox.Show(message + " не может быть больше " + max);
+                return false;
+            }
+        }
+
+        public static ParseResult TryGetDoubleFromTextBox(TextBox textBox, out double result, double min, double max)
+        {
+            if (!double.TryParse(textBox.Text.Trim().Replace(",", "."), NumberStyles.Number, CultureInfo.InvariantCulture, out result)) return ParseResult.none;
+
+            if (result > max) return ParseResult.ToBig;
+            if (result < min) return ParseResult.ToSmall;
+
+            return ParseResult.Ok;
+        }
+
+
+        public enum ParseResult
+        { 
+            Ok,
+            none,
+            ToBig,
+            ToSmall,
         }
     }
 }
