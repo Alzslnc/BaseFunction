@@ -1,5 +1,6 @@
 ﻿using Autodesk.AutoCAD.Colors;
 using Autodesk.AutoCAD.DatabaseServices;
+
 using System;
 using System.Collections.Generic;
 
@@ -134,14 +135,14 @@ namespace BaseFunction
                     {
                         foreach (ParametrClass parametr in ParametrList)
                         {
-                            if (id.ObjectClass.GetType().Equals(parametr.Type))
+                            if (id.ObjectClass.Equals(Autodesk.AutoCAD.Runtime.RXClass.GetClass(parametr.Type)))
                             {
                                 result.Add(id);
                                 break;
                             }
                         }
                     }
-                    else if (id.ObjectClass.GetType().Equals(Parametr.Type)) result.Add(id);
+                    else if (id.ObjectClass.Equals(Autodesk.AutoCAD.Runtime.RXClass.GetClass(Parametr.Type))) result.Add(id);
                 }
             }
             else
@@ -225,7 +226,7 @@ namespace BaseFunction
             if (UseLayer && !e.Layer.Equals(parametr.Layer)) return false;
             if (UseLineWeight && !e.LineWeight.Equals(parametr.LineWeight)) return false;
             if (UseLineType && !e.Linetype.Equals(parametr.LineType)) return false;
-            if (UseClassType && !e.GetType().Equals(parametr.Type)) return false;
+            if (UseClassType && !e.GetRXClass().Equals(Autodesk.AutoCAD.Runtime.RXClass.GetClass(parametr.Type))) return false;
             return true;
         }
         private bool ContainParametr(ParametrClass parametr)

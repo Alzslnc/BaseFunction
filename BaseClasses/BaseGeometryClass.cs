@@ -221,20 +221,27 @@ namespace BaseFunction
         {
             List<Point3d> intersections = new List<Point3d>();
 
+            Curve c1;
+            Curve c2;
+
             if (apparentIntersections)
             {
-                curve.TryGetIntersections(curve2, out intersections);
+                c1 = curve.GetProjectedCurve(new Plane(), Vector3d.ZAxis);
+                c2 = curve2.GetProjectedCurve(new Plane(), Vector3d.ZAxis);
             }
             else
             {
-                using (Point3dCollection coll = new Point3dCollection())
-                {
-                    curve.IntersectWith(curve2, Intersect.OnBothOperands, coll, IntPtr.Zero, IntPtr.Zero);
-                    intersections.AddRange(coll.ToList());
-                }
+                c1 = curve;
+                c2 = curve2;
             }
 
-            return IsIntersect(curve, curve2, intersections);
+            using (Point3dCollection coll = new Point3dCollection())
+            {
+                c1.IntersectWith(c2, Intersect.OnBothOperands, coll, IntPtr.Zero, IntPtr.Zero);
+                intersections.AddRange(coll.ToList());
+            }
+
+            return IsIntersect(c1, c2, intersections);
         }
         /// <summary>
         /// проверяет пересекаются ли кривые или нет
