@@ -437,7 +437,26 @@ namespace BaseFunction
 
             for (int i = result.Count - 1; i >= 0; i--)
             {
-                if (classes.Contains(result[i].ObjectClass)) continue;
+                RXClass rXClass = result[i].ObjectClass;
+                if (classes.Contains(rXClass)) continue;
+                else
+                {
+                    RXClass parent = rXClass.MyParent;
+                    bool equal = false;
+                    while (true)
+                    {
+                        if (parent == null ||
+                            parent.Equals(RXClass.GetClass(typeof(Entity))) ||
+                            parent.Equals(RXClass.GetClass(typeof(Curve)))) break;
+                        if (classes.Contains(parent))
+                        {
+                            equal = true;
+                            break;
+                        }
+                        parent = parent.MyParent;
+                    }
+                    if (equal) continue;
+                }
                 result.RemoveAt(i);
             }
 
