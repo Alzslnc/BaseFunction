@@ -317,21 +317,7 @@ namespace BaseFunction
         public static bool TryGetObjectsIds(out List<ObjectId> result, Type type)
         {
             return TryGetObjectsIds(out result, type, "Выберите объекты");
-        }
-        /// <summary>
-        /// Запрашивает у пользователя выбор объектов и возвращает их ObjectId
-        /// </summary>      
-        public static bool TryGetObjectsIds(out List<ObjectId> result, Type type, bool preSelect)
-        {
-            return TryGetObjectsIds(out result, type, "Выберите объекты", preSelect);
-        }
-        /// <summary>
-        /// Запрашивает у пользователя выбор объектов и возвращает их ObjectId
-        /// </summary>      
-        public static bool TryGetObjectsIds(out List<ObjectId> result, Type type, string message, bool preSelect)
-        {
-            return TryGetObjectsIds(out result, new List<Type> { type }, message, preSelect);
-        }
+        }        
         /// <summary>
         /// Запрашивает у пользователя выбор объектов и возвращает их ObjectId
         /// </summary>    
@@ -401,68 +387,6 @@ namespace BaseFunction
                 return true;
             }
             return false;
-        }
-        /// <summary>
-        /// получение списка с предварительным выбором
-        /// </summary>
-        /// <param name="result"></param>
-        /// <returns></returns>
-        public static bool TryGetObjectsIds(out List<ObjectId> result, List<Type> objTypes, bool preSelect)
-        {
-            return TryGetObjectsIds(out result, objTypes, "Выберите объекты", preSelect);
-        }
-        /// <summary>
-        /// получение списка с предварительным выбором
-        /// </summary>
-        /// <param name="result"></param>
-        /// <returns></returns>
-        public static bool TryGetObjectsIds(out List<ObjectId> result, List<Type> objTypes, string message, bool preSelect)
-        {
-            result = new List<ObjectId>();
-
-            if (!preSelect) return TryGetObjectsIds(out result, objTypes, message);
-
-            List<RXClass> classes = new List<RXClass>();
-
-            if (objTypes != null)
-            {
-                foreach (Type type in objTypes) classes.Add(RXClass.GetClass(type));
-            }
-
-            Editor ed = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor;
-            PromptSelectionResult selRes = ed.SelectImplied();
-            if (selRes.Value != null) result.AddRange(selRes.Value.GetObjectIds());
-
-            if (result.Count > 0 && (objTypes == null || classes.Count == 0)) return true;
-
-            for (int i = result.Count - 1; i >= 0; i--)
-            {
-                RXClass rXClass = result[i].ObjectClass;
-                if (classes.Contains(rXClass)) continue;
-                else
-                {
-                    RXClass parent = rXClass.MyParent;
-                    bool equal = false;
-                    while (true)
-                    {
-                        if (parent == null ||
-                            parent.Equals(RXClass.GetClass(typeof(Entity))) ||
-                            parent.Equals(RXClass.GetClass(typeof(Curve)))) break;
-                        if (classes.Contains(parent))
-                        {
-                            equal = true;
-                            break;
-                        }
-                        parent = parent.MyParent;
-                    }
-                    if (equal) continue;
-                }
-                result.RemoveAt(i);
-            }
-
-            if (result.Count > 0) return true;
-
-            return TryGetObjectsIds(out result, objTypes, message);
         }
         #endregion
 
