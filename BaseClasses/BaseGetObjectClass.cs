@@ -509,5 +509,99 @@ namespace BaseFunction
             return false;
         }
         #endregion
+
+        #region добавление и удаление объектов
+        public static bool AddEntityInCurrentBTR(this Entity entity)
+        {
+            return entity.AddEntityInCurrentBTR(out _);
+        }
+        public static bool AddEntityInCurrentBTR(this Entity entity, out ObjectId id)
+        {
+            id = ObjectId.Null;
+            if (!entity.IsNewObject) return false;
+            try
+            {
+                using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+                {
+                    using (BlockTableRecord ms = tr.GetObject(HostApplicationServices.WorkingDatabase.CurrentSpaceId, OpenMode.ForWrite) as BlockTableRecord)
+                    {
+                        id = ms.AppendEntity(entity);
+                        tr.AddNewlyCreatedDBObject(entity, true);
+                    }
+                    tr.Commit();
+                }
+                return true;
+            }
+            catch { return false; }
+        }
+        public static bool AddEntityInCurrentBTR(this List<Entity> entities)
+        {
+            return entities.AddEntityInCurrentBTR(out _);
+        }
+        public static bool AddEntityInCurrentBTR(this List<Entity> entities, out List<ObjectId> ids)
+        {
+            ids = new List<ObjectId>();
+            try
+            {
+                using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+                {
+                    using (BlockTableRecord ms = tr.GetObject(HostApplicationServices.WorkingDatabase.CurrentSpaceId, OpenMode.ForWrite) as BlockTableRecord)
+                    {
+                        foreach (Entity e in entities)
+                        {
+                            if (!e.IsNewObject) continue;
+                            ids.Add(ms.AppendEntity(e));
+                            tr.AddNewlyCreatedDBObject(e, true);
+                        }
+                    }
+                    tr.Commit();
+                }
+                return true;
+            }
+            catch { return false; }
+        }
+
+        public static bool DeleteEntity(this ObjectId id)
+        {
+            return DeleteEntity(new List<ObjectId> { id });
+        }
+        public static bool DeleteEntity(this List<ObjectId> ids)
+        {
+            try
+            {
+                using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+                {
+                    foreach (ObjectId id in ids)
+                    {
+                        if (id == null || id == ObjectId.Null || !id.IsValid || id.IsErased) continue;
+                        Entity entity = tr.GetObject(id, OpenMode.ForWrite, false, true) as Entity;
+                        entity?.Dispose();
+                    }
+                    tr.Commit();
+                }
+                return true;
+            }
+            catch { return false; }
+        }
+        public static bool DeleteEntity(this Entity entity)
+        {
+            return DeleteEntity(new List<Entity> { entity });
+        }
+        public static bool DeleteEntity(this List<Entity> entities)
+        {
+            try
+            {
+                foreach (Entity entity in entities)
+                {
+                    if (entity == null || entity.ObjectId == ObjectId.Null || entity.IsDisposed || entity.IsErased) continue;
+                    if (!entity.IsWriteEnabled) entity.UpgradeOpen();
+                    entity.Erase();
+                }
+            }
+            catch { return false; }
+
+            return true;
+        }
+        #endregion
     }
 }
