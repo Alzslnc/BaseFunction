@@ -1,6 +1,5 @@
 ﻿using Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.DatabaseServices;
-using OldProgram;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -545,9 +544,9 @@ namespace BaseFunction
         #endregion
 
         #region вставка блока в чертеж
-        public static void InsertBlock(string name, string resourceFileName)
+        public static void InsertBlock(string name, string resourceFileName, Type type)
         {
-            string path = new System.IO.FileInfo(typeof(StampInsertClass).Assembly.Location).DirectoryName;
+            string path = new System.IO.FileInfo(type.Assembly.Location).DirectoryName;
 
             if (!System.IO.Directory.Exists(path)) return;
 
