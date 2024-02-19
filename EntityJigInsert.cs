@@ -20,7 +20,7 @@ namespace BaseFunction
             try
             {
                 //блоки вставляем не так как другие объекты, так как предврительно надо добавить его в базу данных и вставить атрибуты
-                if (ent is BlockReference)
+                if (ent is BlockReference && !(ent is Table))
                 {
                     //открываем транзакцию
                     using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
