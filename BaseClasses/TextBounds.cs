@@ -103,7 +103,7 @@ namespace BaseFunction
                 }
             }
         }
-        private static Polyline CreatePolyline(Extents3d ex)
+        public static Polyline CreatePolyline(Extents3d ex)
         {
             return CreatePolyline(new List<Point3d>
             {

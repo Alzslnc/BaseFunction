@@ -2,11 +2,44 @@
 using Autodesk.AutoCAD.Geometry;
 using System;
 using System.Collections.Generic;
+using static System.Net.Mime.MediaTypeNames;
 
 namespace BaseFunction
 {
     public static class BaseGeometryClass
     {
+        /// <summary>
+        /// Получает точку положения текста в зависимости от выравнивания
+        /// </summary>
+        public static Point3d GetDBTextPosition(this DBText dBText)
+        {
+            Point3d result;
+            if (dBText.VerticalMode == TextVerticalMode.TextBase ||
+                dBText.HorizontalMode == TextHorizontalMode.TextLeft ||
+                dBText.HorizontalMode == TextHorizontalMode.TextAlign ||
+                dBText.HorizontalMode == TextHorizontalMode.TextFit
+               ) result = dBText.Position;
+            else result = dBText.AlignmentPoint;
+            return result;
+        }
+        /// <summary>
+        /// Выставляет положение текста в зависимости от выравнивания
+        /// </summary>
+        public static bool SetDBTextPosition(this DBText dBText, Point3d newPosition)
+        { 
+            if (!dBText.IsNewObject && !dBText.IsWriteEnabled) return false;
+            try
+            {
+                if (dBText.VerticalMode == TextVerticalMode.TextBase ||
+                dBText.HorizontalMode == TextHorizontalMode.TextLeft ||
+                dBText.HorizontalMode == TextHorizontalMode.TextAlign ||
+                dBText.HorizontalMode == TextHorizontalMode.TextFit
+                ) dBText.Position = newPosition;
+                else dBText.AlignmentPoint = newPosition;
+                return true;
+            }
+            catch { return false; }
+        }
         /// <summary>
         /// очищает список от дублирующихся точек
         /// </summary>
