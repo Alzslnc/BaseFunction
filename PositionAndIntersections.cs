@@ -8,13 +8,35 @@ namespace BaseFunction
 {
     public static class PositionAndIntersections
     {      
+        /// <summary>
+        /// Проверяет находится ли кривая внутри другой кривой
+        /// </summary>
+        /// <param name="c1">проверяемая кривая</param>
+        /// <param name="c2">кривая на наличиу внутри которой проверяется первая</param>
+        /// <returns>возвращает ошибку если произошла ошибка или привые перекрещиваются</returns>
         public static PositionType CurveOfCurve(this Curve c1, Curve c2)
         {
+            if (BaseGeometryClass.IsIntersect(c1, c2, true)) return PositionType.fault;
+
+            PositionType centerType = PositionType.fault;
+            PositionType startType;
+            PositionType endType;
+
+            startType = c1.StartPoint.GetPositionType(c2);
+            if (startType == PositionType.outer || startType == PositionType.fault) return startType;
+
+            endType = c1.EndPoint.GetPositionType(c2);
+            if (endType == PositionType.outer || endType == PositionType.fault) return endType;
+
+
             if (c1.GetCentrPoint(out Point3d center))
             {
-                return center.GetPositionType(c2);
+                centerType = center.GetPositionType(c2);
+                if (centerType == PositionType.outer || centerType == PositionType.fault) return centerType;
             }
-            return PositionType.fault;
+
+            if (startType == PositionType.inner || endType == PositionType.inner || centerType == PositionType.inner) return PositionType.inner;
+            else return PositionType.onBound;           
         }
         public static bool TryGetIntersections(this Curve curve, Curve curve2, out List<Point3d> intersections)
         { 

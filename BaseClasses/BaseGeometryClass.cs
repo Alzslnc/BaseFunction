@@ -74,6 +74,16 @@ namespace BaseFunction
                     contour = polyline;
                 }
 
+                if (contour is Line line)
+                {
+                    Polyline polyline = new Polyline();
+                    polyline.AddVertexAt(0, new Point2d(line.StartPoint.X, line.StartPoint.Y), 0, 0, 0);
+                    polyline.AddVertexAt(1, new Point2d(line.EndPoint.X, line.EndPoint.Y), 0, 0, 0);
+                    polyline.Normal = line.Normal;
+                    polyline.EntityCopySettings(line);
+                    contour = polyline;
+                }
+
                 while (!contour.StartPoint.IsEqualTo(contour.EndPoint))
                 {
                     bool stop = true;
@@ -113,6 +123,33 @@ namespace BaseFunction
         {
             foreach (Point3d p in points) { if (p.IsEqualTo(point)) return true; }
             return false;
+        }
+        /// <summary>
+        /// создает замкнутую полилинию по границе
+        /// </summary>     
+        public static Polyline CreatePolylineFromExtents(this Extents3d ex)
+        {
+            return CreatePolylineFromPointList(new List<Point3d>
+            {
+                ex.MinPoint,
+                new Point3d(ex.MinPoint.X, ex.MaxPoint.Y, 0),
+                ex.MaxPoint,
+                new Point3d(ex.MaxPoint.X, ex.MinPoint.Y, 0)
+            });
+        }
+        /// <summary>
+        /// Создает замкнутую полилинию по списку точек
+        /// </summary>   
+        public static Polyline CreatePolylineFromPointList(this List<Point3d> points)
+        {
+            Polyline poly = new Polyline();
+            int i = 0;
+            foreach (Point3d point in points)
+            {
+                poly.AddVertexAt(i++, new Point2d(point.X, point.Y), 0, 0, 0);
+            }
+            poly.Closed = true;
+            return poly;
         }
         /// <summary>
         /// Получает точку положения текста в зависимости от выравнивания

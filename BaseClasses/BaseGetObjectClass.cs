@@ -498,8 +498,10 @@ namespace BaseFunction
                     foreach (ObjectId id in ids)
                     {
                         if (id == null || id == ObjectId.Null || !id.IsValid || id.IsErased) continue;
-                        Entity entity = tr.GetObject(id, OpenMode.ForWrite, false, true) as Entity;
-                        entity?.Dispose();
+                        using (Entity entity = tr.GetObject(id, OpenMode.ForWrite, false, true) as Entity)
+                        {
+                            entity?.Erase();
+                        }
                     }
                     tr.Commit();
                 }
