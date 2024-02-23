@@ -7,73 +7,7 @@ using System.Linq;
 namespace BaseFunction
 {
     public static class PositionAndIntersections
-    {
-        /// <summary>
-        /// соединяет фрагменты кривой и возвращает список с результатом соединения. Возвращает false если произошла ошибка.
-        /// </summary>   
-        public static bool ConnectCurve(this List<Curve> fragments, out List<Curve> result)
-        {
-            result = new List<Curve>();
-               
-            while (fragments.Count > 0)
-            {
-                Curve contour = null;
-
-                foreach (Curve c in fragments)
-                {
-                    if (c is Spline)
-                    {
-                        contour = c;
-                        fragments.Remove(c);
-                        break;
-                    }                
-                }
-
-                if (contour == null)
-                {
-                    contour = fragments[0];
-                    fragments.RemoveAt(0);
-                }               
-                
-                if (contour is Arc arc)
-                {
-                    Polyline polyline = new Polyline();
-                    polyline.AddVertexAt(0, new Point2d(arc.StartPoint.X, arc.StartPoint.Y), arc.GetArcBulge(), 0, 0);
-                    polyline.AddVertexAt(1, new Point2d(arc.EndPoint.X, arc.EndPoint.Y), 0, 0, 0);
-                    polyline.Normal = arc.Normal;
-                    polyline.EntityCopySettings(arc);                    
-                    contour = polyline;
-                }
-
-                while (!contour.StartPoint.IsEqualTo(contour.EndPoint))
-                {
-                    bool stop = true;
-                    for (int i = fragments.Count - 1; i >= 0; i--)
-                    {
-                        Curve fragment = fragments[i];
-
-                        try
-                        {
-                            //if (!fragment.StartPoint.IsEqualTo(contour.EndPoint) && fragment.EndPoint.IsEqualTo(contour.EndPoint)) fragment.ReverseCurve();
-
-                            if (fragment.StartPoint.IsEqualTo(contour.EndPoint) || fragment.EndPoint.IsEqualTo(contour.EndPoint))
-                            {
-                                contour.JoinEntity(fragment);
-                                fragments.RemoveAt(i);
-                                stop = false;
-                            }
-                        }
-                        catch
-                        {
-                            return false;
-                        }
-                    }
-                    if (stop) break;
-                }
-                result.Add(contour);
-            }
-            return true;
-        }
+    {      
         public static PositionType CurveOfCurve(this Curve c1, Curve c2)
         {
             if (c1.GetCentrPoint(out Point3d center))

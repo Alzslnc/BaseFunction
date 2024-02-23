@@ -115,23 +115,7 @@ namespace BaseFunction
             }
             return polyline;
         }
-
-
-
-        /// <summary>
-        /// копирует свойства одного объекта другому
-        /// </summary>
-        /// <param name="e"></param>
-        /// <param name="ie"></param>
-        public static void EntityCopySettings(this Entity e, Entity ie)
-        {
-            e.Color = ie.Color;
-            e.Linetype = ie.Linetype;
-            e.LineWeight = ie.LineWeight;
-            e.Layer = ie.Layer;
-            e.LinetypeScale = ie.LinetypeScale;
-            e.Transparency = ie.Transparency;
-        }
+               
         /// <summary>
         /// Выключает привязки на объектах из списка (утянул у киану вроде, точно не помню)
         /// </summary>

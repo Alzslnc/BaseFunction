@@ -2,44 +2,11 @@
 using Autodesk.AutoCAD.Geometry;
 using System;
 using System.Collections.Generic;
-using static System.Net.Mime.MediaTypeNames;
 
 namespace BaseFunction
 {
     public static class BaseGeometryClass
-    {
-        /// <summary>
-        /// Получает точку положения текста в зависимости от выравнивания
-        /// </summary>
-        public static Point3d GetDBTextPosition(this DBText dBText)
-        {
-            Point3d result;
-            if (dBText.VerticalMode == TextVerticalMode.TextBase ||
-                dBText.HorizontalMode == TextHorizontalMode.TextLeft ||
-                dBText.HorizontalMode == TextHorizontalMode.TextAlign ||
-                dBText.HorizontalMode == TextHorizontalMode.TextFit
-               ) result = dBText.Position;
-            else result = dBText.AlignmentPoint;
-            return result;
-        }
-        /// <summary>
-        /// Выставляет положение текста в зависимости от выравнивания
-        /// </summary>
-        public static bool SetDBTextPosition(this DBText dBText, Point3d newPosition)
-        { 
-            if (!dBText.IsNewObject && !dBText.IsWriteEnabled) return false;
-            try
-            {
-                if (dBText.VerticalMode == TextVerticalMode.TextBase ||
-                dBText.HorizontalMode == TextHorizontalMode.TextLeft ||
-                dBText.HorizontalMode == TextHorizontalMode.TextAlign ||
-                dBText.HorizontalMode == TextHorizontalMode.TextFit
-                ) dBText.Position = newPosition;
-                else dBText.AlignmentPoint = newPosition;
-                return true;
-            }
-            catch { return false; }
-        }
+    {        
         /// <summary>
         /// очищает список от дублирующихся точек
         /// </summary>
@@ -62,6 +29,81 @@ namespace BaseFunction
             return result;
         }
         /// <summary>
+        /// соединяет фрагменты кривой и возвращает список с результатом соединения. Возвращает false если произошла ошибка.
+        /// </summary>   
+        public static bool ConnectCurve(this List<Curve> fragments, out List<Curve> result)
+        {
+            result = new List<Curve>();
+
+            for (int i = fragments.Count - 1; i >= 0; i--)
+            {
+                if (fragments[i] is Circle)
+                {
+                    result.Add(fragments[i]);
+                    fragments.RemoveAt(i);
+                }
+            }
+
+            while (fragments.Count > 0)
+            {
+                Curve contour = null;
+
+                foreach (Curve c in fragments)
+                {
+                    if (c is Spline)
+                    {
+                        contour = c;                      
+                        break;
+                    }
+                }                                
+
+                if (contour == null)
+                {
+                    contour = fragments[0];                  
+                }
+
+                fragments.Remove(contour);
+
+                if (contour is Arc arc)
+                {
+                    Polyline polyline = new Polyline();
+                    polyline.AddVertexAt(0, new Point2d(arc.StartPoint.X, arc.StartPoint.Y), arc.GetArcBulge(), 0, 0);
+                    polyline.AddVertexAt(1, new Point2d(arc.EndPoint.X, arc.EndPoint.Y), 0, 0, 0);
+                    polyline.Normal = arc.Normal;
+                    polyline.EntityCopySettings(arc);
+                    contour = polyline;
+                }
+
+                while (!contour.StartPoint.IsEqualTo(contour.EndPoint))
+                {
+                    bool stop = true;
+                    for (int i = fragments.Count - 1; i >= 0; i--)
+                    {
+                        Curve fragment = fragments[i];
+
+                        try
+                        {
+                            //if (!fragment.StartPoint.IsEqualTo(contour.EndPoint) && fragment.EndPoint.IsEqualTo(contour.EndPoint)) fragment.ReverseCurve();
+
+                            if (fragment.StartPoint.IsEqualTo(contour.EndPoint) || fragment.EndPoint.IsEqualTo(contour.EndPoint))
+                            {
+                                contour.JoinEntity(fragment);
+                                fragments.RemoveAt(i);
+                                stop = false;
+                            }
+                        }
+                        catch
+                        {
+                            return false;
+                        }
+                    }
+                    if (stop) break;
+                }
+                result.Add(contour);
+            }
+            return true;
+        }
+        /// <summary>
         /// Проверяет, содержит ли список точку
         /// </summary>
         /// <param name="points"></param>
@@ -71,6 +113,38 @@ namespace BaseFunction
         {
             foreach (Point3d p in points) { if (p.IsEqualTo(point)) return true; }
             return false;
+        }
+        /// <summary>
+        /// Получает точку положения текста в зависимости от выравнивания
+        /// </summary>
+        public static Point3d DBTextPositionGet(this DBText dBText)
+        {
+            Point3d result;
+            if (dBText.VerticalMode == TextVerticalMode.TextBase ||
+                dBText.HorizontalMode == TextHorizontalMode.TextLeft ||
+                dBText.HorizontalMode == TextHorizontalMode.TextAlign ||
+                dBText.HorizontalMode == TextHorizontalMode.TextFit
+               ) result = dBText.Position;
+            else result = dBText.AlignmentPoint;
+            return result;
+        }
+        /// <summary>
+        /// Выставляет положение текста в зависимости от выравнивания
+        /// </summary>
+        public static bool DBTextPositionSet(this DBText dBText, Point3d newPosition)
+        {
+            if (!dBText.IsNewObject && !dBText.IsWriteEnabled) return false;
+            try
+            {
+                if (dBText.VerticalMode == TextVerticalMode.TextBase ||
+                dBText.HorizontalMode == TextHorizontalMode.TextLeft ||
+                dBText.HorizontalMode == TextHorizontalMode.TextAlign ||
+                dBText.HorizontalMode == TextHorizontalMode.TextFit
+                ) dBText.Position = newPosition;
+                else dBText.AlignmentPoint = newPosition;
+                return true;
+            }
+            catch { return false; }
         }
         /// <summary>
         /// Удаляет из списка точки эквивалентные данной
@@ -101,6 +175,20 @@ namespace BaseFunction
                 return @double *= Math.Round(d /= @double);
             }
             return d;
+        }
+        /// <summary>
+        /// копирует свойства одного объекта другому
+        /// </summary>
+        /// <param name="e"></param>
+        /// <param name="ie"></param>
+        public static void EntityCopySettings(this Entity e, Entity ie)
+        {
+            e.Color = ie.Color;
+            e.Linetype = ie.Linetype;
+            e.LineWeight = ie.LineWeight;
+            e.Layer = ie.Layer;
+            e.LinetypeScale = ie.LinetypeScale;
+            e.Transparency = ie.Transparency;
         }
         /// <summary>
         /// возвращает угол от оси X Autocad из точки pt1 на точку pt2 (аналог polar из лиспа)
