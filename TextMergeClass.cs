@@ -76,7 +76,7 @@ namespace BaseFunction
                 xRightP.Add(objectAndBound.PositionRight);
             }
 
-            double shirina = 0;
+            double width = 0;
             
             List<double> xLeft = new List<double>();
             List<double> xRight = new List<double>();
@@ -129,7 +129,7 @@ namespace BaseFunction
                     contents += line;
                     xLeft.Add(leftX);
                     xRight.Add(rightX);
-                    if (shirina < rightX - leftX) shirina = rightX - leftX;
+                    if (width < rightX - leftX) width = rightX - leftX;
                 }
 
                 if (yList.Count == 0)
@@ -147,11 +147,11 @@ namespace BaseFunction
 
             location = new Point3d(xLeft[0], location.Y, 0);
 
-            locationRight = location + v * shirina;         
+            locationRight = location + v * width;         
 
             AttachmentPoint attachmentPoint = AttachmentPoint.BottomCenter;
-            if (((xLeft[xLeft.Count - 1] - xLeft[0]) / shirina) < 0.1) attachmentPoint = AttachmentPoint.BottomLeft;
-            else if (((xRight[xRight.Count - 1] - xRight[0]) / shirina) < 0.1) attachmentPoint = AttachmentPoint.BottomRight;
+            if (((xLeft[xLeft.Count - 1] - xLeft[0]) / width) < 0.1) attachmentPoint = AttachmentPoint.BottomLeft;
+            else if (((xRight[xRight.Count - 1] - xRight[0]) / width) < 0.1) attachmentPoint = AttachmentPoint.BottomRight;
 
             m.Attachment = attachmentPoint;
 
