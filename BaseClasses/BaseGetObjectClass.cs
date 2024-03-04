@@ -173,18 +173,28 @@ namespace BaseFunction
         #region точки
         public static bool TryGetPointFromUser(out Point3d result)
         {
-            return TryGetPointFromUser(out result, true, "Выберите точку");
+            return TryGetPointFromUser(out result, true, "Выберите точку", null);
         }
         public static bool TryGetPointFromUser(out Point3d result, string message)
         {
-            return TryGetPointFromUser(out result, true, message);
+            return TryGetPointFromUser(out result, true, message, null);
         }
-        public static bool TryGetPointFromUser(out Point3d result, bool inWCS, string message)
+        public static bool TryGetPointFromUser(out Point3d result, string message, Point3d? point)
+        {
+            return TryGetPointFromUser(out result, true, message, point);
+        }
+        public static bool TryGetPointFromUser(out Point3d result, bool inWCS, string message, Point3d? point)
         {
             Editor ed = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor;
+            PromptPointOptions ppo = new PromptPointOptions("\n" + message);
+            if (point.HasValue)
+            {
+                ppo.BasePoint = point.Value;
+                ppo.UseBasePoint = true;
+            }
             while (true)
             {
-                PromptPointResult res = ed.GetPoint("\n" + message);
+                PromptPointResult res = ed.GetPoint(ppo);
                 if (res.Status == PromptStatus.Cancel)
                 {
                     result = Point3d.Origin;
@@ -415,12 +425,15 @@ namespace BaseFunction
             if (allEmpty) return false;
 
             PromptKeywordOptions pso = new PromptKeywordOptions(message);
+                
 
             foreach (string variant in variants)
             {
                 if (string.IsNullOrEmpty(variant)) continue;
-                pso.Keywords.Add(variant.ToUpper());
+                pso.Keywords.Add(variant);               
             }
+
+            pso.Keywords.Default = variants[0];
 
             PromptResult pr = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor.GetKeywords(pso);
 
