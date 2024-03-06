@@ -26,23 +26,40 @@ namespace BaseFunction
         /// <param name="sender"></param>
         /// <param name="e"></param>
         public static void TbKeyDoubleMinus(object sender, KeyPressEventArgs e)
-        {
+        {         
             TextBox tTB = sender as TextBox;
+
+            int position = tTB.SelectionStart;
+            string withoutSelected = tTB.WithoutSelected();
+
             //заменяем запятую на точку
             if (e.KeyChar == ',') e.KeyChar = '.';
+
+            //обработка бекспейса, возможность удаления выделенного фрагмента и установку курсора в месте удаления
+            if (e.KeyChar == 8)
+            {
+                if (tTB.SelectionLength > 0)
+                {
+                    tTB.Text = withoutSelected;
+                    tTB.SelectionStart = position;
+                    e.Handled = true;
+                }   
+                return;
+            }
             //инвертируем записанное число при минусе
             if (e.KeyChar == '-')
             {
-                int pos = tTB.SelectionStart;
+                tTB.Text = withoutSelected;
+                tTB.SelectionStart = position;
                 if (tTB.Text.Contains('-'))
                 {
                     tTB.Text = tTB.Text.Substring(1);
-                    tTB.SelectionStart = pos - 1;
+                    tTB.SelectionStart = position - 1;
                 }
                 else
                 {
                     tTB.Text = '-' + tTB.Text;
-                    tTB.SelectionStart = pos + 1;
+                    tTB.SelectionStart = position + 1;
                 }
                 e.Handled = true;
                 return;
@@ -50,25 +67,24 @@ namespace BaseFunction
             //если введена точка то проверяем что бы точки еще не было, и что бы точку не пытались вводить перед минусом
             if (e.KeyChar == '.')
             {
-                if (tTB.Text.Contains('.') | (tTB.SelectionStart == 0 & tTB.Text.Contains('-'))) e.Handled = true;
-                return;
-            }
-            //обработка бекспейса, возможность удаления выделенного фрагмента и установку курсора в месте удаления
-            if (e.KeyChar == 8)
-            {
-                if (tTB.SelectionLength > 0)
+                if (withoutSelected.Contains('.') | (position == 0 & withoutSelected.Contains('-'))) e.Handled = true;
+                else
                 {
-                    int pos = tTB.SelectionStart;
-                    tTB.Text = tTB.Text.Substring(0, tTB.SelectionStart) + tTB.Text.Substring(tTB.SelectionStart + tTB.SelectionLength);
-                    tTB.SelectionStart = pos;
-                    e.Handled = true;
+                    tTB.Text = withoutSelected;
+                    tTB.SelectionStart = position;
                 }
                 return;
             }
+           
             //проверка что бы вводимое число не ставилось перед минусом
             if (Char.IsDigit(e.KeyChar))
             {
-                if (tTB.Text.Contains('-') & tTB.SelectionStart == 0) e.Handled = true;
+                if (withoutSelected.Contains('-') & position == 0) e.Handled = true;
+                else
+                {
+                    tTB.Text = withoutSelected;
+                    tTB.SelectionStart = position;
+                }
                 return;
             }
             e.Handled = true;
@@ -81,28 +97,48 @@ namespace BaseFunction
         public static void TbKeyDouble(object sender, KeyPressEventArgs e)
         {
             TextBox tTB = sender as TextBox;
+
+            int position = tTB.SelectionStart;
+            string withoutSelected = tTB.WithoutSelected();
+
             if (e.KeyChar == ',') e.KeyChar = '.';
-            if (e.KeyChar == '.')
-            {
-                if (tTB.Text.Contains('.') | (tTB.SelectionStart == 0 & tTB.Text.Contains('-'))) e.Handled = true;
-                return;
-            }
+
+            //обработка бекспейса, возможность удаления выделенного фрагмента и установку курсора в месте удаления
             if (e.KeyChar == 8)
             {
                 if (tTB.SelectionLength > 0)
                 {
-                    int pos = tTB.SelectionStart;
-                    tTB.Text = tTB.Text.Substring(0, tTB.SelectionStart) + tTB.Text.Substring(tTB.SelectionStart + tTB.SelectionLength);
-                    tTB.SelectionStart = pos;
+                    tTB.Text = withoutSelected;
+                    tTB.SelectionStart = position;
                     e.Handled = true;
                 }
                 return;
             }
-            if (Char.IsDigit(e.KeyChar))
+          
+            //если введена точка то проверяем что бы точки еще не было, и что бы точку не пытались вводить перед минусом
+            if (e.KeyChar == '.')
             {
-                if (tTB.Text.Contains('-') & tTB.SelectionStart == 0) e.Handled = true;
+                if (withoutSelected.Contains('.') | (position == 0 & withoutSelected.Contains('-'))) e.Handled = true;
+                else
+                {
+                    tTB.Text = withoutSelected;
+                    tTB.SelectionStart = position;
+                }
                 return;
             }
+
+            //проверка что бы вводимое число не ставилось перед минусом
+            if (Char.IsDigit(e.KeyChar))
+            {
+                if (withoutSelected.Contains('-') & position == 0) e.Handled = true;
+                else
+                {
+                    tTB.Text = withoutSelected;
+                    tTB.SelectionStart = position;
+                }
+                return;
+            }
+
             e.Handled = true;
         }
         /// <summary>
@@ -113,38 +149,52 @@ namespace BaseFunction
         public static void TbKeyIntegerMinus(object sender, KeyPressEventArgs e)
         {
             TextBox tTB = sender as TextBox;
-            if (e.KeyChar == '-')
-            {
-                int pos = tTB.SelectionStart;
-                if (tTB.Text.Contains('-'))
-                {
-                    tTB.Text = tTB.Text.Substring(1);
-                    tTB.SelectionStart = pos - 1;
-                }
-                else
-                {
-                    tTB.Text = '-' + tTB.Text;
-                    tTB.SelectionStart = pos + 1;
-                }
-                e.Handled = true;
-                return;
-            }
+
+            int position = tTB.SelectionStart;
+            string withoutSelected = tTB.WithoutSelected();
+
+            //обработка бекспейса, возможность удаления выделенного фрагмента и установку курсора в месте удаления
             if (e.KeyChar == 8)
             {
                 if (tTB.SelectionLength > 0)
                 {
-                    int pos = tTB.SelectionStart;
-                    tTB.Text = tTB.Text.Substring(0, tTB.SelectionStart) + tTB.Text.Substring(tTB.SelectionStart + tTB.SelectionLength);
-                    tTB.SelectionStart = pos;
+                    tTB.Text = withoutSelected;
+                    tTB.SelectionStart = position;
                     e.Handled = true;
                 }
                 return;
             }
+            //инвертируем записанное число при минусе
+            if (e.KeyChar == '-')
+            {
+                tTB.Text = withoutSelected;
+                tTB.SelectionStart = position;
+                if (tTB.Text.Contains('-'))
+                {
+                    tTB.Text = tTB.Text.Substring(1);
+                    tTB.SelectionStart = position - 1;
+                }
+                else
+                {
+                    tTB.Text = '-' + tTB.Text;
+                    tTB.SelectionStart = position + 1;
+                }
+                e.Handled = true;
+                return;
+            }       
+
+            //проверка что бы вводимое число не ставилось перед минусом
             if (Char.IsDigit(e.KeyChar))
             {
-                if (tTB.Text.Contains('-') & tTB.SelectionStart == 0) e.Handled = true;
+                if (withoutSelected.Contains('-') & position == 0) e.Handled = true;
+                else
+                {
+                    tTB.Text = withoutSelected;
+                    tTB.SelectionStart = position;
+                }
                 return;
             }
+
             e.Handled = true;
         }
 
@@ -156,22 +206,34 @@ namespace BaseFunction
         public static void TbKeyInteger(object sender, KeyPressEventArgs e)
         {
             TextBox tTB = sender as TextBox;
+
+            int position = tTB.SelectionStart;
+            string withoutSelected = tTB.WithoutSelected();
+
+            //обработка бекспейса, возможность удаления выделенного фрагмента и установку курсора в месте удаления
             if (e.KeyChar == 8)
             {
                 if (tTB.SelectionLength > 0)
                 {
-                    int pos = tTB.SelectionStart;
-                    tTB.Text = tTB.Text.Substring(0, tTB.SelectionStart) + tTB.Text.Substring(tTB.SelectionStart + tTB.SelectionLength);
-                    tTB.SelectionStart = pos;
+                    tTB.Text = withoutSelected;
+                    tTB.SelectionStart = position;
                     e.Handled = true;
                 }
                 return;
             }
+        
+            //проверка что бы вводимое число не ставилось перед минусом
             if (Char.IsDigit(e.KeyChar))
             {
-                if (tTB.Text.Contains('-') & tTB.SelectionStart == 0) e.Handled = true;
+                if (withoutSelected.Contains('-') & position == 0) e.Handled = true;
+                else
+                {
+                    tTB.Text = withoutSelected;
+                    tTB.SelectionStart = position;
+                }
                 return;
             }
+
             e.Handled = true;
         }
         public static bool TryGetIntFromTextBox(TextBox textBox, out int result, int min, int max, string message)
@@ -219,6 +281,15 @@ namespace BaseFunction
             return ParseResult.Ok;
         }
 
+        private static string WithoutSelected(this TextBox tTB)
+        {
+            string text = tTB.Text;
+            if (tTB.SelectionLength > 0)
+            {               
+                text = tTB.Text.Substring(0, tTB.SelectionStart) + tTB.Text.Substring(tTB.SelectionStart + tTB.SelectionLength);              
+            }
+            return text;
+        }
 
         public enum ParseResult
         { 
