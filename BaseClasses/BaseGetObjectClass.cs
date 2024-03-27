@@ -354,6 +354,12 @@ namespace BaseFunction
             List<string> typeString = new List<string>();
             foreach (Type type in objTypes)
             {
+                if (type.Equals(typeof(ProxyEntity)))
+                {
+                    typeString.Add("ACAD_PROXY_ENTITY");
+                    continue;
+                }                    
+
                 RXClass rXClass = RXClass.GetClass(type);
                 if (rXClass != null) typeString.Add(rXClass.DxfName);
             }

@@ -1,5 +1,6 @@
 ﻿using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.Geometry;
+using Autodesk.AutoCAD.Runtime;
 using System;
 using System.Collections.Generic;
 
@@ -62,9 +63,10 @@ namespace BaseFunction
         /// <summary>
         /// расчленияет блок и возвращает ObjectId полученных элементов
         /// </summary>
-        public static List<ObjectId> ExplodeBlock(Transaction tr, Database db, ObjectId id, bool erase, bool inLayer, bool recursive)
+        public static List<ObjectId> ExplodeBlock(Transaction tr, Database db, ObjectId id, bool erase, bool inLayer, bool recursive, bool explodeProxy, Matrix3d matrix)
         {
-            List<ObjectId> result = new List<ObjectId>();
+            
+            List <ObjectId> result = new List<ObjectId>();
             List<ObjectId> attrList = new List<ObjectId>();
             List<ObjectId> dimList = new List<ObjectId>();
             List<ObjectId> toExplode = new List<ObjectId>();
@@ -72,6 +74,9 @@ namespace BaseFunction
             // открыть «для чтения»т.к. эта операция не меняет исходный примитив
             BlockReference br = tr.GetObject(id, OpenMode.ForRead, false, true) as BlockReference;
             if (br == null) { return result; }
+
+            matrix = br.BlockTransform ;
+
             Scale3d scale3D = br.ScaleFactors;
             double scale = 1;
             if (Math.Abs(scale3D.X).IsEqualTo(Math.Abs(scale3D.Y))) scale = Math.Abs(scale3D.X);
@@ -118,6 +123,45 @@ namespace BaseFunction
                     }
                 }
             }
+            if (explodeProxy)
+            {
+                
+
+                ObjectId btrId = ObjectId.Null;
+
+                if (br.IsDynamicBlock && br.DynamicBlockTableRecord != ObjectId.Null) btrId = br.DynamicBlockTableRecord;
+                else btrId = br.BlockTableRecord;
+
+                if (btrId != ObjectId.Null)
+                {
+                    using (BlockTableRecord ms = tr.GetObject(db.CurrentSpaceId, OpenMode.ForWrite, false, true) as BlockTableRecord)
+                    {
+                        BlockTableRecord btr = tr.GetObject(btrId, OpenMode.ForRead, false, true) as BlockTableRecord;
+                        foreach (ObjectId prId in btr)
+                        {                       
+                            ProxyEntity proxyEntity = tr.GetObject(prId, OpenMode.ForRead, false, true) as ProxyEntity;
+                            if (proxyEntity != null && proxyEntity.GraphicsMetafileType == GraphicsMetafileType.FullGraphics)
+                            {
+                                using (DBObjectCollection collection = new DBObjectCollection())
+                                {
+                                    proxyEntity.Explode(collection);
+                                    foreach (DBObject obj1 in collection)
+                                    {
+                                        if (obj1 is Entity entity)
+                                        {
+                                            entity.TransformBy(matrix);
+                                            ms.AppendEntity(entity);
+                                            tr.AddNewlyCreatedDBObject(entity, true);
+                                        }
+                                        else obj1?.Dispose();
+                                    }
+                                }
+                            }
+
+                        }
+                    }
+                }      
+            }
             // Создаем обработчик для получения вложенных вставок блока
             void handler(object s, ObjectEventArgs e)
             {
@@ -135,7 +179,7 @@ namespace BaseFunction
             // расчленяем их если надо
             foreach (ObjectId bid in toExplode)
             {
-                result.AddRange(ExplodeBlock(tr, db, bid, erase, inLayer, recursive));
+                result.AddRange(ExplodeBlock(tr, db, bid, erase, inLayer, recursive, explodeProxy, matrix));
             }   
             //удаляем атрибуты, они уже преобразованы в тексты
             foreach (ObjectId objectId in attrList)
