@@ -23,7 +23,7 @@ namespace BaseFunction
         {
             if (!TryGetobjectId(out ObjectId contourid, new List<Type>
             { typeof(Arc), typeof(Polyline), typeof(Line), typeof(Circle) }, "Выберите контур в плане")) return;
-            if (!TryGetPointFromUser(out Point3d point, true, "Выберите точку на фасаде соответствующую началу контура на нулевой отметке")) return;
+            if (!TryGetPointFromUser(out Point3d point, true, "Выберите точку на фасаде соответствующую началу контура на нулевой отметке", null)) return;
             if (!TryGetObjectsIds(out List<ObjectId> ids, typeof(BlockReference), "Выберите закладные")) return;
 
             using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
@@ -95,7 +95,7 @@ namespace BaseFunction
                     {
                         foreach (MText mtext in mtexts)
                         {
-                            if (mtext.IsNewObject)
+                            if (mtext != null &&  mtext.IsNewObject)
                             { 
                                 ms.AppendEntity(mtext);
                                 tr.AddNewlyCreatedDBObject(mtext, true);

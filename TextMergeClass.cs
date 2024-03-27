@@ -16,7 +16,11 @@ namespace BaseFunction
             foreach (Text t in texts)
             {
                 if (t.TextType == TextType.SimpleMText) result.Add(t.MText);
-                else if (t.TextType == TextType.Fragmented) result.Add(TextMerge(t, dopusk));
+                else if (t.TextType == TextType.Fragmented)
+                {
+                    MText mText = TextMerge(t, dopusk);
+                    if (mText != null) result.Add(mText);
+                }                
             }
             return result;
         }
