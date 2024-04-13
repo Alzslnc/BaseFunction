@@ -125,6 +125,20 @@ namespace BaseFunction
             return false;
         }
         /// <summary>
+        /// Возвращает матрицу преобразования объетов модели в выбранный видовой экран
+        /// </summary>
+        /// <returns></returns>
+        public static Matrix3d ConvertToViewport(this Viewport viewport)
+        {
+            Matrix3d matrix =
+            Matrix3d.Scaling(1 / viewport.CustomScale, viewport.CenterPoint).PreMultiplyBy
+            (Matrix3d.Displacement(viewport.ViewCenter.GetPoint3d(0) - viewport.CenterPoint)).PreMultiplyBy
+            (Matrix3d.PlaneToWorld(viewport.ViewDirection)).PreMultiplyBy
+            (Matrix3d.Displacement(viewport.ViewTarget - Point3d.Origin)).PreMultiplyBy
+            (Matrix3d.Rotation(-viewport.TwistAngle, viewport.ViewDirection, viewport.ViewTarget));
+            return matrix.Inverse();
+        }
+        /// <summary>
         /// создает замкнутую полилинию по границе
         /// </summary>     
         public static Polyline CreatePolylineFromExtents(this Extents3d ex)
