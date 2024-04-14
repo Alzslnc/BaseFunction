@@ -179,7 +179,7 @@ namespace BaseFunction
         /// </summary>
         /// <param name="brId">ObjectId блока</param>
         /// <param name="attributes">список (таг, значение) изменяемых атрибутов</param>
-        public static bool BlockReferenceChangeAttribute(ObjectId brId, List<(string tag, object value)> attributes)
+        public static bool BlockReferenceChangeAttribute(this ObjectId brId, List<(string tag, object value)> attributes)
         {
             if (brId == null || brId == ObjectId.Null) return false;
             Dictionary<string, string> dictionary = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase);
@@ -196,7 +196,7 @@ namespace BaseFunction
         /// <param name="tag"></param>
         /// <param name="value"></param>
         /// <returns>true если атрибут найден и изменен</returns>
-        public static bool BlockReferenceChangeAttribute(ObjectId brId, string tag, string value)
+        public static bool BlockReferenceChangeAttribute(this ObjectId brId, string tag, string value)
         {
             if (brId == null || brId == ObjectId.Null) return false;
             Dictionary<string, string> dictionary = new Dictionary<string, string>() { { tag, value } };
@@ -208,7 +208,7 @@ namespace BaseFunction
         /// <param name="brId"></param>
         /// <param name="attributes">словарь с атрибутами(таг/значение)</param>
         /// <returns>true если все атрибуты из словаря поменяны</returns>
-        public static bool BlockReferenceChangeAttribute(ObjectId brId, Dictionary<string, string> attributes)
+        public static bool BlockReferenceChangeAttribute(this ObjectId brId, Dictionary<string, string> attributes)
         {
             if (brId == null || brId == ObjectId.Null) return false;
             return BlockReferenceChangeAttribute(brId, attributes, false);
@@ -220,7 +220,7 @@ namespace BaseFunction
         /// <param name="attributes">словарь с атрибутами(таг/значение)</param>
         /// <param name="allReplace">изменяет атрибуты только полным набором, если хоть один атрибут из списка не найден то ничего не будет изменено</param>
         /// <returns>true если все атрибуты из словаря поменяны</returns>
-        public static bool BlockReferenceChangeAttribute(ObjectId brId, Dictionary<string, string> attributes, bool allReplace)
+        public static bool BlockReferenceChangeAttribute(this ObjectId brId, Dictionary<string, string> attributes, bool allReplace)
         {
             if (brId == null || brId == ObjectId.Null) return false;
 
@@ -238,7 +238,7 @@ namespace BaseFunction
             }
             return result;
         }
-        public static bool BlockReferenceChangeAttribute(BlockReference br, Transaction tr, Dictionary<string, string> attributes)
+        public static bool BlockReferenceChangeAttribute(this BlockReference br, Transaction tr, Dictionary<string, string> attributes)
         {
 
             DocumentLock documentLock = null;
@@ -337,7 +337,7 @@ namespace BaseFunction
         /// <param name="result"></param>
         /// <param name="tr"></param>
         /// <returns>true если получено хотя бы одно значение</returns>
-        public static bool BlockReferenceGetAttribute(BlockReference br, out Dictionary<string, string> result, Transaction tr)
+        public static bool BlockReferenceGetAttribute(this BlockReference br, out Dictionary<string, string> result, Transaction tr)
         {
             result = new Dictionary<string, string>();
             if (br == null) return false;
@@ -358,7 +358,7 @@ namespace BaseFunction
         /// <param name="br"></param>    
         /// <param name="result"></param>
         /// <returns>true если получено хотя бы одно значение</returns>        
-        public static bool BlockReferenceGetAttribute(BlockReference br, out Dictionary<string, string> result)
+        public static bool BlockReferenceGetAttribute(this BlockReference br, out Dictionary<string, string> result)
         {
             result = new Dictionary<string, string>();
             if (br == null) return false;
@@ -391,7 +391,7 @@ namespace BaseFunction
         /// <param name="tag"></param>
         /// <param name="result"></param>
         /// <returns>true если получено хотя бы одно значение</returns>        
-        public static bool BlockReferenceGetAttribute(ObjectId brId, out Dictionary<string, string> result)
+        public static bool BlockReferenceGetAttribute(this ObjectId brId, out Dictionary<string, string> result)
         {
             result = new Dictionary<string, string>();
             if (brId == null || brId == ObjectId.Null) return false;
@@ -431,7 +431,7 @@ namespace BaseFunction
         /// <param name="tag"></param>
         /// <param name="result"></param>
         /// <returns>true если получено хотя бы одно значение</returns>
-        public static bool BlockReferenceGetAttribute(BlockReference br, string tag, out string result)
+        public static bool BlockReferenceGetAttribute(this BlockReference br, string tag, out string result)
         {
             result = string.Empty;
             if (br == null) return false;
@@ -468,7 +468,7 @@ namespace BaseFunction
         /// <param name="tag"></param>
         /// <param name="result"></param>
         /// <returns>true если получено хотя бы одно значение</returns>
-        public static bool BlockReferenceGetAttribute(ObjectId brId, string tag, out string result)
+        public static bool BlockReferenceGetAttribute(this ObjectId brId, string tag, out string result)
         {
             result = string.Empty;
             if (brId == null || brId == ObjectId.Null) return false;
