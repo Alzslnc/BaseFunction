@@ -291,6 +291,30 @@ namespace BaseFunction
             return text;
         }
 
+        public static bool CheckString(this string _string,  bool text, bool number, bool space, bool message)
+        {
+            if (!text && !number && !space) throw new ArgumentException("Параметры не заданы");
+            string messageString = "В тексте могут быть только ";
+            if (text) messageString += "буквы ";
+            if (number) messageString += "цифры ";
+            if (space) messageString += "пробелы ";
+
+            foreach (char c in _string)
+            {
+                if (space && c == ' ') continue;
+                if (text)
+                {
+                    if (c >= 'a' && c <= 'z') continue;
+                    if (c >= 'A' && c <= 'Z') continue;
+                    if (c >= 'а' && c <= 'я') continue;
+                    if (c >= 'А' && c <= 'Я') continue;
+                }
+                if(space && (c >= '0' && c <= '9')) continue;
+                if (message) MessageBox.Show(messageString);
+                return false;
+            }
+            return true;
+        }
         public enum ParseResult
         { 
             Ok,
