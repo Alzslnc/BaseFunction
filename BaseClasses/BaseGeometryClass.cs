@@ -146,8 +146,7 @@ namespace BaseFunction
         /// <param name="hatchType">Тип штриховки</param>
         /// <returns></returns>
         public static Hatch CreateHatch(List<Curve> OuterLoops, List<Curve> InnerLoops, HatchType hatchType)
-        {
-            Hatch res = new Hatch();
+        {           
             Hatch hatch = new Hatch();
             using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
             {
@@ -173,7 +172,7 @@ namespace BaseFunction
                             hatch.SetHatchPattern(HatchPatternType.PreDefined, "ANSI31");
                             break;
                         }
-                    case HatchType.Сoncrete:
+                    case HatchType.Concrete:
                         {
                             hatch.PatternScale = 0.02;
                             hatch.SetHatchPattern(HatchPatternType.PreDefined, "ANSI31");
@@ -236,7 +235,7 @@ namespace BaseFunction
         /// <summary>
         /// Создает замкнутую полилинию по списку точек
         /// </summary>   
-        public static Polyline CreatePolylineFromPointList(this List<Point3d> points)
+        public static Polyline CreatePolylineFromPointList(this List<Point3d> points, bool closed = true)
         {
             Polyline poly = new Polyline();
             int i = 0;
@@ -244,7 +243,7 @@ namespace BaseFunction
             {
                 poly.AddVertexAt(i++, new Point2d(point.X, point.Y), 0, 0, 0);
             }
-            poly.Closed = true;
+            poly.Closed = closed;
             return poly;
         }
         /// <summary>
@@ -630,7 +629,7 @@ namespace BaseFunction
             Solid,
             Ground,
             Sand,
-            Сoncrete,
+            Concrete,
             ReinforcedConcrete
         }
     }
