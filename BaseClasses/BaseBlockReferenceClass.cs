@@ -250,17 +250,27 @@ namespace BaseFunction
             List<string> usingTag = new List<string>();
             bool result = false;
 
-            foreach (ObjectId id in br.AttributeCollection)
+            foreach (object o in br.AttributeCollection)
             {
-                //открываем объект как атрибут
-                using (AttributeReference attRef = tr.GetObject(id, OpenMode.ForWrite, false, true) as AttributeReference)
+                if (o is ObjectId id)
+                {
+                    using (AttributeReference attRef = tr.GetObject(id, OpenMode.ForWrite, false, true) as AttributeReference)
+                    {
+                        if (attRef != null && attributes.ContainsKey(attRef.Tag))
+                        {
+                            attRef.TextString = attributes[attRef.Tag];
+                            if (!usingTag.Contains(attRef.Tag)) usingTag.Add(attRef.Tag);
+                        }
+                    }
+                }
+                else if (o is AttributeReference attRef)
                 {
                     if (attRef != null && attributes.ContainsKey(attRef.Tag))
                     {
                         attRef.TextString = attributes[attRef.Tag];
                         if (!usingTag.Contains(attRef.Tag)) usingTag.Add(attRef.Tag);
                     }
-                }
+                }          
             }
             if (usingTag.Count.Equals(attributes.Count)) result = true;
             documentLock?.Dispose();

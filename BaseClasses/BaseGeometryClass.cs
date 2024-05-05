@@ -138,87 +138,7 @@ namespace BaseFunction
             (Matrix3d.Rotation(-viewport.TwistAngle, viewport.ViewDirection, viewport.ViewTarget));
             return matrix.Inverse();
         }
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="OuterLoops">Список внешних контуров</param>
-        /// <param name="InnerLoops">Список внутренних контуров</param>
-        /// <param name="hatchType">Тип штриховки</param>
-        /// <returns></returns>
-        public static Hatch CreateHatch(List<Curve> OuterLoops, List<Curve> InnerLoops, HatchType hatchType)
-        {           
-            Hatch hatch = new Hatch();
-            using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
-            {
-                BlockTableRecord ms = tr.GetObject(HostApplicationServices.WorkingDatabase.CurrentSpaceId, OpenMode.ForWrite) as BlockTableRecord;                               
-                ms.AppendEntity(hatch);
-                tr.AddNewlyCreatedDBObject(hatch, true);
-                switch (hatchType)
-                {
-                    default:
-                        {
-                            hatch.SetHatchPattern(HatchPatternType.PreDefined, "SOLID");
-                            break;
-                        }
-                    case HatchType.Sand:
-                        {
-                            hatch.PatternScale = 0.004;
-                            hatch.SetHatchPattern(HatchPatternType.PreDefined, "AR-SAND");
-                            break;
-                        }
-                    case HatchType.Ground:
-                        {
-                            hatch.PatternScale = 0.02;
-                            hatch.SetHatchPattern(HatchPatternType.PreDefined, "ANSI31");
-                            break;
-                        }
-                    case HatchType.Concrete:
-                        {
-                            hatch.PatternScale = 0.02;
-                            hatch.SetHatchPattern(HatchPatternType.PreDefined, "ANSI31");
-                            break;
-                        }
-                    case HatchType.ReinforcedConcrete:
-                        {
-                            hatch.PatternScale = 0.01;
-                            hatch.SetHatchPattern(HatchPatternType.PreDefined, "ANSI32");
-                            break;
-                        }
-                }              
-                hatch.ColorIndex = 7;
-                hatch.LineWeight = LineWeight.LineWeight005;
-
-                using (ObjectIdCollection collection = new ObjectIdCollection())
-                {
-                    foreach (Curve curve in OuterLoops)
-                    {
-                        collection.Clear();
-                        try
-                        {
-                            Curve c = curve.Clone() as Curve;
-                            collection.Add(ms.AppendEntity(c));
-                            tr.AddNewlyCreatedDBObject(c, true);
-                            hatch.AppendLoop(HatchLoopTypes.External, collection);
-                        }
-                        catch { return null; }
-                    }
-                    foreach (Curve curve in InnerLoops)
-                    {
-                        collection.Clear();
-                        try
-                        {
-                            Curve c = curve.Clone() as Curve;
-                            collection.Add(ms.AppendEntity(c));
-                            tr.AddNewlyCreatedDBObject(c, true);
-                            hatch.AppendLoop(HatchLoopTypes.External | HatchLoopTypes.Outermost, collection);
-                        }
-                        catch { return null; }
-                    }
-                }                                                
-                tr.Abort();
-            }
-            return hatch.Clone() as Hatch;         
-        }
+      
         /// <summary>
         /// создает замкнутую полилинию по границе
         /// </summary>     
@@ -541,7 +461,17 @@ namespace BaseFunction
 
             return parametr;
         }
-
+        /// <summary>
+        /// создает зеркальные относительно оси Y точки в списке
+        /// </summary>
+        /// <param name="points"></param>
+        public static void MirrorList(this List<Point3d> points)
+        {
+            for (int i = points.Count - 1; i >= 0; i--)
+            {
+                points.Add(new Point3d(-points[i].X, points[i].Y, 0));
+            }
+        }
         /// <summary>
         /// сортирует точки по близости к началу кривой
         /// </summary>
@@ -623,14 +553,6 @@ namespace BaseFunction
             return new Point3d(point.X, point.Y, 0);
         }
 
-        public enum HatchType
-        {
-            None = 0,
-            Solid,
-            Ground,
-            Sand,
-            Concrete,
-            ReinforcedConcrete
-        }
+ 
     }
 }
