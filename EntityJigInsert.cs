@@ -12,8 +12,9 @@ namespace BaseFunction
         /// </summary>
         /// <param name="ent"></param>
         /// <returns></returns>
-        public static bool EntityInsert(this Entity ent)
+        public static bool EntityInsert(this Entity ent, out ObjectId id)
         {
+            id = ObjectId.Null;
             if (!ent.IsNewObject) return false;
             //трай на всякий случай вдруг кто-то применит к уже добавленному в базу данных объекту
             //хотя по идее можно сделать проверку на наличие ObjectId, мысля на будущее
@@ -29,7 +30,7 @@ namespace BaseFunction
                         using (BlockTableRecord ms = tr.GetObject(HostApplicationServices.WorkingDatabase.CurrentSpaceId, OpenMode.ForWrite) as BlockTableRecord)
                         {
                             //вставляем блок
-                            ms.AppendEntity(ent);
+                            id = ms.AppendEntity(ent);
                             tr.AddNewlyCreatedDBObject(ent, true);
                             //вставляем атрибуты
                             BlockReferenceSetAttribute(ent.Id);
@@ -65,7 +66,7 @@ namespace BaseFunction
                             using (BlockTableRecord ms = tr.GetObject(HostApplicationServices.WorkingDatabase.CurrentSpaceId, OpenMode.ForWrite) as BlockTableRecord)
                             {
                                 //добавляем объект в базу данных 
-                                ms.AppendEntity(ent);
+                                id = ms.AppendEntity(ent);
                                 tr.AddNewlyCreatedDBObject(ent, true);
                             }
                             tr.Commit();

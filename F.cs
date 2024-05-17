@@ -209,7 +209,7 @@ namespace BaseFunction
         /// <param name="app">приложение чьи данные очищаем, если пусто или null чистим все</param>
         /// <param name="values">список удаляемых значений в приложении</param>
         /// <returns>true - если удалось очистить</returns>
-        public static bool XDataClear(ObjectId id, string app, List<TypedValue> values)
+        public static bool XDataClear(this ObjectId id, string app, List<TypedValue> values)
         {
             //если объект удален прекращаем
             if (id.IsErased) return false;
@@ -286,7 +286,7 @@ namespace BaseFunction
         /// <param name="id">ObjectId объекта</param>
         /// <param name="app">приложение - чьи данные получаем или получаем все если null или пустое</param>
         /// <returns>ResultBuffer - список TypeValue</returns>
-        public static ResultBuffer XDataGet(ObjectId id, string app)
+        public static ResultBuffer XDataGet(this ObjectId id, string app)
         {
             if (id.IsErased) return null;
             ResultBuffer resultBuffer = null;
@@ -315,7 +315,7 @@ namespace BaseFunction
         /// <param name="app">приложение данны которого записывам</param>
         /// <param name="datas">список TypedValue с данными</param>
         /// <param name="reSet">перезаписывать данные?</param>
-        public static void XDataSet(ObjectId id, string app, List<TypedValue> datas, bool reSet)
+        public static void XDataSet(this ObjectId id, string app, List<TypedValue> datas, bool reSet)
         {
             if (id.IsErased) return;
             try
