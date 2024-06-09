@@ -124,6 +124,54 @@ namespace BaseFunction
             foreach (Point3d p in points) { if (p.IsEqualTo(point)) return true; }
             return false;
         }
+        public static Polyline Convert3dPolylineToPolyline(Polyline3d pline, Transaction tr, bool erase)
+        {
+            if (pline == null) return null;
+
+            Polyline polyline = new Polyline();
+            //счетчик вершин полилинии
+            int i = 0;            
+            //считываем вершины из 3д полилинии в список
+            foreach (ObjectId objectId in pline)
+            {
+                //получаем вершину полилинии
+                PolylineVertex3d vertex3D = tr.GetObject(objectId, OpenMode.ForRead) as PolylineVertex3d;
+                if (vertex3D != null)
+                {
+                    //добавляем вершину полилинии
+                    polyline.AddVertexAt(i++, vertex3D.Position.GetPoint2d(), 0, 0, 0);
+                }
+            }
+            //если вершин меньше 2 то возвращаем null
+            if (polyline.NumberOfVertices < 2) return null;
+            //пеоеносим параметры
+            polyline.Closed = pline.Closed;
+            polyline.Layer = pline.Layer;
+            polyline.Linetype = pline.Linetype;
+            polyline.LineWeight = pline.LineWeight;
+            polyline.Color = pline.Color;
+            //удаляем 3д полилинию если надо
+            if (erase)
+            {
+                if (pline.IsReadEnabled) pline.UpgradeOpen();
+                pline.Erase();
+            }
+
+            return polyline;
+        }
+        public static Polyline Convert3dPolylineToPolyline(ObjectId id, bool erase)
+        {
+            Polyline polyline;
+            using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+            {
+                using (Polyline3d pline = tr.GetObject(id, OpenMode.ForRead) as Polyline3d)
+                {
+                    polyline = Convert3dPolylineToPolyline(pline, tr, erase);
+                }
+                tr.Commit();
+            }
+            return polyline;
+        }
         /// <summary>
         /// Возвращает матрицу преобразования объетов модели в выбранный видовой экран
         /// </summary>

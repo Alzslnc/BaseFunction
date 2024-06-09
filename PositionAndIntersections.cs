@@ -38,6 +38,14 @@ namespace BaseFunction
             if (startType == PositionType.inner || endType == PositionType.inner || centerType == PositionType.inner) return PositionType.inner;
             else return PositionType.onBound;           
         }
+        public static bool PIntersect(this Curve poly1, Curve poly2)
+        {
+            using (Point3dCollection coll = new Point3dCollection())
+            {
+                poly1.IntersectWith(poly2, Intersect.OnBothOperands, coll, IntPtr.Zero, IntPtr.Zero);
+                if (coll.Count > 0) return true; return false;
+            }
+        }
         public static bool TryGetIntersections(this Curve curve, Curve curve2, out List<Point3d> intersections)
         { 
             if (curve.Equals(curve2)) return curve.TryGetSelfIntersect(out intersections);
