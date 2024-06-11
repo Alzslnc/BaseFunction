@@ -69,11 +69,11 @@ namespace BaseFunction
                             {
                                 for (int j = 0; j < cci2.NumberOfIntersectionPoints; j++)
                                 { 
-                                    intersections.Add(cci2.GetIntersectionPoint(j));
+                                    if (!intersections.ContainPoint(cci2.GetIntersectionPoint(j))) intersections.Add(cci2.GetIntersectionPoint(j));
                                 }                            
                             }
                         } 
-                    }
+                    }                    
                     intersections.SortOnCurve(curve);
                 }
                 catch { return false; }
