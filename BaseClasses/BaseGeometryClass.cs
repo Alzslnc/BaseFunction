@@ -7,6 +7,7 @@ namespace BaseFunction
 {
     public static class BaseGeometryClass
     {        
+
         /// <summary>
         /// очищает список от дублирующихся точек
         /// </summary>
@@ -434,6 +435,44 @@ namespace BaseFunction
         public static bool IsEqualTo(this double d1, double d2)
         { 
             if (Math.Abs(d2 - d1) > Tolerance.Global.EqualPoint) return false; return true;        
+        }
+        public static bool IsIntersect(this Polyline p1, Polyline p2)
+        {
+            List<Point3d> points = new List<Point3d>();
+            List<Line> p1l = new List<Line>();
+            List<Line> p2l = new List<Line>();
+
+            for (int i = 1; i < p1.NumberOfVertices; i++)
+            {
+                p1l.Add(new Line(p1.GetPoint3dAt(i), p1.GetPoint3dAt(i - 1)));
+            }
+            for (int i = 1; i < p2.NumberOfVertices; i++)
+            {
+                p2l.Add(new Line(p2.GetPoint3dAt(i), p2.GetPoint3dAt(i - 1)));
+            }
+            foreach (Line l1 in p1l)
+            {
+                foreach (Line l2 in p2l)
+                {
+                    using (Point3dCollection collection = new Point3dCollection())
+                    {
+                        l1.IntersectWith(l2, Intersect.OnBothOperands, collection, IntPtr.Zero, IntPtr.Zero);
+                        if (collection.Count > 0)
+                        {
+                            foreach (Point3d p in collection)
+                            {
+                                Point3d closest = l1.GetClosestPointTo(p, false);
+                                if (closest.IsEqualTo(l1.StartPoint) || closest.IsEqualTo(l1.EndPoint)) continue;
+                                closest = l2.GetClosestPointTo(p, false);
+                                if (closest.IsEqualTo(l2.StartPoint) || closest.IsEqualTo(l2.EndPoint)) continue;
+                                points.Add(p);
+                            }
+                        }
+                    }
+                }
+            }
+            if (points.Count > 0) return true;
+            else return false;
         }
         /// <summary>
         /// проверяет пересекаются ли кривые или нет

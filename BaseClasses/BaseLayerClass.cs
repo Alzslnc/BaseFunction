@@ -122,6 +122,24 @@ namespace BaseFunction
             else if (variant.Contains(LayerTypeChange.full)) return LayerTypeChange.full;
             else return LayerTypeChange.none;
         }
+        public static bool LayerGroupNew(string groupName)
+        {
+            using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+            {              
+                //LayerFilterTree lf = ;
+                //LayerFilter clg = lf.Current;
+                //if (clg != null)
+                //{
+                //    if (clg.IsIdFilter)
+                //    {
+                //        ((LayerGroup)clg).LayerIds.Add(newLayerId);
+                //        clayerId.Database.LayerFilters = lf;
+                //    }
+                //}
+                tr.Commit();
+            }
+            return true;
+        }
         /// <summary>
         /// Создает новый слой в Autocad
         /// </summary>       
