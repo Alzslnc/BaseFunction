@@ -446,10 +446,12 @@ namespace BaseFunction
             {
                 p1l.Add(new Line(p1.GetPoint3dAt(i), p1.GetPoint3dAt(i - 1)));
             }
+            if (p1.Closed && !p1.StartPoint.IsEqualTo(p1.EndPoint)) p1l.Add(new Line(p1.StartPoint, p1.EndPoint));
             for (int i = 1; i < p2.NumberOfVertices; i++)
             {
                 p2l.Add(new Line(p2.GetPoint3dAt(i), p2.GetPoint3dAt(i - 1)));
             }
+            if (p2.Closed && !p2.StartPoint.IsEqualTo(p2.EndPoint)) p2l.Add(new Line(p2.StartPoint, p2.EndPoint));
             foreach (Line l1 in p1l)
             {
                 foreach (Line l2 in p2l)

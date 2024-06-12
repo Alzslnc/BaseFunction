@@ -7,7 +7,32 @@ using System.Linq;
 namespace BaseFunction
 {
     public static class PositionAndIntersections
-    {      
+    {
+        public static int GetInnerLevel(this Polyline polyline, List<Polyline> polylines)
+        {
+            int j = 0;
+            foreach (Polyline poly in polylines)
+            {
+                if (poly == polyline) continue;
+                PositionType position = polyline.CurveOfCurve(poly);
+                if (position == PositionType.inner)
+                {
+                    j++;
+                    continue;
+                }
+                else if (position == PositionType.fault)
+                {
+                    if (!polyline.GetCentrPoint(out Point3d center)) continue;
+                    position = center.GetPositionType(poly);
+                    if (position == PositionType.inner)
+                    {
+                        j++;
+                        continue;
+                    }
+                }
+            }
+            return j;
+        }
         /// <summary>
         /// Проверяет находится ли кривая внутри другой кривой
         /// </summary>
@@ -117,7 +142,7 @@ namespace BaseFunction
             if (intersections.Count > 0) return true; return false;
         }
 
-        public static List<Point3d> Intersectionts(this Curve c, Curve c2)
+        public static List<Point3d> Intersectionts(this Curve c, Curve c2, bool includeStartAndEnd = false)
         {
             List<Point3d> intersections = new List<Point3d>();
             using (Point3dCollection coll2 = new Point3dCollection())
@@ -127,8 +152,11 @@ namespace BaseFunction
                 {
                     foreach (Point3d p in coll2)
                     {
-                        if ((p.IsEqualTo(c.StartPoint) || p.IsEqualTo(c.EndPoint)) &&
-                            (p.IsEqualTo(c2.StartPoint) || p.IsEqualTo(c2.EndPoint))) continue;
+                        if (!includeStartAndEnd)
+                        {
+                            if ((p.IsEqualTo(c.StartPoint) || p.IsEqualTo(c.EndPoint)) &&
+                                (p.IsEqualTo(c2.StartPoint) || p.IsEqualTo(c2.EndPoint))) continue;
+                        }
                         if (!intersections.Contains(p)) intersections.Add(p);
                     }
                 }
