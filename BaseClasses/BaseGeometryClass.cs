@@ -2,6 +2,7 @@
 using Autodesk.AutoCAD.Geometry;
 using System;
 using System.Collections.Generic;
+using System.Windows.Controls;
 
 namespace BaseFunction
 {
@@ -438,43 +439,59 @@ namespace BaseFunction
         }
         public static bool IsIntersect(this Polyline p1, Polyline p2)
         {
-            List<Point3d> points = new List<Point3d>();
-            List<Line> p1l = new List<Line>();
-            List<Line> p2l = new List<Line>();
-
-            for (int i = 1; i < p1.NumberOfVertices; i++)
+            using (Point3dCollection collection = new Point3dCollection())
             {
-                p1l.Add(new Line(p1.GetPoint3dAt(i), p1.GetPoint3dAt(i - 1)));
-            }
-            if (p1.Closed && !p1.StartPoint.IsEqualTo(p1.EndPoint)) p1l.Add(new Line(p1.StartPoint, p1.EndPoint));
-            for (int i = 1; i < p2.NumberOfVertices; i++)
-            {
-                p2l.Add(new Line(p2.GetPoint3dAt(i), p2.GetPoint3dAt(i - 1)));
-            }
-            if (p2.Closed && !p2.StartPoint.IsEqualTo(p2.EndPoint)) p2l.Add(new Line(p2.StartPoint, p2.EndPoint));
-            foreach (Line l1 in p1l)
-            {
-                foreach (Line l2 in p2l)
+                p1.IntersectWith(p2, Intersect.OnBothOperands, collection, IntPtr.Zero, IntPtr.Zero);
+                if (collection.Count > 0)
                 {
-                    using (Point3dCollection collection = new Point3dCollection())
+                    foreach (Point3d p in collection)
                     {
-                        l1.IntersectWith(l2, Intersect.OnBothOperands, collection, IntPtr.Zero, IntPtr.Zero);
-                        if (collection.Count > 0)
+                        if (p.IsEqualTo(p1.GetClosestPointTo(p, false)) &&
+                            p.IsEqualTo(p2.GetClosestPointTo(p, false)))
                         {
-                            foreach (Point3d p in collection)
-                            {
-                                Point3d closest = l1.GetClosestPointTo(p, false);
-                                if (closest.IsEqualTo(l1.StartPoint) || closest.IsEqualTo(l1.EndPoint)) continue;
-                                closest = l2.GetClosestPointTo(p, false);
-                                if (closest.IsEqualTo(l2.StartPoint) || closest.IsEqualTo(l2.EndPoint)) continue;
-                                points.Add(p);
-                            }
+                            return true;
                         }
                     }
                 }
             }
-            if (points.Count > 0) return true;
-            else return false;
+            return false;
+            //List<Point3d> points = new List<Point3d>();
+            //List<Line> p1l = new List<Line>();
+            //List<Line> p2l = new List<Line>();
+
+            //for (int i = 1; i < p1.NumberOfVertices; i++)
+            //{
+            //    p1l.Add(new Line(p1.GetPoint3dAt(i), p1.GetPoint3dAt(i - 1)));
+            //}
+            //if (p1.Closed && !p1.StartPoint.IsEqualTo(p1.EndPoint)) p1l.Add(new Line(p1.StartPoint, p1.EndPoint));
+            //for (int i = 1; i < p2.NumberOfVertices; i++)
+            //{
+            //    p2l.Add(new Line(p2.GetPoint3dAt(i), p2.GetPoint3dAt(i - 1)));
+            //}
+            //if (p2.Closed && !p2.StartPoint.IsEqualTo(p2.EndPoint)) p2l.Add(new Line(p2.StartPoint, p2.EndPoint));
+            //foreach (Line l1 in p1l)
+            //{
+            //    foreach (Line l2 in p2l)
+            //    {
+            //        using (Point3dCollection collection = new Point3dCollection())
+            //        {
+            //            l1.IntersectWith(l2, Intersect.OnBothOperands, collection, IntPtr.Zero, IntPtr.Zero);
+            //            if (collection.Count > 0)
+            //            {
+            //                foreach (Point3d p in collection)
+            //                {
+            //                    Point3d closest = l1.GetClosestPointTo(p, false);
+            //                    if (closest.IsEqualTo(l1.StartPoint) || closest.IsEqualTo(l1.EndPoint)) continue;
+            //                    closest = l2.GetClosestPointTo(p, false);
+            //                    if (closest.IsEqualTo(l2.StartPoint) || closest.IsEqualTo(l2.EndPoint)) continue;
+            //                    points.Add(p);
+            //                }
+            //            }
+            //        }
+            //    }
+            //}
+            //if (points.Count > 0) return true;
+            //else return false;
         }
         /// <summary>
         /// проверяет пересекаются ли кривые или нет
