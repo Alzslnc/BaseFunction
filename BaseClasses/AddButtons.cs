@@ -15,9 +15,12 @@ namespace BaseFunction
     //    {
     //        StartEvents startEvents = new StartEvents();
 
-    //        startEvents.Buttons.Add(new Button("nCommand", "panel",
-    //            new ButtonCommand("command", "name",
-    //            "content")));
+    //        startEvents.Buttons.Add(new Button("nCommand", "Civil",
+    //            new List<ButtonCommand>
+    //            {
+    //                new ButtonCommand("111", "111",
+    //                "1111"),
+    //            }));
 
     //        startEvents.Initialize();
     //    }
