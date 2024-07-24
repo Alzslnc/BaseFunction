@@ -526,7 +526,29 @@ namespace BaseFunction
             DynamicBlockReferencePropertyCollection collection = reference.DynamicBlockReferencePropertyCollection;
             foreach (DynamicBlockReferenceProperty property in collection)
             {
-                result.Add(property.PropertyName, property.Value);
+                if (result.ContainsKey(property.PropertyName))
+                { 
+                    int i = 0;
+                    while (result.ContainsKey(property.PropertyName + "..." + ++i)) continue;
+                    result.Add(property.PropertyName + "..." + i, property.Value);
+                }
+                else result.Add(property.PropertyName, property.Value);              
+            }
+            return result;
+        }
+        public static Dictionary<string, (dynamic, dynamic)> GetBlockReferencePropertiesAndUnits(this BlockReference reference)
+        {
+            Dictionary<string, (dynamic, dynamic)> result = new Dictionary<string, (dynamic, dynamic)>();
+            DynamicBlockReferencePropertyCollection collection = reference.DynamicBlockReferencePropertyCollection;
+            foreach (DynamicBlockReferenceProperty property in collection)
+            {
+                if (result.ContainsKey(property.PropertyName))
+                {
+                    int i = 0;
+                    while (result.ContainsKey(property.PropertyName + "..." + ++i)) continue;
+                    result.Add(property.PropertyName + "..." + i, (property.Value, property.UnitsType));
+                }
+                else result.Add(property.PropertyName, (property.Value, property.UnitsType));         
             }
             return result;
         }
