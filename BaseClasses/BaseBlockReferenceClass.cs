@@ -10,6 +10,20 @@ namespace BaseFunction
 {
     public static class BaseBlockReferenceClass
     {
+        #region получаем название блока
+        public static string GetName(this BlockReference reference)
+        {
+            if (reference.IsDynamicBlock)
+            {
+                using (BlockTableRecord btr = reference.DynamicBlockTableRecord.Open(OpenMode.ForRead) as BlockTableRecord)
+                { 
+                    return btr.Name;
+                }
+            }
+            else return reference.Name;
+        }
+        #endregion
+
         #region перенос блоков из других чертежей
         /// <summary>
         /// переносит отсутствующие в чертеже блоки из выбранного файла в используемый файл
@@ -312,7 +326,7 @@ namespace BaseFunction
         /// <param name="result"></param>
         /// <param name="tr"></param>
         /// <returns>true если получено хотя бы одно значение</returns>
-        public static bool BlockReferenceGetAttribute(this BlockReference br, out Dictionary<string, string> result, Transaction tr)
+        public static bool BlockReferenceGetAttribute(this BlockReference br, out Dictionary<string, string> result, Transaction tr, List<string> names = null)
         {
             result = new Dictionary<string, string>();
             if (br == null) return false;
@@ -322,6 +336,7 @@ namespace BaseFunction
                 //открываем объект как атрибут
                 using (AttributeReference attRef = tr.GetObject(id, OpenMode.ForRead, false, true) as AttributeReference)
                 {
+                    if (names != null && !names.Contains(attRef.Tag)) continue;
                     if (attRef != null && !result.ContainsKey(attRef.Tag)) result.Add(attRef.Tag, attRef.TextString);
                 }
             }
@@ -333,7 +348,7 @@ namespace BaseFunction
         /// <param name="br"></param>    
         /// <param name="result"></param>
         /// <returns>true если получено хотя бы одно значение</returns>        
-        public static bool BlockReferenceGetAttribute(this BlockReference br, out Dictionary<string, string> result)
+        public static bool BlockReferenceGetAttribute(this BlockReference br, out Dictionary<string, string> result, List<string> names = null)
         {
             result = new Dictionary<string, string>();
             if (br == null) return false;
@@ -351,6 +366,7 @@ namespace BaseFunction
                     //открываем объект как атрибут
                     using (AttributeReference attRef = tr.GetObject(id, OpenMode.ForRead, false, true) as AttributeReference)
                     {
+                        if (names != null && !names.Contains(attRef.Tag)) continue;
                         if (attRef != null && !result.ContainsKey(attRef.Tag)) result.Add(attRef.Tag, attRef.TextString);
                     }
                 }
@@ -520,9 +536,9 @@ namespace BaseFunction
         #endregion
 
         #region получение и установка параметров блока
-        public static Dictionary<string, object> GetBlockReferenceProperties(this BlockReference reference)
+        public static Dictionary<string, dynamic> GetBlockReferenceProperties(this BlockReference reference)
         { 
-            Dictionary<string, object> result = new Dictionary<string, object>();
+            Dictionary<string, dynamic> result = new Dictionary<string, dynamic>();
             DynamicBlockReferencePropertyCollection collection = reference.DynamicBlockReferencePropertyCollection;
             foreach (DynamicBlockReferenceProperty property in collection)
             {
@@ -540,6 +556,7 @@ namespace BaseFunction
         {
             Dictionary<string, (dynamic, dynamic)> result = new Dictionary<string, (dynamic, dynamic)>();
             DynamicBlockReferencePropertyCollection collection = reference.DynamicBlockReferencePropertyCollection;
+                       
             foreach (DynamicBlockReferenceProperty property in collection)
             {
                 if (result.ContainsKey(property.PropertyName))
