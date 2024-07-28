@@ -511,8 +511,10 @@ namespace BaseFunction
                 using (BlockReference newReference = new BlockReference(oldReference.Position, newBtr))
                 {
                     newReference.ScaleFactors = oldReference.ScaleFactors;
-                    newReference.Rotation = oldReference.Rotation;
                     newReference.Normal = oldReference.Normal;
+                    newReference.Rotation = oldReference.Rotation;
+                    //newReference.TransformBy(Matrix3d.Rotation(oldReference.Rotation, newReference.Normal, newReference.Position));               
+                    newReference.XData = oldReference.XData;
 
                     newReference.Color = oldReference.Color;
                     newReference.Linetype = oldReference.Linetype;
@@ -530,6 +532,11 @@ namespace BaseFunction
                     {
                         BlockReferenceChangeAttribute(newReference, tr, attributes);
                     }
+
+                    if (newReference.IsDynamicBlock)
+                    {                
+                        newReference.SetBlockreferenceProperties(oldReference.GetBlockReferenceProperties());
+                    }                    
                 }
             }
         }
@@ -570,12 +577,16 @@ namespace BaseFunction
             return result;
         }
         public static void SetBlockreferenceProperties(this BlockReference reference, Dictionary<string, object> properties)
-        {
+        {          
             DynamicBlockReferencePropertyCollection collection = reference.DynamicBlockReferencePropertyCollection;
             foreach (DynamicBlockReferenceProperty property in collection)
             {
-                if (properties.ContainsKey(property.PropertyName)) property.Value = properties[property.PropertyName];               
-            }          
+                try
+                {
+                    if (properties.ContainsKey(property.PropertyName) && !property.PropertyName.Contains("Origin")) property.Value = properties[property.PropertyName];
+
+                } catch { }
+            }
         }
         #endregion
     }
