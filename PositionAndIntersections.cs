@@ -8,11 +8,12 @@ namespace BaseFunction
 {
     public static class PositionAndIntersections
     {
-        public static int GetInnerLevel(this Polyline polyline, List<Polyline> polylines)
+        public static int GetInnerLevel(this Polyline polyline, List<Polyline> polylines, bool simple = false)
         {
             int j = 0;
             foreach (Polyline poly in polylines)
             {
+                if (simple && j > 1) return j;
                 if (poly == polyline) continue;
                 PositionType position = polyline.CurveOfCurve(poly);
                 if (position == PositionType.inner)
