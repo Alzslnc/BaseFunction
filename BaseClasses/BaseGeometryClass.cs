@@ -6,7 +6,58 @@ using System.Collections.Generic;
 namespace BaseFunction
 {
     public static class BaseGeometryClass
-    {        
+    {
+        public static Polyline GetClearPolyline(this Polyline poly, Tolerance? tolerance = null, bool reverse = true)
+        {            
+            if (!tolerance.HasValue) tolerance = new Tolerance (Tolerance.Global.EqualPoint, Tolerance.Global.EqualVector); 
+            for (int i = poly.NumberOfVertices - 2; i > 0; i--)
+            { 
+                Vector3d next = (poly.GetPoint3dAt(i + 1) - poly.GetPoint3dAt(i)).GetNormal();
+                Vector3d previous = (poly.GetPoint3dAt(i - 1) - poly.GetPoint3dAt(i)).GetNormal();
+                if ((next.IsEqualTo(previous, tolerance.Value) && reverse) || next.IsEqualTo(-previous, tolerance.Value)) poly.RemoveVertexAt(i);
+            }
+            return poly;
+        }
+        public static Polyline3d GetClearPolyline(this Polyline3d poly, Transaction tr, Tolerance? tolerance = null, bool reverse = true)
+        {
+            if (!tolerance.HasValue) tolerance = new Tolerance(Tolerance.Global.EqualPoint, Tolerance.Global.EqualVector);
+
+            List<PolylineVertex3d> vertices = new List<PolylineVertex3d> ();
+
+            Transaction transaction;
+
+            if (tr == null)
+            {
+                transaction = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction();
+            }
+            else transaction = tr;
+
+            foreach (object o in poly)
+            {
+                if (o is PolylineVertex3d v) vertices.Add(v);
+                else if (o is ObjectId id && transaction.GetObject(id, OpenMode.ForWrite, false, true) is PolylineVertex3d v2) vertices.Add(v2);
+            }
+
+            for (int i = vertices.Count - 2; i > 0; i--)
+            {
+                Vector3d next = (vertices[i + 1].Position - vertices[i].Position).GetNormal();
+                Vector3d previous = (vertices[i - 1].Position - vertices[i].Position).GetNormal();
+                if ((next.IsEqualTo(previous, tolerance.Value) && reverse) || next.IsEqualTo(-previous, tolerance.Value))
+                {
+                    vertices[i].Erase();
+                    vertices.RemoveAt(i);
+                }
+            }
+
+            if (tr == null)
+            {
+                transaction.Commit();
+                transaction.Dispose();
+            }
+               
+
+            return poly;
+        }
 
         /// <summary>
         /// очищает список от дублирующихся точек
@@ -221,10 +272,11 @@ namespace BaseFunction
         public static Point3d DBTextPositionGet(this DBText dBText)
         {
             Point3d result;
-            if (dBText.VerticalMode == TextVerticalMode.TextBase ||
-                dBText.HorizontalMode == TextHorizontalMode.TextLeft ||
+            if (
+                (dBText.HorizontalMode == TextHorizontalMode.TextLeft ||
                 dBText.HorizontalMode == TextHorizontalMode.TextAlign ||
-                dBText.HorizontalMode == TextHorizontalMode.TextFit
+                dBText.HorizontalMode == TextHorizontalMode.TextFit) &&
+                dBText.VerticalMode == TextVerticalMode.TextBase
                ) result = dBText.Position;
             else result = dBText.AlignmentPoint;
             return result;
