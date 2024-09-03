@@ -184,10 +184,19 @@ namespace BaseFunction
             //счетчик вершин полилинии
             int i = 0;            
             //считываем вершины из 3д полилинии в список
-            foreach (ObjectId objectId in pline)
+
+            foreach (object o in pline)
             {
-                //получаем вершину полилинии
-                PolylineVertex3d vertex3D = tr.GetObject(objectId, OpenMode.ForRead) as PolylineVertex3d;
+                PolylineVertex3d vertex3D;
+                if (o is ObjectId id)
+                {
+
+                    if (tr != null) vertex3D = tr.GetObject(id, OpenMode.ForRead) as PolylineVertex3d;
+                    else vertex3D = id.Open(OpenMode.ForRead) as PolylineVertex3d;
+                }
+                else if (o is PolylineVertex3d) vertex3D = o as PolylineVertex3d;
+                else continue;
+
                 if (vertex3D != null)
                 {
                     //добавляем вершину полилинии
@@ -372,7 +381,9 @@ namespace BaseFunction
             double deltaAng = arc.EndAngle - arc.StartAngle;
             if (deltaAng < 0)
                 deltaAng += 2 * Math.PI;
-            return Math.Tan(deltaAng * 0.25);
+            double bulge = Math.Tan(deltaAng * 0.25);
+            if (arc.Normal.Z < 0) bulge = -bulge;
+            return bulge;
         }
         /// <summary>
         /// Возвращает центральную точку кривой если кривая корректна и не нулевой длины

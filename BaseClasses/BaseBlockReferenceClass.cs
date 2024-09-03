@@ -591,7 +591,6 @@ namespace BaseFunction
         #endregion
     }
 
-
     public sealed class WorkingDatabaseSwitcher : IDisposable
     {
         private readonly Database PrevDb = null;
