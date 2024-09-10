@@ -4,6 +4,7 @@ using Autodesk.AutoCAD.Geometry;
 using Autodesk.AutoCAD.Runtime;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace BaseFunction
 {
@@ -208,6 +209,53 @@ namespace BaseFunction
                 }
             }
         }
+        #endregion
+
+        #region объекты в точке
+
+        public static bool GetObjectInPoint(out List<ObjectId> result, Type type, string message, List<ObjectId> excludes, Point3d? clickPoint = null, double? precision = null)
+        {
+            return GetObjectInPoint(out result, new List<Type> { type },  message, excludes, clickPoint, precision);
+        }
+
+        public static bool GetObjectInPoint(out List<ObjectId> result, List<Type> types, string message, List<ObjectId> excludes, Point3d? point = null, double? precision = null)
+        {
+            result = new List<ObjectId>();
+
+            Point3d clickPoint;
+
+            if (point.HasValue) clickPoint = point.Value;
+            else if (!TryGetPointFromUser(out clickPoint, message)) return false;          
+
+            if (precision == null) precision = Tolerance.Global.EqualPoint;
+
+            string typeString = "";
+            foreach (Type type in types)
+            { 
+                typeString += RXClass.GetClass(type).DxfName + ",";
+            }
+            if (typeString.Length > 1) typeString = typeString.Substring(0, typeString.Length - 1);
+            //выбираем типы для множественного выбора
+            TypedValue[] values = new TypedValue[]
+            {
+                  new TypedValue((int)DxfCode.Start,typeString)
+            };
+
+            //объявляем фильтр
+            SelectionFilter filter = new SelectionFilter(values);
+            //создаем точки для выбора объектов в области
+            Point3d pt1 = new Point3d(clickPoint.X - precision.Value, clickPoint.Y - precision.Value, 0);
+            Point3d pt2 = new Point3d(clickPoint.X + precision.Value, clickPoint.Y + precision.Value, 0);
+            //выбираем объекты в области вокруг выбранной точки
+            PromptSelectionResult psr = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager
+                .MdiActiveDocument.Editor.SelectCrossingWindow(pt1, pt2, filter);
+            if (psr.Status != PromptStatus.OK || psr.Value.Count == 0) return false;
+
+            result.AddRange(psr.Value.GetObjectIds().Except(excludes));
+
+            return true;
+        }
+
         #endregion
 
         #region получение ObjectId
