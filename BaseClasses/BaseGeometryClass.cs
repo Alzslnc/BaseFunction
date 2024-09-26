@@ -7,6 +7,11 @@ namespace BaseFunction
 {
     public static class BaseGeometryClass
     {
+        public static int GetAfterPointNumber(this string s)
+        {
+            if (!s.Contains(".")) return 0;
+            return s.Length - 1 - s.IndexOf(".");          
+        }
         public static Polyline GetClearPolyline(this Polyline poly, Tolerance? tolerance = null, bool reverse = true)
         {            
             if (!tolerance.HasValue) tolerance = new Tolerance (Tolerance.Global.EqualPoint, Tolerance.Global.EqualVector); 
