@@ -86,6 +86,7 @@
     <Compile Include="BaseClasses\BaseGeometryClass.cs" />
     <Compile Include="BaseClasses\BaseLayerClass.cs" />
     <Compile Include="BaseClasses\TextBounds.cs" />
+    <Compile Include="BaseClasses\TransientGraphicsClass.cs" />
     <Compile Include="CheckEntityClass.cs" />
     <Compile Include="BaseClasses\BaseGetObjectClass.cs" />
     <Compile Include="EntityJigInsert.cs" />
