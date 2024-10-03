@@ -16,8 +16,17 @@ namespace BaseFunction
         {            
             if (!tolerance.HasValue) tolerance = new Tolerance (Tolerance.Global.EqualPoint, Tolerance.Global.EqualVector); 
             for (int i = poly.NumberOfVertices - 2; i > 0; i--)
-            { 
-                Vector3d next = (poly.GetPoint3dAt(i + 1) - poly.GetPoint3dAt(i)).GetNormal();
+            {
+                Point3d nextPt = poly.GetPoint3dAt(i + 1);
+                Point3d previousPt = poly.GetPoint3dAt(i);
+
+                if (nextPt.IsEqualTo(previousPt))
+                {
+                    poly.RemoveVertexAt(i);
+                    continue;
+                }
+                    
+                Vector3d next = (nextPt - previousPt).GetNormal();
                 Vector3d previous = (poly.GetPoint3dAt(i - 1) - poly.GetPoint3dAt(i)).GetNormal();
                 if ((next.IsEqualTo(previous, tolerance.Value) && reverse) || next.IsEqualTo(-previous, tolerance.Value)) poly.RemoveVertexAt(i);
             }
@@ -45,7 +54,17 @@ namespace BaseFunction
 
             for (int i = vertices.Count - 2; i > 0; i--)
             {
-                Vector3d next = (vertices[i + 1].Position - vertices[i].Position).GetNormal();
+                Point3d nextPt = vertices[i + 1].Position;
+                Point3d previousPt = vertices[i].Position;
+
+                if (nextPt.IsEqualTo(previousPt))
+                {
+                    vertices[i].Erase();
+                    vertices.RemoveAt(i);
+                    continue;
+                }
+
+                Vector3d next = (nextPt - previousPt).GetNormal();
                 Vector3d previous = (vertices[i - 1].Position - vertices[i].Position).GetNormal();
                 if ((next.IsEqualTo(previous, tolerance.Value) && reverse) || next.IsEqualTo(-previous, tolerance.Value))
                 {
@@ -60,7 +79,6 @@ namespace BaseFunction
                 transaction.Dispose();
             }
                
-
             return poly;
         }
 

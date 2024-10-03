@@ -236,7 +236,7 @@ namespace BaseFunction
                     using (AttributeReference attRef = tr.GetObject(id, OpenMode.ForWrite, false, true) as AttributeReference)
                     {
                         if (attRef != null && attributes.ContainsKey(attRef.Tag))
-                        {
+                        {                           
                             attRef.TextString = attributes[attRef.Tag];
                             if (!usingTag.Contains(attRef.Tag)) usingTag.Add(attRef.Tag);
                         }
