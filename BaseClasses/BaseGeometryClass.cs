@@ -500,6 +500,11 @@ namespace BaseFunction
         {
             return Vector3d.XAxis.TransformBy(Matrix3d.Rotation(rotation, Vector3d.ZAxis, Point3d.Origin));
         }
+        public static Vector3d GetViewVector()
+        {
+            Point3d vpoint = (Point3d)Autodesk.AutoCAD.ApplicationServices.Application.GetSystemVariable("VIEWDIR");
+            return vpoint.GetAsVector().GetNormal();
+        }
         /// <summary>
         /// проверяет объект на пренадлежность типу Acad Curve
         /// </summary>
