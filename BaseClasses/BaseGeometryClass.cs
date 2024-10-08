@@ -7,6 +7,48 @@ namespace BaseFunction
 {
     public static class BaseGeometryClass
     {
+        public enum ExPosition
+        { 
+            none,
+            Inner,
+            Outer,
+            Intersect,
+            Surround
+        }
+        /// <summary>
+        /// определяет положение первой области относительно второй
+        /// </summary>
+        /// <param name="ex1"></param>
+        /// <param name="ex2"></param>
+        /// <returns></returns>
+        public static ExPosition GetExPosition(this Extents3d ex1, Extents3d ex2)
+        { 
+            ExPosition result;
+            //снаружи второго
+            if (
+                ex1.MaxPoint.X < ex2.MinPoint.X ||
+                ex1.MaxPoint.Y < ex2.MinPoint.Y ||
+                ex1.MinPoint.X > ex2.MaxPoint.X ||
+                ex1.MinPoint.Y > ex1.MaxPoint.Y
+                ) result = ExPosition.Outer;
+            //внутри второго
+            else if (
+                ex1.MaxPoint.X < ex2.MaxPoint.X &&
+                ex1.MinPoint.X > ex2.MinPoint.X &&
+                ex1.MaxPoint.Y < ex2.MaxPoint.Y &&
+                ex1.MinPoint.Y > ex2.MinPoint.Y
+                ) result = ExPosition.Inner;
+            //окружает второй
+            else if (
+                ex1.MinPoint.X < ex2.MinPoint.X &&
+                ex1.MaxPoint.X > ex2.MaxPoint.X &&
+                ex1.MinPoint.Y < ex2.MinPoint.Y &&
+                ex1.MaxPoint.Y > ex2.MaxPoint.Y
+                ) result = ExPosition.Surround;
+            //иначе пересекаются
+            else result = ExPosition.Intersect;    
+            return result;
+        }
         public static int GetAfterPointNumber(this string s)
         {
             if (!s.Contains(".")) return 0;
