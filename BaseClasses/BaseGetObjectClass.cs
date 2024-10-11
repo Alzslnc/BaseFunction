@@ -265,9 +265,9 @@ namespace BaseFunction
             Point3d pt2 = new Point3d(clickPoint.X + precision.Value, clickPoint.Y + precision.Value, 0);
             //выбираем объекты в области вокруг выбранной точки
             PromptSelectionResult psr = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager
-                //.MdiActiveDocument.Editor.SelectCrossingWindow(pt1, pt2, filter);
-                .MdiActiveDocument.Editor.SelectCrossingPolygon(new Point3dCollection 
-                { pt1, pt1 + Vector3d.XAxis * precision.Value * 2, pt2, pt1 + Vector3d.YAxis * precision.Value * 2}, filter);
+                .MdiActiveDocument.Editor.SelectCrossingWindow(pt1, pt2, filter);
+               // .MdiActiveDocument.Editor.SelectCrossingPolygon(new Point3dCollection 
+               // { pt1, pt1 + Vector3d.XAxis * precision.Value * 2, pt2, pt1 + Vector3d.YAxis * precision.Value * 2}, filter);
             if (psr.Status != PromptStatus.OK || psr.Value.Count == 0) return false;
 
             result.AddRange(psr.Value.GetObjectIds().Except(excludes));
