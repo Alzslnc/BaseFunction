@@ -7,7 +7,7 @@ namespace BaseFunction
 {
     public static class TextBounds
     {
-        public static Polyline CreatePolyline(MText mTexta)
+        public static Polyline CreatePolyline(this MText mTexta)
         {
             using (MText mText = mTexta.Clone() as MText)
             {
@@ -69,7 +69,7 @@ namespace BaseFunction
                 });              
             }
         }
-        public static Polyline CreatePolyline(DBText texta)
+        public static Polyline CreatePolyline(this DBText texta)
         {
             using (DBText text = texta.Clone() as DBText)
             {

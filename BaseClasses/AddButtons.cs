@@ -1,32 +1,37 @@
-﻿using Autodesk.AutoCAD.ApplicationServices;
-using Autodesk.AutoCAD.Runtime;
-using Autodesk.Windows;
+﻿using Autodesk.Windows;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using AppCore = Autodesk.AutoCAD.ApplicationServices.Core.Application;
 using AppSystemVariableChangedEventArgs = Autodesk.AutoCAD.ApplicationServices.SystemVariableChangedEventArgs;
 
+
+//Использование в плагинах
+
+//public class ExampleRibbon : IExtensionApplication
+//{
+//    public void Initialize()
+//    {
+//        StartEvents startEvents = new StartEvents();
+
+//        startEvents.Buttons.Add(new Button("Панель", "Вкладка", new List<ButtonCommand>
+//            {
+//                //кнопка
+//                new ButtonCommand("Команда1", "Название кнопки1",
+//                "Описание"),
+//                //если в одной кнопке несколько команд то добавлять их в список
+//                //new ButtonCommand("Команда2", "Название кнопки2",
+//                //"Описание"),
+//            }
+//            ));
+
+//        startEvents.Initialize();
+//    }
+//    public void Terminate() { }
+//}
+
 namespace BaseFunction
 {
-    //public class ExampleRibbon : IExtensionApplication
-    //{
-    //    public void Initialize()
-    //    {
-    //        StartEvents startEvents = new StartEvents();
-
-    //        startEvents.Buttons.Add(new Button("nCommand", "Civil",
-    //            new List<ButtonCommand>
-    //            {
-    //                new ButtonCommand("111", "111",
-    //                "1111"),
-    //            }));
-
-    //        startEvents.Initialize();
-    //    }
-    //    public void Terminate() { }
-    //}
-
     internal class StartEvents
     {
         private bool Initialized { get; set; } = false;

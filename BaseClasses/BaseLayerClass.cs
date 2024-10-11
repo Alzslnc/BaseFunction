@@ -122,6 +122,39 @@ namespace BaseFunction
             else if (variant.Contains(LayerTypeChange.full)) return LayerTypeChange.full;
             else return LayerTypeChange.none;
         }
+        public static void LayerDelete(string layerName)
+        {
+            using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+            {
+                LayerTable lt = tr.GetObject(HostApplicationServices.WorkingDatabase.LayerTableId, OpenMode.ForRead, false, true) as LayerTable;
+
+                if (lt != null)
+                {
+                    if (lt.Has(layerName))
+                    {
+                        BlockTable blockTable = tr.GetObject(HostApplicationServices.WorkingDatabase.BlockTableId, OpenMode.ForRead) as BlockTable;
+
+                        foreach (ObjectId btrId in blockTable)
+                        {
+                            BlockTableRecord btr = tr.GetObject(btrId, OpenMode.ForRead, false, true) as BlockTableRecord;
+
+                            foreach (ObjectId id in btr)
+                            {
+                                Entity e = tr.GetObject(id, OpenMode.ForRead, false, true) as Entity;
+                                if (e == null || e.Layer != layerName) continue;
+                                e.UpgradeOpen();
+                                e.Erase();
+                            }
+                        }
+                        LayerTableRecord ltr = tr.GetObject(lt[layerName], OpenMode.ForWrite, false, true) as LayerTableRecord;
+                        ltr?.Erase();
+                    }
+                }
+
+                tr.Commit();
+            }
+
+        }
         public static bool LayerGroupNew(string groupName)
         {
             using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
