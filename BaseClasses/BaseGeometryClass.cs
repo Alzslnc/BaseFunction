@@ -766,6 +766,21 @@ namespace BaseFunction
             return new Point3d(point.X, point.Y, 0);
         }
 
- 
+        public static int? GetFirstPointIndex(this List<Point3d> points, Point3d point)
+        {
+            for (int i = 0; i < points.Count; i++)
+            {
+                if (points[i].IsEqualTo(point)) return i;
+            }
+            return null;
+        }
+        public static int? GetLastPointIndex(this List<Point3d> points, Point3d point)
+        {
+            for (int i = points.Count - 1; i >= 0; i--)
+            {
+                if (points[i].IsEqualTo(point)) return i;
+            }
+            return null;
+        }
     }
 }

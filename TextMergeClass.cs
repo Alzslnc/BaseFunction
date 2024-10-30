@@ -284,13 +284,13 @@ namespace BaseFunction
             {
                 Text = m;
                 MText = m;
-                Bound = CreatePolyline(m);
+                Bound = m.CreatePolyline();
             }
             else if (o is DBText t)
             {
                 Text = t;
                 DBText = t;
-                Bound = CreatePolyline(t);
+                Bound = t.CreatePolyline();
             }
             else return;
             if (!Bound.Bounds.HasValue) return;

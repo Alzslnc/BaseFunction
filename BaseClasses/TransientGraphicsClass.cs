@@ -52,6 +52,7 @@ namespace BaseFunction
             get
             {
                 if (Circle != null) return Circle.Center;
+                else if (Entity is Solid3d s) return s.MassProperties.Centroid;
                 else return null;
             }
             set
@@ -154,10 +155,13 @@ namespace BaseFunction
             {
                 if (_Entity != value)
                 {
-                    if (_Entity != null && TDraw)
+                    
+                    if (_Entity != null)
                     {
-                        TransientManager.EraseTransient(Entity, new IntegerCollection());
+                        if (TDraw) TransientManager.EraseTransient(Entity, new IntegerCollection());
+                        _Entity.Dispose();
                     }
+                    
                     _Entity = value;
                     if (_Entity == null)
                     {
