@@ -245,9 +245,10 @@ namespace BaseFunction
                 else if (o is AttributeReference attRef)
                 {
                     if (attRef != null && attributes.ContainsKey(attRef.Tag))
-                    {
+                    {                        
                         attRef.TextString = attributes[attRef.Tag];
                         if (!usingTag.Contains(attRef.Tag)) usingTag.Add(attRef.Tag);
+                        attRef.AdjustAlignment(HostApplicationServices.WorkingDatabase);
                     }
                 }          
             }
@@ -326,7 +327,7 @@ namespace BaseFunction
         /// <param name="result"></param>
         /// <param name="tr"></param>
         /// <returns>true если получено хотя бы одно значение</returns>
-        public static bool BlockReferenceGetAttribute(this BlockReference br, out Dictionary<string, string> result, Transaction tr, List<string> names = null)
+        public static bool BlockReferenceGetAttribute(this BlockReference br, out Dictionary<string, string> result, Transaction tr, List<string> names = null, bool fullContents = false)
         {
             result = new Dictionary<string, string>();
             if (br == null) return false;
@@ -337,7 +338,19 @@ namespace BaseFunction
                 using (AttributeReference attRef = tr.GetObject(id, OpenMode.ForRead, false, true) as AttributeReference)
                 {
                     if (names != null && !names.Contains(attRef.Tag)) continue;
-                    if (attRef != null && !result.ContainsKey(attRef.Tag)) result.Add(attRef.Tag, attRef.TextString);
+                    if (attRef != null && !result.ContainsKey(attRef.Tag))
+                    {
+                        if (attRef.IsMTextAttribute)
+                        {
+                            if (fullContents) result.Add(attRef.Tag, attRef.MTextAttribute.Contents);
+                            else result.Add(attRef.Tag, attRef.MTextAttribute.Text);
+                        }
+                        else
+                        {
+                            result.Add(attRef.Tag, attRef.TextString);
+                        }
+                    }
+                   
                 }
             }
             if (result.Count > 0) return true; return false;
