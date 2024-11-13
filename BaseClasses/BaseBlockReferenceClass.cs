@@ -1,4 +1,5 @@
 ﻿using Autodesk.AutoCAD.ApplicationServices;
+using Aap = Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.Geometry;
 using System;
@@ -221,9 +222,9 @@ namespace BaseFunction
         {
 
             DocumentLock documentLock = null;
-            if (Application.DocumentManager != null && Application.DocumentManager.MdiActiveDocument != null)
+            if (Aap.Application.DocumentManager != null && Aap.Application.DocumentManager.MdiActiveDocument != null)
             {
-                documentLock = Application.DocumentManager.MdiActiveDocument.LockDocument();
+                documentLock = Aap.Application.DocumentManager.MdiActiveDocument.LockDocument();
             }
             attributes = new Dictionary<string, string>(attributes, StringComparer.InvariantCultureIgnoreCase);
             List<string> usingTag = new List<string>();
@@ -281,9 +282,9 @@ namespace BaseFunction
         public static void BlockReferenceSetAttribute(BlockReference br, Transaction tr)
         {
             DocumentLock documentLock = null;
-            if (Application.DocumentManager != null && Application.DocumentManager.MdiActiveDocument != null)
+            if (Aap.Application.DocumentManager != null && Aap.Application.DocumentManager.MdiActiveDocument != null)
             {
-                documentLock = Application.DocumentManager.MdiActiveDocument.LockDocument();
+                documentLock = Aap.Application.DocumentManager.MdiActiveDocument.LockDocument();
             }
             //запускаем транзакцию
             //получаем запись о блоке в таблице блоков
@@ -366,9 +367,9 @@ namespace BaseFunction
             result = new Dictionary<string, string>();
             if (br == null) return false;
             DocumentLock documentLock = null;
-            if (Application.DocumentManager != null && Application.DocumentManager.MdiActiveDocument != null)
+            if (Aap.Application.DocumentManager != null && Aap.Application.DocumentManager.MdiActiveDocument != null)
             {
-                documentLock = Application.DocumentManager.MdiActiveDocument.LockDocument();
+                documentLock = Aap.Application.DocumentManager.MdiActiveDocument.LockDocument();
             }
             //запускаем транзакцию
             using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
@@ -400,9 +401,9 @@ namespace BaseFunction
             result = new Dictionary<string, string>();
             if (brId == null || brId == ObjectId.Null) return false;
             DocumentLock documentLock = null;
-            if (Application.DocumentManager != null && Application.DocumentManager.MdiActiveDocument != null)
+            if (Aap.Application.DocumentManager != null && Aap.Application.DocumentManager.MdiActiveDocument != null)
             {
-                documentLock = Application.DocumentManager.MdiActiveDocument.LockDocument();
+                documentLock = Aap.Application.DocumentManager.MdiActiveDocument.LockDocument();
             }
             //запускаем транзакцию
             using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
@@ -440,9 +441,9 @@ namespace BaseFunction
             result = string.Empty;
             if (br == null) return false;
             DocumentLock documentLock = null;
-            if (Application.DocumentManager != null && Application.DocumentManager.MdiActiveDocument != null)
+            if (Aap.Application.DocumentManager != null && Aap.Application.DocumentManager.MdiActiveDocument != null)
             {
-                documentLock = Application.DocumentManager.MdiActiveDocument.LockDocument();
+                documentLock = Aap.Application.DocumentManager.MdiActiveDocument.LockDocument();
             }
             //запускаем транзакцию
             using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
@@ -477,9 +478,9 @@ namespace BaseFunction
             result = string.Empty;
             if (brId == null || brId == ObjectId.Null) return false;
             DocumentLock documentLock = null;
-            if (Application.DocumentManager != null && Application.DocumentManager.MdiActiveDocument != null)
+            if (Aap.Application.DocumentManager != null && Aap.Application.DocumentManager.MdiActiveDocument != null)
             {
-                documentLock = Application.DocumentManager.MdiActiveDocument.LockDocument();
+                documentLock = Aap.Application.DocumentManager.MdiActiveDocument.LockDocument();
             }
             //запускаем транзакцию
             using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
