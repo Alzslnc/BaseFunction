@@ -278,6 +278,16 @@ namespace BaseFunction
         #endregion
 
         #region получение ObjectId
+
+        public static List<Type> GetSubclassTypes(Type type)
+        {
+            try
+            {
+                return System.Reflection.Assembly.GetAssembly(type).GetTypes().Where(t => t.IsSubclassOf(type)).ToList();
+            }
+            catch { return new List<Type>(); }
+        }
+
         /// <summary>
         /// возвращает ObjectId выбранного элемента
         /// </summary>    
