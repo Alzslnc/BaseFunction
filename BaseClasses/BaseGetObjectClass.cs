@@ -574,7 +574,7 @@ namespace BaseFunction
                     {
                         foreach (Entity e in entities)
                         {
-                            if (!e.IsNewObject) continue;
+                            if (e == null || e.IsDisposed || !e.IsNewObject) continue;
                             ids.Add(ms.AppendEntity(e));
                             tr.AddNewlyCreatedDBObject(e, true);
                         }

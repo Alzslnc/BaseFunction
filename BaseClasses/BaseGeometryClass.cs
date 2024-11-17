@@ -2,6 +2,7 @@
 using Autodesk.AutoCAD.Geometry;
 using System;
 using System.Collections.Generic;
+using System.Reflection;
 
 namespace BaseFunction
 {
@@ -154,7 +155,7 @@ namespace BaseFunction
 
             for (int i = fragments.Count - 1; i >= 0; i--)
             {
-                if (fragments[i] is Circle)
+                if (fragments[i] is Circle || fragments[i].Closed || fragments[i].StartPoint.IsEqualTo(fragments[i].EndPoint))
                 {
                     result.Add(fragments[i]);
                     fragments.RemoveAt(i);
@@ -212,7 +213,8 @@ namespace BaseFunction
                         {
                             //if (!fragment.StartPoint.IsEqualTo(contour.EndPoint) && fragment.EndPoint.IsEqualTo(contour.EndPoint)) fragment.ReverseCurve();
 
-                            if (fragment.StartPoint.IsEqualTo(contour.EndPoint) || fragment.EndPoint.IsEqualTo(contour.EndPoint))
+                            if (fragment.StartPoint.IsEqualTo(contour.EndPoint) || fragment.EndPoint.IsEqualTo(contour.EndPoint) ||
+                                fragment.StartPoint.IsEqualTo(contour.StartPoint) || fragment.EndPoint.IsEqualTo(contour.StartPoint))
                             {
                                 contour.JoinEntity(fragment);
                                 fragments.RemoveAt(i);
@@ -410,12 +412,36 @@ namespace BaseFunction
         /// <param name="ie"></param>
         public static void EntityCopySettings(this Entity e, Entity ie)
         {
-            e.Color = ie.Color;
-            e.Linetype = ie.Linetype;
-            e.LineWeight = ie.LineWeight;
-            e.Layer = ie.Layer;
-            e.LinetypeScale = ie.LinetypeScale;
-            e.Transparency = ie.Transparency;
+            try
+            {
+                e.Color = ie.Color;
+            }
+            catch { }
+            try
+            {
+                e.Linetype = ie.Linetype;
+            }
+            catch { }
+            try
+            {
+                e.LineWeight = ie.LineWeight;
+            }
+            catch { }
+            try
+            {
+                e.Layer = ie.Layer;
+            }
+            catch { }
+            try
+            {
+                e.LinetypeScale = ie.LinetypeScale;
+            }
+            catch { }
+            try
+            {
+                e.Transparency = ie.Transparency;
+            }
+            catch { }          
         }
         /// <summary>
         /// возвращает угол от оси X Autocad из точки pt1 на точку pt2 (аналог polar из лиспа)
@@ -475,6 +501,181 @@ namespace BaseFunction
         public static Point3d GetCentrPoint(this Point3d p1, Point3d p2)
         {
             return p1 + (p2 - p1) * 0.5;
+        }
+        public static Curve GetCurveFromGe(this Curve2d cv, Plane plane)
+        {
+            Curve result = null;
+
+            LineSegment2d line2d = cv as LineSegment2d;
+            CircularArc2d arc2d = cv as CircularArc2d;
+            EllipticalArc2d ellipse2d = cv as EllipticalArc2d;
+            NurbCurve2d spline2d = cv as NurbCurve2d;
+            if (line2d != null)
+            {
+                result = new Line(new Point3d(plane, line2d.StartPoint), new Point3d(plane, line2d.EndPoint));
+            }
+            else if (arc2d != null)
+            {
+                if (arc2d.IsClosed() || Math.Abs(arc2d.EndAngle - arc2d.StartAngle) < 1e-5)
+                {
+                    result = new Circle(new Point3d(plane, arc2d.Center), plane.Normal, arc2d.Radius);
+                }
+                else
+                {
+                    if (arc2d.IsClockWise)
+                    {
+                        arc2d = arc2d.GetReverseParameterCurve() as CircularArc2d;
+                    }
+                    double angle = new Vector3d(plane, arc2d.ReferenceVector).AngleOnPlane(plane);
+                    double startAngle = arc2d.StartAngle + angle;
+                    double endAngle = arc2d.EndAngle + angle;
+                    result = new Arc(new Point3d(plane, arc2d.Center), plane.Normal, arc2d.Radius, startAngle, endAngle);
+                }
+            }
+            else if (ellipse2d != null)
+            {
+                //-------------------------------------------------------------------------------------------
+                // Bug: Can not assign StartParam and EndParam of Ellipse:
+                // Ellipse ent = new Ellipse(new Point3d(plane, e2d.Center), plane.Normal, 
+                //      new Vector3d(plane,e2d.MajorAxis) * e2d.MajorRadius,
+                //      e2d.MinorRadius / e2d.MajorRadius, e2d.StartAngle, e2d.EndAngle);
+                // ent.StartParam = e2d.StartAngle; 
+                // ent.EndParam = e2d.EndAngle;
+                // error CS0200: Property or indexer 'Autodesk.AutoCAD.DatabaseServices.Curve.StartParam' cannot be assigned to -- it is read only
+                // error CS0200: Property or indexer 'Autodesk.AutoCAD.DatabaseServices.Curve.EndParam' cannot be assigned to -- it is read only
+                //---------------------------------------------------------------------------------------------
+                // Workaround is using Reflection
+                // 
+                Ellipse ent = new Ellipse(new Point3d(plane, ellipse2d.Center), plane.Normal,
+                     new Vector3d(plane, ellipse2d.MajorAxis) * ellipse2d.MajorRadius,
+                     ellipse2d.MinorRadius / ellipse2d.MajorRadius, ellipse2d.StartAngle, ellipse2d.EndAngle);
+                ent.GetType().InvokeMember("StartParam", BindingFlags.SetProperty, null,
+                  ent, new object[] { ellipse2d.StartAngle });
+                ent.GetType().InvokeMember("EndParam", BindingFlags.SetProperty, null,
+                  ent, new object[] { ellipse2d.EndAngle });
+                result = ent;
+            }
+            else if (spline2d != null)
+            {
+                if (spline2d.HasFitData)
+                {
+                    NurbCurve2dFitData n2fd = spline2d.FitData;
+                    using (Point3dCollection p3ds = new Point3dCollection())
+                    {
+                        foreach (Point2d p in n2fd.FitPoints) p3ds.Add(new Point3d(plane, p));
+                        result = new Spline(p3ds, new Vector3d(plane, n2fd.StartTangent), new Vector3d(plane, n2fd.EndTangent),
+                        /* n2fd.KnotParam, */  n2fd.Degree, n2fd.FitTolerance.EqualPoint);
+
+                    }
+                }
+                else
+                {
+                    NurbCurve2dData n2fd = spline2d.DefinitionData;
+                    using (Point3dCollection p3ds = new Point3dCollection())
+                    {
+                        DoubleCollection knots = new DoubleCollection(n2fd.Knots.Count);
+                        foreach (Point2d p in n2fd.ControlPoints) p3ds.Add(new Point3d(plane, p));
+                        foreach (double k in n2fd.Knots) knots.Add(k);
+                        double period = 0;
+                        result = new Spline(n2fd.Degree, n2fd.Rational,
+                                 spline2d.IsClosed(), spline2d.IsPeriodic(out period),
+                                 p3ds, knots, n2fd.Weights, n2fd.Knots.Tolerance, n2fd.Knots.Tolerance);
+                    }
+                }
+            }
+            return result;
+        }
+        public static Curve GetCurveFromGe(this Curve3d cv, Plane plane)
+        {
+            Curve result = null;
+            LineSegment3d line2d;
+            CircularArc3d arc2d;
+            EllipticalArc3d ellipse2d;
+            NurbCurve3d spline2d;
+            if (cv is ExternalCurve3d ex)
+            {
+                line2d = ex.NativeCurve as LineSegment3d;
+                arc2d = ex.NativeCurve as CircularArc3d;
+                ellipse2d = ex.NativeCurve as EllipticalArc3d;
+                spline2d = ex.NativeCurve as NurbCurve3d;
+            }
+            else
+            {
+                line2d = cv as LineSegment3d;
+                arc2d = cv as CircularArc3d;
+                ellipse2d = cv as EllipticalArc3d;
+                spline2d = cv as NurbCurve3d;
+            }
+            if (line2d != null)
+            {
+                result = new Line(line2d.StartPoint, line2d.EndPoint);
+            }
+            else if (arc2d != null)
+            {
+                if (arc2d.IsClosed() || Math.Abs(arc2d.EndAngle - arc2d.StartAngle) < 1e-5)
+                {
+                    result = new Circle(arc2d.Center, plane.Normal, arc2d.Radius);
+                }
+                else
+                {
+                    double angle = arc2d.ReferenceVector.AngleOnPlane(plane);
+                    double startAngle = arc2d.StartAngle + angle;
+                    double endAngle = arc2d.EndAngle + angle;
+                    result = new Arc(arc2d.Center, plane.Normal, arc2d.Radius, startAngle, endAngle);
+                }
+            }
+            else if (ellipse2d != null)
+            {
+                //-------------------------------------------------------------------------------------------
+                // Bug: Can not assign StartParam and EndParam of Ellipse:
+                // Ellipse ent = new Ellipse(new Point3d(plane, e2d.Center), plane.Normal, 
+                //      new Vector3d(plane,e2d.MajorAxis) * e2d.MajorRadius,
+                //      e2d.MinorRadius / e2d.MajorRadius, e2d.StartAngle, e2d.EndAngle);
+                // ent.StartParam = e2d.StartAngle; 
+                // ent.EndParam = e2d.EndAngle;
+                // error CS0200: Property or indexer 'Autodesk.AutoCAD.DatabaseServices.Curve.StartParam' cannot be assigned to -- it is read only
+                // error CS0200: Property or indexer 'Autodesk.AutoCAD.DatabaseServices.Curve.EndParam' cannot be assigned to -- it is read only
+                //---------------------------------------------------------------------------------------------
+                // Workaround is using Reflection
+                // 
+                Ellipse ent = new Ellipse(ellipse2d.Center, plane.Normal,
+                     ellipse2d.MajorAxis * ellipse2d.MajorRadius,
+                     ellipse2d.MinorRadius / ellipse2d.MajorRadius, ellipse2d.StartAngle, ellipse2d.EndAngle);
+                ent.GetType().InvokeMember("StartParam", BindingFlags.SetProperty, null,
+                  ent, new object[] { ellipse2d.StartAngle });
+                ent.GetType().InvokeMember("EndParam", BindingFlags.SetProperty, null,
+                  ent, new object[] { ellipse2d.EndAngle });
+                result = ent;
+            }
+            else if (spline2d != null)
+            {
+                if (spline2d.HasFitData)
+                {
+                    NurbCurve3dFitData n2fd = spline2d.FitData;
+                    using (Point3dCollection p3ds = new Point3dCollection())
+                    {
+                        foreach (Point2d p in n2fd.FitPoints) p3ds.Add(new Point3d(plane, p));
+                        result = new Spline(p3ds, n2fd.StartTangent, n2fd.EndTangent,
+                        /* n2fd.KnotParam, */  n2fd.Degree, n2fd.FitTolerance.EqualPoint);
+
+                    }
+                }
+                else
+                {
+                    NurbCurve3dData n2fd = spline2d.DefinitionData;
+                    using (Point3dCollection p3ds = new Point3dCollection())
+                    {
+                        DoubleCollection knots = new DoubleCollection(n2fd.Knots.Count);
+                        foreach (Point3d p in n2fd.ControlPoints) p3ds.Add(p);
+                        foreach (double k in n2fd.Knots) knots.Add(k);
+                        double period = 0;
+                        result = new Spline(n2fd.Degree, n2fd.Rational,
+                                 spline2d.IsClosed(), spline2d.IsPeriodic(out period),
+                                 p3ds, knots, n2fd.Weights, n2fd.Knots.Tolerance, n2fd.Knots.Tolerance);
+                    }
+                }
+            }
+            return result;
         }
         /// <summary>
         /// возвращает длину кривой
@@ -663,7 +864,22 @@ namespace BaseFunction
             }
             return false;
         }
-
+        public static bool? IsSelfIntersect(this Curve curve)
+        {
+            try
+            {
+                using (Curve3d c3d = curve.GetGeCurve())
+                using (CurveCurveIntersector3d cci = new CurveCurveIntersector3d(c3d, c3d, Vector3d.ZAxis))
+                {
+                    if (cci.NumberOfIntersectionPoints > 0) return true;
+                    return false;
+                }
+            }
+            catch 
+            {
+                return null;
+            }
+        }
         private static double GetIncrementParametr(this Curve curve ,Point3d point, double increment)
         {
             double parametr = curve.GetParameterAtPoint(curve.GetClosestPointTo(point, false));
@@ -685,6 +901,7 @@ namespace BaseFunction
                 points.Add(new Point3d(-points[i].X, points[i].Y, 0));
             }
         }
+       
         /// <summary>
         /// сортирует точки по близости к началу кривой
         /// </summary>
