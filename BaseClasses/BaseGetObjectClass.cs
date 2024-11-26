@@ -241,38 +241,45 @@ namespace BaseFunction
 
             Point3d clickPoint;
 
-            if (point.HasValue) clickPoint = point.Value;
-            else if (!TryGetPointFromUser(out clickPoint, message)) return false;          
-
-            if (precision == null) precision = Tolerance.Global.EqualPoint;
-
-            string typeString = "";
-            foreach (Type type in types)
-            { 
-                typeString += RXClass.GetClass(type).DxfName + ",";
-            }
-            if (typeString.Length > 1) typeString = typeString.Substring(0, typeString.Length - 1);
-            //выбираем типы для множественного выбора
-            TypedValue[] values = new TypedValue[]
+            while (true)
             {
+
+                if (point.HasValue) clickPoint = point.Value;
+                else if (!TryGetPointFromUser(out clickPoint, false, message, null)) return false;
+
+                if (precision == null) precision = Tolerance.Global.EqualPoint;
+
+                string typeString = "";
+                foreach (Type type in types)
+                {
+                    typeString += RXClass.GetClass(type).DxfName + ",";
+                }
+                if (typeString.Length > 1) typeString = typeString.Substring(0, typeString.Length - 1);
+                //выбираем типы для множественного выбора
+                TypedValue[] values = new TypedValue[]
+                {
                   new TypedValue((int)DxfCode.Start,typeString)
-            };
+                };
 
-            //объявляем фильтр
-            SelectionFilter filter = new SelectionFilter(values);
-            //создаем точки для выбора объектов в области
-            Point3d pt1 = new Point3d(clickPoint.X - precision.Value, clickPoint.Y - precision.Value, 0);
-            Point3d pt2 = new Point3d(clickPoint.X + precision.Value, clickPoint.Y + precision.Value, 0);
-            //выбираем объекты в области вокруг выбранной точки
-            PromptSelectionResult psr = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager
-                .MdiActiveDocument.Editor.SelectCrossingWindow(pt1, pt2, filter);
-               // .MdiActiveDocument.Editor.SelectCrossingPolygon(new Point3dCollection 
-               // { pt1, pt1 + Vector3d.XAxis * precision.Value * 2, pt2, pt1 + Vector3d.YAxis * precision.Value * 2}, filter);
-            if (psr.Status != PromptStatus.OK || psr.Value.Count == 0) return false;
+                //объявляем фильтр
+                SelectionFilter filter = new SelectionFilter(values);
+                //создаем точки для выбора объектов в области
+                Point3d pt1 = new Point3d(clickPoint.X - precision.Value, clickPoint.Y - precision.Value, 0);
+                Point3d pt2 = new Point3d(clickPoint.X + precision.Value, clickPoint.Y + precision.Value, 0);
+                //выбираем объекты в области вокруг выбранной точки
+                PromptSelectionResult psr = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager
+                    .MdiActiveDocument.Editor.SelectCrossingWindow(pt1, pt2, filter);
+                // .MdiActiveDocument.Editor.SelectCrossingPolygon(new Point3dCollection 
+                // { pt1, pt1 + Vector3d.XAxis * precision.Value * 2, pt2, pt1 + Vector3d.YAxis * precision.Value * 2}, filter);         
 
-            result.AddRange(psr.Value.GetObjectIds().Except(excludes));
-
-            return true;
+                if (psr.Value != null)
+                {
+                    if (excludes != null) result.AddRange(psr.Value.GetObjectIds().Except(excludes));
+                    else result.AddRange(psr.Value.GetObjectIds());
+                    return true;
+                } 
+            }
+         
         }
 
         #endregion
