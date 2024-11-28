@@ -241,7 +241,7 @@ namespace BaseFunction
             ResultBuffer resultBuffer = null;
             using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
             {
-                using (Entity ent = tr.GetObject(id, OpenMode.ForRead, false, true) as Entity)
+                using (DBObject ent = tr.GetObject(id, OpenMode.ForRead, false, true) as DBObject)
                 {
                     if (ent != null)
                     {
@@ -274,7 +274,7 @@ namespace BaseFunction
                 using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
                 {
                     //открываем объект на запись
-                    using (Entity ent = tr.GetObject(id, OpenMode.ForWrite, false, true) as Entity)
+                    using (DBObject ent = tr.GetObject(id, OpenMode.ForWrite, false, true) as DBObject)
                     {
                         if (ent != null)
                         {
