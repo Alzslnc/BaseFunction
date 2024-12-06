@@ -11,7 +11,7 @@ namespace BaseFunction
         /// <summary>
         /// возвращает список слоев активной базы данных
         /// </summary>      
-        public static List<string> GetLayerNames()
+        public static List<string> GetLayerNames(bool dependent = true)
         {
             List<string> result = new List<string>();
             using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
@@ -22,6 +22,7 @@ namespace BaseFunction
                     {
                         using (LayerTableRecord layer = tr.GetObject(id, OpenMode.ForRead, false, true) as LayerTableRecord)
                         {
+                            if (!dependent && layer.IsDependent) continue;
                             result.Add(layer.Name);
                         }
                     }
