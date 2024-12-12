@@ -87,8 +87,10 @@ namespace BaseFunction
                 if (!rat.Has(regAppName))
                 {
                     rat.UpgradeOpen();
-                    var ratr = new RegAppTableRecord();
-                    ratr.Name = regAppName;
+                    var ratr = new RegAppTableRecord
+                    {
+                        Name = regAppName
+                    };
                     rat.Add(ratr);
                     tr.AddNewlyCreatedDBObject(ratr, true);
                 }

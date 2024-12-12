@@ -32,6 +32,29 @@ namespace BaseFunction
             return result;
         }
         /// <summary>
+        /// возвращает список слоев активной базы данных
+        /// </summary>      
+        public static List<(string, Color)> GetLayerNamesAndColors(bool dependent = true)
+        {
+            List<(string, Color)> result = new List<(string, Color)>();
+            using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+            {
+                using (LayerTable lt = tr.GetObject(HostApplicationServices.WorkingDatabase.LayerTableId, OpenMode.ForRead) as LayerTable)
+                {
+                    foreach (ObjectId id in lt)
+                    {
+                        using (LayerTableRecord layer = tr.GetObject(id, OpenMode.ForRead, false, true) as LayerTableRecord)
+                        {
+                            if (!dependent && layer.IsDependent) continue;
+                            result.Add((layer.Name, layer.Color));
+                        }
+                    }
+                }
+                tr.Commit();
+            }
+            return result;
+        }
+        /// <summary>
         /// Изменяет параметры существующего слоя
         /// </summary>
         public static LayerTypeChange LayerChangeParametrs(string layer_name, short colorIndex)
