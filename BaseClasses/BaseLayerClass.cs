@@ -3,6 +3,7 @@ using Autodesk.AutoCAD.Colors;
 using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.LayerManager;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace BaseFunction
 {
@@ -34,9 +35,9 @@ namespace BaseFunction
         /// <summary>
         /// возвращает список слоев активной базы данных
         /// </summary>      
-        public static List<(string, Color)> GetLayerNamesAndColors(bool dependent = true)
+        public static Dictionary<string, Color> GetLayerNamesAndColors(bool dependent = true)
         {
-            List<(string, Color)> result = new List<(string, Color)>();
+            Dictionary<string, Color> result = new Dictionary<string, Color>();
             using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
             {
                 using (LayerTable lt = tr.GetObject(HostApplicationServices.WorkingDatabase.LayerTableId, OpenMode.ForRead) as LayerTable)
@@ -46,13 +47,13 @@ namespace BaseFunction
                         using (LayerTableRecord layer = tr.GetObject(id, OpenMode.ForRead, false, true) as LayerTableRecord)
                         {
                             if (!dependent && layer.IsDependent) continue;
-                            result.Add((layer.Name, layer.Color));
+                            result.Add(layer.Name, layer.Color);
                         }
                     }
                 }
                 tr.Commit();
             }
-            return result;
+            return result.OrderBy(x => x.Key).ToDictionary(x => x.Key, x => x.Value);
         }
         /// <summary>
         /// Изменяет параметры существующего слоя
