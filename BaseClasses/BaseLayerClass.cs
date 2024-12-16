@@ -56,6 +56,29 @@ namespace BaseFunction
             return result.OrderBy(x => x.Key).ToDictionary(x => x.Key, x => x.Value);
         }
         /// <summary>
+        /// возвращает список слоев активной базы данных c полным перечнем их параметров
+        /// </summary>      
+        public static Dictionary<string, LayerData> GetLayerNamesAndData(bool dependent = true)
+        {
+            Dictionary<string, LayerData> result = new Dictionary<string, LayerData>();
+            using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+            {
+                using (LayerTable lt = tr.GetObject(HostApplicationServices.WorkingDatabase.LayerTableId, OpenMode.ForRead) as LayerTable)
+                {
+                    foreach (ObjectId id in lt)
+                    {
+                        using (LayerTableRecord layer = tr.GetObject(id, OpenMode.ForRead, false, true) as LayerTableRecord)
+                        {
+                            if (!dependent && layer.IsDependent) continue;
+                            result.Add(layer.Name, new LayerData(layer, tr));
+                        }
+                    }
+                }
+                tr.Commit();
+            }
+            return result.OrderBy(x => x.Key).ToDictionary(x => x.Key, x => x.Value);
+        }
+        /// <summary>
         /// Изменяет параметры существующего слоя
         /// </summary>
         public static LayerTypeChange LayerChangeParametrs(string layer_name, short colorIndex)
@@ -290,6 +313,25 @@ namespace BaseFunction
         }
 
         
+    }
+    public class LayerData
+    { 
+        public LayerData(LayerTableRecord layer, Transaction tr) 
+        { 
+            Name = layer.Name;
+            Color = layer.Color;
+            LineWeight = layer.LineWeight;
+            LineTypeObjectId = layer.LinetypeObjectId;
+
+            LinetypeTableRecord linetypeTableRecord = tr.GetObject(LineTypeObjectId, OpenMode.ForRead) as LinetypeTableRecord;
+
+            LineTypeName = linetypeTableRecord.Name;
+        }
+        public string Name { get; set; }
+        public Color Color { get; set; }
+        public ObjectId LineTypeObjectId { get; set; } 
+        public string LineTypeName { get; set; } 
+        public LineWeight LineWeight { get; set; }
     }
     public enum LayerTypeChange
     {
