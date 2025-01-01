@@ -1,11 +1,10 @@
 ﻿using Autodesk.AutoCAD.ApplicationServices;
-using Aap = Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.DatabaseServices;
-using Autodesk.AutoCAD.Geometry;
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using Aap = Autodesk.AutoCAD.ApplicationServices;
 
 namespace BaseFunction
 {
@@ -604,7 +603,9 @@ namespace BaseFunction
         }
         #endregion
     }
-
+    /// <summary>
+    /// Класс написанный Андреем Бушманом и немного модифицированный
+    /// </summary>
     public sealed class WorkingDatabaseSwitcher : IDisposable
     {
         private readonly Database PrevDb = null;
@@ -629,10 +630,15 @@ namespace BaseFunction
         public void Dispose()
         {
             HostApplicationServices.WorkingDatabase = PrevDb;
-            if (Save) NextDb.SaveAs(NextDb.Filename, DwgVersion.Current);
+            if (Save) 
+            {
+                try { NextDb.SaveAs(NextDb.Filename, DwgVersion.Current); } 
+                catch { }
+            }             
         }
     }
     /// <summary>
+    /// Класс написанный Андреем Бушманом
     /// Методы расширений для объектов класса Autodesk.AutoCAD.DatabaseServices.BlockTableRecord
     /// </summary>
     public static class BlockTableRecordExtensionMethods
@@ -867,7 +873,5 @@ namespace BaseFunction
                 }
             }
         }
-    }
-
-    
+    }    
 }
