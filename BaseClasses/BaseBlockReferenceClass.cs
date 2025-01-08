@@ -32,7 +32,7 @@ namespace BaseFunction
         /// <param name="fileName">файл из которого переносятся блоки</param>
         /// <param name="folders">список местоположений где может находиться файл</param>
         /// <returns>true если блоки перенесены успешно</returns>
-        public static bool BlockMigrate(List<string> blNames, string fileName, List<string> folders, bool replace = false)
+        public static bool BlockMigrate(List<string> blNames, string fileName, List<string> folders, bool replace = false, bool message = true)
         {
 
             if (blNames.Count == 0 || (GetMissBlocks(HostApplicationServices.WorkingDatabase, blNames).Count == 0 && !replace)) return true;       
@@ -44,7 +44,7 @@ namespace BaseFunction
                     if (allFoundFiles.Count() > 0) return BlockMigrate(blNames, allFoundFiles[0], replace);
                 }
             }
-            System.Windows.Forms.MessageBox.Show("Файл ресурсов не найден");
+            if (message) System.Windows.Forms.MessageBox.Show("Файл ресурсов не найден");
             return false;
         }
         /// <summary>
