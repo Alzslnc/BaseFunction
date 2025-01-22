@@ -252,6 +252,11 @@ namespace BaseFunction
                 string typeString = "";
                 foreach (Type type in types)
                 {
+                    if (type.Equals(typeof(ProxyEntity)))
+                    {
+                        typeString += "ACAD_PROXY_ENTITY,";
+                        continue;
+                    }
                     typeString += RXClass.GetClass(type).DxfName + ",";
                 }
                 if (typeString.Length > 1) typeString = typeString.Substring(0, typeString.Length - 1);
