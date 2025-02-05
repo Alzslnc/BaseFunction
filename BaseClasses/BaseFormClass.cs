@@ -42,7 +42,7 @@ namespace BaseFunction
             dynamic tTB = sender as TextBox;
 
             int position = tTB.SelectionStart;
-            string withoutSelected = tTB.WithoutSelected();
+            string withoutSelected = WithoutSelected(tTB);        
 
             //заменяем запятую на точку
             if (e.KeyChar == ',') e.KeyChar = '.';
@@ -63,7 +63,7 @@ namespace BaseFunction
             {
                 tTB.Text = withoutSelected;
                 tTB.SelectionStart = position;
-                if (tTB.Text.Contains('-'))
+                if (tTB.Text.Contains("-"))
                 {
                     tTB.Text = tTB.Text.Substring(1);
                     tTB.SelectionStart = position - 1;
@@ -79,7 +79,7 @@ namespace BaseFunction
             //если введена точка то проверяем что бы точки еще не было, и что бы точку не пытались вводить перед минусом
             if (e.KeyChar == '.')
             {
-                if (withoutSelected.Contains('.') | (position == 0 & withoutSelected.Contains('-'))) e.Handled = true;
+                if (withoutSelected.Contains('.') | (position == 0 & withoutSelected.Contains("-"))) e.Handled = true;
                 else
                 {
                     tTB.Text = withoutSelected;
@@ -91,7 +91,7 @@ namespace BaseFunction
             //проверка что бы вводимое число не ставилось перед минусом
             if (Char.IsDigit(e.KeyChar))
             {
-                if (withoutSelected.Contains('-') & position == 0) e.Handled = true;
+                if (withoutSelected.Contains("-") & position == 0) e.Handled = true;
                 else
                 {
                     tTB.Text = withoutSelected;
@@ -134,7 +134,7 @@ namespace BaseFunction
             //если введена точка то проверяем что бы точки еще не было, и что бы точку не пытались вводить перед минусом
             if (e.KeyChar == '.')
             {
-                if (withoutSelected.Contains('.') | (position == 0 & withoutSelected.Contains('-'))) e.Handled = true;
+                if (withoutSelected.Contains('.') | (position == 0 & withoutSelected.Contains("-"))) e.Handled = true;
                 else
                 {
                     tTB.Text = withoutSelected;
@@ -146,7 +146,7 @@ namespace BaseFunction
             //проверка что бы вводимое число не ставилось перед минусом
             if (char.IsDigit(e.KeyChar))
             {
-                if (withoutSelected.Contains('-') & position == 0) e.Handled = true;
+                if (withoutSelected.Contains("-") & position == 0) e.Handled = true;
                 else
                 {
                     tTB.Text = withoutSelected;
@@ -173,7 +173,7 @@ namespace BaseFunction
             dynamic tTB = sender as TextBox;
 
             int position = tTB.SelectionStart;
-            string withoutSelected = tTB.WithoutSelected();
+            string withoutSelected = WithoutSelected(tTB);
 
             //обработка бекспейса, возможность удаления выделенного фрагмента и установку курсора в месте удаления
             if (e.KeyChar == 8)
@@ -191,7 +191,7 @@ namespace BaseFunction
             {
                 tTB.Text = withoutSelected;
                 tTB.SelectionStart = position;
-                if (tTB.Text.Contains('-'))
+                if (tTB.Text.Contains("-"))
                 {
                     tTB.Text = tTB.Text.Substring(1);
                     tTB.SelectionStart = position - 1;
@@ -208,7 +208,7 @@ namespace BaseFunction
             //проверка что бы вводимое число не ставилось перед минусом
             if (Char.IsDigit(e.KeyChar))
             {
-                if (withoutSelected.Contains('-') & position == 0) e.Handled = true;
+                if (withoutSelected.Contains("-") & position == 0) e.Handled = true;
                 else
                 {
                     tTB.Text = withoutSelected;
@@ -235,7 +235,7 @@ namespace BaseFunction
             dynamic tTB = sender as TextBox;
 
             int position = tTB.SelectionStart;
-            string withoutSelected = tTB.WithoutSelected();
+            string withoutSelected = WithoutSelected(tTB);
 
             //обработка бекспейса, возможность удаления выделенного фрагмента и установку курсора в месте удаления
             if (e.KeyChar == 8)
@@ -252,7 +252,7 @@ namespace BaseFunction
             //проверка что бы вводимое число не ставилось перед минусом
             if (Char.IsDigit(e.KeyChar))
             {
-                if (withoutSelected.Contains('-') & position == 0) e.Handled = true;
+                if (withoutSelected.Contains("-") & position == 0) e.Handled = true;
                 else
                 {
                     tTB.Text = withoutSelected;
