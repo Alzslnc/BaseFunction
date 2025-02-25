@@ -503,28 +503,11 @@ namespace BaseFunction
         {
             result = string.Empty;
             if (variants.Count == 0) return false;
-
-            //bool allEmpty = true;
-
-            //message += " [";
-
-            //foreach (string variant in variants)
-            //{
-            //    if (string.IsNullOrEmpty(variant)) continue;
-            //    allEmpty = false;
-            //    message += variant.ToString().ToUpper() + "/";
-            //}
-
-            //message = message.Substring(0, message.Length - 1) + "]";
-
-            //if (allEmpty) return false;
-
+                        
             PromptKeywordOptions pso = new PromptKeywordOptions(message)
             {
                 AllowNone = false
             };
-
-            //PromptStringOptions pso = new PromptStringOptions(message);
 
             foreach (string variant in variants)
             {
@@ -532,8 +515,7 @@ namespace BaseFunction
                 pso.Keywords.Add(variant);               
             }
 
-            pso.Keywords.Default = variants[0];
-            //pso.AppendKeywordsToMessage = true;
+            pso.Keywords.Default = variants[0];         
 
             PromptResult pr = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor.GetKeywords(pso);
 
