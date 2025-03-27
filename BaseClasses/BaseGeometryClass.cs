@@ -210,9 +210,7 @@ namespace BaseFunction
                         Curve fragment = fragments[i];
 
                         try
-                        {
-                            //if (!fragment.StartPoint.IsEqualTo(contour.EndPoint) && fragment.EndPoint.IsEqualTo(contour.EndPoint)) fragment.ReverseCurve();
-
+                        {                            
                             if (fragment.StartPoint.IsEqualTo(contour.EndPoint) || fragment.EndPoint.IsEqualTo(contour.EndPoint) ||
                                 fragment.StartPoint.IsEqualTo(contour.StartPoint) || fragment.EndPoint.IsEqualTo(contour.StartPoint))
                             {
