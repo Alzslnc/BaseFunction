@@ -86,6 +86,7 @@
     <Compile Include="BaseClasses\BaseFormClass.cs" />
     <Compile Include="BaseClasses\BaseGeometryClass.cs" />
     <Compile Include="BaseClasses\BaseLayerClass.cs" />
+    <Compile Include="BaseClasses\BaseWPF.cs" />
     <Compile Include="BaseClasses\TextBounds.cs" />
     <Compile Include="BaseClasses\TransientGraphicsClass.cs" />
     <Compile Include="CheckEntityClass.cs" />

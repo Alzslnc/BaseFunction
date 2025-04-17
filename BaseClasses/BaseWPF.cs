@@ -1,0 +1,54 @@
+﻿using System;
+using System.Collections.Generic;
+using System.ComponentModel;
+using System.Runtime.CompilerServices;
+using System.Windows.Input;
+
+namespace BaseFunction
+{
+    public class BaseClass : INotifyPropertyChanged
+    {
+        public event PropertyChangedEventHandler PropertyChanged;
+        /// <summary>
+        /// метод для изменения переменной который так же получаем имя изменяемой переменной и сообщает о изменении
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="data"></param>
+        /// <param name="value"></param>
+        /// <param name="name"></param>
+        protected void SetData<T>(ref T data, T value, [CallerMemberName] string name = "")
+        {
+            //если значение не поменялось то событие не вызываем
+            if (EqualityComparer<T>.Default.Equals(data, value)) return;
+            data = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+        }
+    }
+    public class RelayCommand : ICommand
+    {
+        public RelayCommand(Action<object> execute, Func<object, bool> canExecute = null)
+        {
+            this.execute = execute;
+            this.canExecute = canExecute;
+        }
+
+        private Action<object> execute;
+        private Func<object, bool> canExecute;
+
+        public event EventHandler CanExecuteChanged
+        {
+            add { CommandManager.RequerySuggested += value; }
+            remove { CommandManager.RequerySuggested -= value; }
+        }
+
+        public bool CanExecute(object parameter)
+        {
+            return this.canExecute == null || this.canExecute(parameter);
+        }
+
+        public void Execute(object parameter)
+        {
+            this.execute(parameter);
+        }
+    }
+}
