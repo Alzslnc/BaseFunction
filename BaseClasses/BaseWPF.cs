@@ -11,14 +11,7 @@ namespace BaseFunction
 {
     public class BaseClass : INotifyPropertyChanged
     {
-        public event PropertyChangedEventHandler PropertyChanged;
-        /// <summary>
-        /// метод для изменения переменной который так же получаем имя изменяемой переменной и сообщает о изменении
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="data"></param>
-        /// <param name="value"></param>
-        /// <param name="name"></param>
+        public event PropertyChangedEventHandler PropertyChanged;       
         protected void SetData<T>(ref T data, T value, [CallerMemberName] string name = "")
         {
             //если значение не поменялось то событие не вызываем
@@ -27,6 +20,7 @@ namespace BaseFunction
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
         }
     }
+
     public class RelayCommand : ICommand
     {
         public RelayCommand(Action<object> execute, Func<object, bool> canExecute = null)
@@ -55,7 +49,7 @@ namespace BaseFunction
         }
     }
 
-    internal abstract class ConverterBase : MarkupExtension, IValueConverter
+    public abstract class ConverterBase : MarkupExtension, IValueConverter
     {
         public virtual object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
