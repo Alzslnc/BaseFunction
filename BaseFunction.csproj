@@ -74,6 +74,7 @@
     <Reference Include="System.Drawing" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xaml" />
+    <Reference Include="System.Xml" />
     <Reference Include="System.Xml.Linq, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
     </Reference>
@@ -87,6 +88,7 @@
     <Compile Include="BaseClasses\BaseGeometryClass.cs" />
     <Compile Include="BaseClasses\BaseLayerClass.cs" />
     <Compile Include="BaseClasses\BaseWPF.cs" />
+    <Compile Include="BaseClasses\BaseXMLClass.cs" />
     <Compile Include="BaseClasses\TextBounds.cs" />
     <Compile Include="BaseClasses\TransientGraphicsClass.cs" />
     <Compile Include="CheckEntityClass.cs" />
