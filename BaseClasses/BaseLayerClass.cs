@@ -322,6 +322,9 @@ namespace BaseFunction
             Color = layer.Color;
             LineWeight = layer.LineWeight;
             LineTypeObjectId = layer.LinetypeObjectId;
+            IsFrozen = layer.IsFrozen;
+            IsLocked = layer.IsLocked;
+            IsOff = layer.IsOff;
 
             LinetypeTableRecord linetypeTableRecord = tr.GetObject(LineTypeObjectId, OpenMode.ForRead) as LinetypeTableRecord;
 
@@ -332,6 +335,9 @@ namespace BaseFunction
         public ObjectId LineTypeObjectId { get; set; } 
         public string LineTypeName { get; set; } 
         public LineWeight LineWeight { get; set; }
+        public bool IsFrozen { get; set; }
+        public bool IsLocked { get; set; }
+        public bool IsOff { get; set; }
     }
     public enum LayerTypeChange
     {
