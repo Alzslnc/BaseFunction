@@ -72,13 +72,15 @@ namespace BaseFunction
                 if (coll.Count > 0) return true; return false;
             }
         }
-        public static bool TryGetIntersections(this Curve curve, Curve curve2, out List<Point3d> intersections)
+        public static bool TryGetIntersections(this Curve curve, Curve curve2, out List<Point3d> intersections, bool isTangentialinclude = true, Plane plane = null, bool sort = true)
         { 
             if (curve.Equals(curve2)) return curve.TryGetSelfIntersect(out intersections);
 
-            intersections = new List<Point3d>();
-            using (Curve curvePr = curve.GetProjectedCurve(new Plane(), Vector3d.ZAxis))
-            using (Curve curve2Pr = curve2.GetProjectedCurve(new Plane(), Vector3d.ZAxis))
+            if (plane == null) plane = new Plane();
+
+            intersections = new List<Point3d>();            
+            using (Curve curvePr = curve.GetProjectedCurve(plane, Vector3d.ZAxis))
+            using (Curve curve2Pr = curve2.GetProjectedCurve(plane, Vector3d.ZAxis))
             {
                 if (curvePr.GetLength() == 0 || curve2Pr.GetLength() == 0) return false;
                 try
@@ -90,17 +92,18 @@ namespace BaseFunction
                     {
                         for (int i = 0; i < cci.NumberOfIntersectionPoints; i++)
                         {
+                            if (cci.IsTangential(i)) continue;
                             using (Line3d l3d = new Line3d(cci.GetIntersectionPoint(i), Vector3d.ZAxis))
                             using (CurveCurveIntersector3d cci2 = new CurveCurveIntersector3d(l3d, icurve3d, Vector3d.ZAxis))
                             {
                                 for (int j = 0; j < cci2.NumberOfIntersectionPoints; j++)
-                                { 
+                                {
                                     if (!intersections.ContainPoint(cci2.GetIntersectionPoint(j))) intersections.Add(cci2.GetIntersectionPoint(j));
-                                }                            
+                                }
                             }
-                        } 
-                    }                    
-                    intersections.SortOnCurve(curve);
+                        }
+                    }
+                    if (sort) intersections.SortOnCurve(curve);
                 }
                 catch { return false; }
             }

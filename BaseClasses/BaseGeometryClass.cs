@@ -30,7 +30,7 @@ namespace BaseFunction
                 ex1.MaxPoint.X < ex2.MinPoint.X ||
                 ex1.MaxPoint.Y < ex2.MinPoint.Y ||
                 ex1.MinPoint.X > ex2.MaxPoint.X ||
-                ex1.MinPoint.Y > ex1.MaxPoint.Y
+                ex1.MinPoint.Y > ex2.MaxPoint.Y
                 ) result = ExPosition.Outer;
             //внутри второго
             else if (
@@ -774,7 +774,7 @@ namespace BaseFunction
             if (delta == 0) delta = Tolerance.Global.EqualPoint;
             if (Math.Abs(d2 - d1) > delta) return false; return true;        
         }
-        public static bool IsIntersect(this Polyline p1, Polyline p2)
+        public static bool IsIntersect(this Curve p1, Curve p2)
         {
             using (Point3dCollection collection = new Point3dCollection())
             {
@@ -979,8 +979,7 @@ namespace BaseFunction
         public static Point3d Z0(this Point3d point)
         {
             return new Point3d(point.X, point.Y, 0);
-        }
-
+        }        
         public static int? GetFirstPointIndex(this List<Point3d> points, Point3d point)
         {
             for (int i = 0; i < points.Count; i++)
