@@ -63,7 +63,7 @@ namespace BaseFunction
         /// <summary>
         /// расчленияет блок и возвращает ObjectId полученных элементов
         /// </summary>
-        public static List<ObjectId> ExplodeBlock(Transaction tr, Database db, ObjectId id, bool erase, bool inLayer, bool recursive, bool explodeProxy, Matrix3d matrix)
+        public static List<ObjectId> ExplodeBlock(Transaction tr, Database db, ObjectId id, bool erase, bool inLayer, bool recursive, bool explodeProxy, Matrix3d matrix, BlockReference br = null)
         {
             
             List <ObjectId> result = new List<ObjectId>();
@@ -71,8 +71,8 @@ namespace BaseFunction
             List<ObjectId> dimList = new List<ObjectId>();
             List<ObjectId> toExplode = new List<ObjectId>();
             // Открываем вставку блока – для расчленения достаточно возможности
-            // открыть «для чтения»т.к. эта операция не меняет исходный примитив
-            BlockReference br = tr.GetObject(id, OpenMode.ForRead, false, true) as BlockReference;
+            // открыть «для чтения»т.к. эта операция не меняет исходный примитив          
+            if (br == null) br = tr.GetObject(id, OpenMode.ForRead, false, true) as BlockReference;           
             if (br == null) { return result; }
 
             matrix = br.BlockTransform ;

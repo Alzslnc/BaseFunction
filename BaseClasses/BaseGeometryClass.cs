@@ -751,11 +751,11 @@ namespace BaseFunction
         /// </summary>
         /// <param name="ent"></param>
         /// <returns></returns>
-        public static bool IsAcadCurve(this Entity ent)
+        public static bool IsAcadCurve(this Entity ent, bool includeLeader = false)
         {
             if (ent is Arc || ent is Circle || ent is Ellipse || ent is Line ||
                 ent is Polyline || ent is Polyline2d || ent is Polyline3d ||
-                ent is Ray || ent is Spline || ent is Xline) return true;
+                ent is Ray || ent is Spline || ent is Xline || (includeLeader && ent is Leader)) return true;
             else return false;
         }
 
