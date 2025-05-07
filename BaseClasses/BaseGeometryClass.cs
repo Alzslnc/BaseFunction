@@ -8,6 +8,13 @@ namespace BaseFunction
 {
     public static class BaseGeometryClass
     {
+        /// <summary>
+        /// добавляет в список новую точку, если она в нем отсутствовала ранее
+        /// </summary>
+        public static void AddNewPoint(this List<Point3d> points, Point3d point)
+        {
+            if (!points.ContainPoint(point)) points.Add(point);
+        }
         public enum ExPosition
         { 
             none,
