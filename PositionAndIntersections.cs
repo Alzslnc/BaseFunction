@@ -100,31 +100,52 @@ namespace BaseFunction
         }
         public static bool TryGetIntersections(this Curve curve, Curve curve2, out List<Point3d> intersections, bool isTangentialinclude = true, Plane plane = null, bool sort = true)
         { 
+            Vector3d transform = new Vector3d((Point3d.Origin - curve.StartPoint).X, (Point3d.Origin - curve.StartPoint).Y, 0);            
+
             if (curve.Equals(curve2)) return curve.TryGetSelfIntersect(out intersections);
 
             if (plane == null) plane = new Plane();
 
             intersections = new List<Point3d>();            
             using (Curve curvePr = curve.GetProjectedCurve(plane, Vector3d.ZAxis))
+            using (Curve curveClone = curve.Clone() as Curve)
             using (Curve curve2Pr = curve2.GetProjectedCurve(plane, Vector3d.ZAxis))
             {
+                curvePr.TransformBy(Matrix3d.Displacement(transform));
+                curveClone.TransformBy(Matrix3d.Displacement(transform));
+                curve2Pr.TransformBy(Matrix3d.Displacement(transform));
+
+                double elevation = 0;
+                if (curvePr is Polyline2d p2d)
+                { 
+                    elevation = p2d.Elevation;
+                    p2d.Elevation = 0;
+                }   
                 if (curvePr.GetLength() == 0 || curve2Pr.GetLength() == 0) return false;
                 try
                 {
-                    using (Curve3d icurve3d = curve.GetGeCurve())
+                    using (Curve3d icurve3d = curveClone.GetGeCurve())
                     using (Curve3d curve3d = curvePr.GetGeCurve())
                     using (Curve3d curve23d = curve2Pr.GetGeCurve())
                     using (CurveCurveIntersector3d cci = new CurveCurveIntersector3d(curve3d, curve23d, Vector3d.ZAxis))
-                    {
+                    {                        
                         for (int i = 0; i < cci.NumberOfIntersectionPoints; i++)
                         {
                             if (cci.IsTangential(i)) continue;
-                            using (Line3d l3d = new Line3d(cci.GetIntersectionPoint(i), Vector3d.ZAxis))
-                            using (CurveCurveIntersector3d cci2 = new CurveCurveIntersector3d(l3d, icurve3d, Vector3d.ZAxis))
+                            if (!elevation.IsEqualTo(0))
                             {
-                                for (int j = 0; j < cci2.NumberOfIntersectionPoints; j++)
+                                Point3d intersection = cci.GetIntersectionPoint(i).GetPoint2d().GetPoint3d(elevation);
+                                if (!intersections.ContainPoint(intersection)) intersections.Add(intersection);
+                            }
+                            else
+                            {
+                                using (Line3d l3d = new Line3d(cci.GetIntersectionPoint(i), Vector3d.ZAxis))
+                                using (CurveCurveIntersector3d cci2 = new CurveCurveIntersector3d(l3d, icurve3d, Vector3d.ZAxis))
                                 {
-                                    if (!intersections.ContainPoint(cci2.GetIntersectionPoint(j))) intersections.Add(cci2.GetIntersectionPoint(j));
+                                    for (int j = 0; j < cci2.NumberOfIntersectionPoints; j++)
+                                    {
+                                        if (!intersections.ContainPoint(cci2.GetIntersectionPoint(j))) intersections.Add(cci2.GetIntersectionPoint(j));
+                                    }
                                 }
                             }
                         }
@@ -133,6 +154,13 @@ namespace BaseFunction
                 }
                 catch { return false; }
             }
+
+            for (int i = intersections.Count - 1; i >= 0; i--)
+            {
+                intersections.Add(intersections[i] - transform);
+                intersections.RemoveAt(i);
+            }; 
+
             if (intersections.Count > 0) return true; return false;            
         }
         public static bool TryGetSelfIntersect(this Curve curve, out List<Point3d> intersections)
