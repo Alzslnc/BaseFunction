@@ -8,7 +8,7 @@ namespace BaseFunction
 {
     public static class PositionAndIntersections
     {
-        public static int GetInnerLevel(this Curve polyline, List<Curve> polylines, bool simple = false)
+        public static int GetInnerLevel(this Curve polyline, List<Curve> polylines, bool simple = false, bool onBoundInclude = false)
         {
             int j = 0;
             foreach (Curve poly in polylines)
@@ -16,7 +16,7 @@ namespace BaseFunction
                 if (simple && j > 1) return j;
                 if (poly == polyline) continue;
                 PositionType position = polyline.CurveOfCurve(poly);
-                if (position == PositionType.inner)
+                if (onBoundInclude ? position != PositionType.outer : position == PositionType.inner)
                 {
                     j++;
                     continue;
@@ -115,6 +115,14 @@ namespace BaseFunction
                 curveClone.TransformBy(Matrix3d.Displacement(transform));
                 curve2Pr.TransformBy(Matrix3d.Displacement(transform));
 
+                List<Point3d> intt = new List<Point3d>();
+
+                using (Point3dCollection collenction = new Point3dCollection())
+                {
+                    curvePr.IntersectWith(curve2Pr, Intersect.OnBothOperands, collenction, IntPtr.Zero, IntPtr.Zero);
+                    intt = collenction.ToList();
+                }
+
                 double elevation = 0;
                 if (curvePr is Polyline2d p2d)
                 { 
@@ -128,26 +136,30 @@ namespace BaseFunction
                     using (Curve3d curve3d = curvePr.GetGeCurve())
                     using (Curve3d curve23d = curve2Pr.GetGeCurve())
                     using (CurveCurveIntersector3d cci = new CurveCurveIntersector3d(curve3d, curve23d, Vector3d.ZAxis))
-                    {                        
+                    {
                         for (int i = 0; i < cci.NumberOfIntersectionPoints; i++)
                         {
-                            if (cci.IsTangential(i)) continue;
+                            Point3d intersection = cci.GetIntersectionPoint(i);
+                                                       
                             if (!elevation.IsEqualTo(0))
                             {
-                                Point3d intersection = cci.GetIntersectionPoint(i).GetPoint2d().GetPoint3d(elevation);
-                                if (!intersections.ContainPoint(intersection)) intersections.Add(intersection);
+                                intersection = intersection.GetPoint2d().GetPoint3d(elevation);
                             }
                             else
                             {
-                                using (Line3d l3d = new Line3d(cci.GetIntersectionPoint(i), Vector3d.ZAxis))
+                                using (Line3d l3d = new Line3d(intersection, Vector3d.ZAxis))
                                 using (CurveCurveIntersector3d cci2 = new CurveCurveIntersector3d(l3d, icurve3d, Vector3d.ZAxis))
                                 {
                                     for (int j = 0; j < cci2.NumberOfIntersectionPoints; j++)
                                     {
-                                        if (!intersections.ContainPoint(cci2.GetIntersectionPoint(j))) intersections.Add(cci2.GetIntersectionPoint(j));
+                                        intersection = cci2.GetIntersectionPoint(j);
                                     }
                                 }
                             }
+
+                            if (!isTangentialinclude && !curvePr.IsIntersect(curve2Pr, new List<Point3d> { intersection })) continue;
+
+                            if (!intersections.ContainPoint(intersection)) intersections.Add(intersection);                          
                         }
                     }
                     if (sort) intersections.SortOnCurve(curve);
