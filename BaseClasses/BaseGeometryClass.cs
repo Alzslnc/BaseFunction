@@ -3,6 +3,7 @@ using Autodesk.AutoCAD.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
+using Trim_objects.TrimClass.Trim;
 
 namespace BaseFunction
 {
@@ -1002,6 +1003,61 @@ namespace BaseFunction
                 if (points[i].IsEqualTo(point)) return i;
             }
             return null;
+        }
+        private static Curve2d ConvertToCurve2d(Curve3d curve3D)
+        {
+            Curve2d result = null;
+
+            LineSegment3d line2d = curve3D as LineSegment3d;
+            CircularArc3d arc2d = curve3D as CircularArc3d;
+            EllipticalArc3d ellipse2d = curve3D as EllipticalArc3d;
+            NurbCurve3d spline2d = curve3D as NurbCurve3d;
+            if (line2d != null)
+            {
+                result = new Line2d(new Point2d(line2d.StartPoint.X, line2d.StartPoint.Y), new Point2d(line2d.EndPoint.X, line2d.EndPoint.Y));
+            }
+            else if (arc2d != null)
+            {
+
+                if (arc2d.IsClosed() || Math.Abs(arc2d.EndAngle - arc2d.StartAngle) < 1e-5)
+                {
+                    result = new CircularArc2d(arc2d.Center.GetPoint2d(), arc2d.Radius);
+                }
+                else
+                {
+                    arc2d.GetCurveFromGe(MainTrimClass.Plane).GetCentrPoint(out Point3d center);
+                    result = new CircularArc2d(arc2d.StartPoint.GetPoint2d(), center.GetPoint2d(), arc2d.EndPoint.GetPoint2d());
+                }
+            }
+            else if (ellipse2d != null)
+            {
+                result = new EllipticalArc2d(ellipse2d.Center.GetPoint2d(),
+                    ellipse2d.MajorAxis.Convert2d(MainTrimClass.Plane),
+                    ellipse2d.MinorAxis.Convert2d(MainTrimClass.Plane),
+                    ellipse2d.MajorRadius, ellipse2d.MinorRadius);
+            }
+            else if (spline2d != null)
+            {
+                if (spline2d.HasFitData)
+                {
+                    NurbCurve3dFitData n2fd = spline2d.FitData;
+                    Point2dCollection p3ds = new Point2dCollection();
+                    foreach (Point3d p in n2fd.FitPoints) p3ds.Add(p.GetPoint2d());
+                    result = new NurbCurve2d(p3ds,
+                        n2fd.StartTangent.Convert2d(MainTrimClass.Plane),
+                        n2fd.EndTangent.Convert2d(MainTrimClass.Plane), true, true, n2fd.KnotParam
+                        );
+                }
+                else
+                {
+                    NurbCurve3dData n2fd = spline2d.DefinitionData;
+                    Point2dCollection p2dcoll = new Point2dCollection();
+                    foreach (Point3d p in n2fd.ControlPoints) p2dcoll.Add(p.GetPoint2d());
+                    result = new NurbCurve2d(n2fd.Degree, n2fd.Knots, p2dcoll, n2fd.Periodic);
+                }
+            }
+            return result;
+
         }
     }
 }

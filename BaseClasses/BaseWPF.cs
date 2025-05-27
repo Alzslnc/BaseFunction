@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Markup;
@@ -64,6 +65,42 @@ namespace BaseFunction
         public override object ProvideValue(IServiceProvider serviceProvider)
         {
             return this;
+        }
+    }
+
+    internal class EnumConverter : ConverterBase
+    {
+        public override object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value?.Equals(parameter);
+        }
+        public override object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value?.Equals(true) == true ? parameter : Binding.DoNothing;
+        }
+    }
+
+    public class BoolToVisibleConverter : ConverterBase
+    {
+        public override object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value == null) return Visibility.Visible;
+            if (value is bool bValue)
+            {
+                if (bValue) return Visibility.Visible;
+                else return Visibility.Collapsed;
+            }
+            return string.Empty;
+        }
+    }
+
+    public class BoolInvertedConverter : ConverterBase
+    {
+        public override object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value == null) return false;
+            if (value is bool bValue) return !bValue;
+            return false;
         }
     }
 }

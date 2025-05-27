@@ -553,31 +553,38 @@ namespace BaseFunction
             }
             catch { return false; }
         }
-        public static bool AddEntityInCurrentBTR(this List<Entity> entities)
+        public static bool AddEntityInCurrentBTR(this List<Entity> entities, Transaction transaction = null)
         {
-            return entities.AddEntityInCurrentBTR(out _);
+            return entities.AddEntityInCurrentBTR(out _, transaction);
         }
-        public static bool AddEntityInCurrentBTR(this List<Entity> entities, out List<ObjectId> ids)
+        public static bool AddEntityInCurrentBTR(this List<Entity> entities, out List<ObjectId> ids, Transaction transaction = null)
         {
             ids = new List<ObjectId>();
+            bool newTransaction = transaction == null;
+
             try
             {
-                using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+                if (newTransaction) transaction = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction();
+                using (BlockTableRecord ms = transaction.GetObject(HostApplicationServices.WorkingDatabase.CurrentSpaceId, OpenMode.ForWrite) as BlockTableRecord)
                 {
-                    using (BlockTableRecord ms = tr.GetObject(HostApplicationServices.WorkingDatabase.CurrentSpaceId, OpenMode.ForWrite) as BlockTableRecord)
+                    foreach (Entity e in entities)
                     {
-                        foreach (Entity e in entities)
-                        {
-                            if (e == null || e.IsDisposed || !e.IsNewObject) continue;
-                            ids.Add(ms.AppendEntity(e));
-                            tr.AddNewlyCreatedDBObject(e, true);
-                        }
+                        if (e == null || e.IsDisposed || !e.IsNewObject) continue;
+                        ids.Add(ms.AppendEntity(e));
+                        transaction.AddNewlyCreatedDBObject(e, true);
                     }
-                    tr.Commit();
                 }
                 return true;
             }
             catch { return false; }
+            finally 
+            {
+                if (newTransaction)
+                {
+                    transaction?.Commit();
+                    transaction?.Dispose();
+                }
+            }
         }
 
         public static bool DeleteEntity(this ObjectId id)

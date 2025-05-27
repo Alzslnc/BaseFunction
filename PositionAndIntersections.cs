@@ -8,28 +8,35 @@ namespace BaseFunction
 {
     public static class PositionAndIntersections
     {
-        public static int GetInnerLevel(this Curve polyline, List<Curve> polylines, bool simple = false, bool onBoundInclude = false)
+        public static int GetInnerLevel(this Curve polyline, List<Curve> polylines, bool simple = false, bool onBoundInclude = false, bool centerPoint = false, bool onBoundIsZero = false)
         {
             int j = 0;
             foreach (Curve poly in polylines)
             {
                 if (simple && j > 1) return j;
                 if (poly == polyline) continue;
-                PositionType position = polyline.CurveOfCurve(poly);
+
+                PositionType position = centerPoint 
+                    ?(polyline.GetCentrPoint(out Point3d center) ? center.GetPositionType(poly) : PositionType.fault)                   
+                    : polyline.CurveOfCurve(poly);
+
+                if (onBoundIsZero && position == PositionType.onBound) return 0;
+
                 if (onBoundInclude ? position != PositionType.outer : position == PositionType.inner)
                 {
                     j++;
                     continue;
                 }
-                else if (position == PositionType.fault)
+                else if (position == PositionType.fault && !centerPoint)
                 {
-                    if (!polyline.GetCentrPoint(out Point3d center)) continue;
-                    position = center.GetPositionType(poly);
+                    if (!polyline.GetCentrPoint(out Point3d center2)) continue;
+                    position = center2.GetPositionType(poly);
                     if (position == PositionType.inner)
                     {
                         j++;
                         continue;
                     }
+                    else if (onBoundIsZero && position == PositionType.onBound) return 0;
                 }
             }
             return j;
