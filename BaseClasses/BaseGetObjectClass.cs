@@ -436,6 +436,29 @@ namespace BaseFunction
         /// <summary>
         /// Запрашивает у пользователя выбор объектов и возвращает их ObjectId
         /// </summary>
+        /// <param name="objectTypes">список классов для возможного выбора пользователя, null или пустой списко для выбора любых объектов</param>
+        /// <returns>список ObjectId объекта или ObjectId.Null если произошла отмена выбора</returns>         
+        public static bool TryGetObjectsIds(out List<ObjectId> result, List<RXClass> objTypes, string message)
+        {
+            List<string> typeString = new List<string>();
+
+            foreach (RXClass xClass in objTypes)
+            {
+                if (xClass == null) continue;
+                if (xClass.GetRuntimeType() == typeof(ProxyEntity)) typeString.Add("ACAD_PROXY_ENTITY");
+                else typeString.Add(xClass.DxfName);
+            }
+          
+            if (objTypes.Count > 0 && typeString.Count == 0)
+            {
+                result = new List<ObjectId>();
+                return false;
+            }
+            return TryGetObjectsIds(out result, typeString, message);
+        }
+        /// <summary>
+        /// Запрашивает у пользователя выбор объектов и возвращает их ObjectId
+        /// </summary>
         /// <param name="objectTypes">список типов для возможного выбора пользователя, null или пустой списко для выбора любых объектов</param>
         /// <returns>список ObjectId объекта или ObjectId.Null если произошла отмена выбора</returns>         
         public static bool TryGetObjectsIds(out List<ObjectId> result, List<Type> objTypes, string message)
@@ -492,6 +515,39 @@ namespace BaseFunction
                 return true;
             }
             return false;
+        }
+
+        public static List<ObjectId> GetSelectImplied(this Type type)
+        { 
+            return GetSelectImplied(new List<RXClass> { RXClass.GetClass(type) });
+        }
+        public static List<ObjectId> GetSelectImplied(this RXClass type)
+        {
+            return GetSelectImplied(new List<RXClass> { type });
+        }
+        public static List<ObjectId> GetSelectImplied(List<RXClass> types = null)
+        {
+            List<ObjectId> ids = new List<ObjectId>();
+            PromptSelectionResult result = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor.SelectImplied();        
+            if (result.Value != null)
+            {
+                if (types == null) return result.Value.GetObjectIds().ToList();
+
+                foreach (ObjectId id in result.Value.GetObjectIds())
+                {
+                    if (types.Contains(id.ObjectClass)) ids.Add(id);
+                }
+            }
+            return ids;
+        }
+        public static List<ObjectId> GetSelectImplied(this List<Type> types)
+        {           
+            List<RXClass> classes = new List<RXClass>();
+            if (types != null)
+            {
+                foreach (Type type in types) classes.Add(RXClass.GetClass(type));
+            }
+            return GetSelectImplied(classes);
         }
         #endregion
 

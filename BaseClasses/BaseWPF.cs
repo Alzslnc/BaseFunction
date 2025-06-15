@@ -103,4 +103,30 @@ namespace BaseFunction
             return false;
         }
     }
+
+    public class StringToDoubleConverter : ConverterBase
+    {
+        public override object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value;
+        }
+        public override object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value == null) return null;
+
+            if (double.TryParse(value.ToString().Replace(",","."), NumberStyles.Any, CultureInfo.InvariantCulture, out double result)) return result;
+
+            return null;            
+        }
+    }
+
+    public class NumberToBoolConverter : ConverterBase
+    {
+        public override object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value == null) return false;
+            if (value is int i && i > 0) return true;
+            return false;
+        }
+    }
 }

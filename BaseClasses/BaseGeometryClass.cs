@@ -3,7 +3,6 @@ using Autodesk.AutoCAD.Geometry;
 using System;
 using System.Collections.Generic;
 using System.Reflection;
-using Trim_objects.TrimClass.Trim;
 
 namespace BaseFunction
 {
@@ -244,9 +243,12 @@ namespace BaseFunction
         /// <param name="points"></param>
         /// <param name="point"></param>
         /// <returns></returns>
-        public static bool ContainPoint(this List<Point3d> points, Point3d point)
+        public static bool ContainPoint(this List<Point3d> points, Point3d point, Tolerance? tolerance = null)
         {
-            foreach (Point3d p in points) { if (p.IsEqualTo(point)) return true; }
+            foreach (Point3d p in points) 
+            { 
+                if (tolerance.HasValue ? p.IsEqualTo(point, tolerance.Value) : p.IsEqualTo(point)) return true; 
+            }
             return false;
         }
         public static Polyline Convert3dPolylineToPolyline(Polyline3d pline, Transaction tr, bool erase)
@@ -1004,7 +1006,9 @@ namespace BaseFunction
             }
             return null;
         }
-        private static Curve2d ConvertToCurve2d(Curve3d curve3D)
+        public static bool Under(this double number, double number2)  => !number.IsEqualTo(number2) && number < number2;
+        public static bool Over(this double number, double number2) => !number.IsEqualTo(number2) && number > number2;
+        public static Curve2d ConvertToCurve2d(this Curve3d curve3D)
         {
             Curve2d result = null;
 
@@ -1025,15 +1029,15 @@ namespace BaseFunction
                 }
                 else
                 {
-                    arc2d.GetCurveFromGe(MainTrimClass.Plane).GetCentrPoint(out Point3d center);
+                    arc2d.GetCurveFromGe(new Plane()).GetCentrPoint(out Point3d center);
                     result = new CircularArc2d(arc2d.StartPoint.GetPoint2d(), center.GetPoint2d(), arc2d.EndPoint.GetPoint2d());
                 }
             }
             else if (ellipse2d != null)
             {
                 result = new EllipticalArc2d(ellipse2d.Center.GetPoint2d(),
-                    ellipse2d.MajorAxis.Convert2d(MainTrimClass.Plane),
-                    ellipse2d.MinorAxis.Convert2d(MainTrimClass.Plane),
+                    ellipse2d.MajorAxis.Convert2d(new Plane()),
+                    ellipse2d.MinorAxis.Convert2d(new Plane()),
                     ellipse2d.MajorRadius, ellipse2d.MinorRadius);
             }
             else if (spline2d != null)
@@ -1044,8 +1048,8 @@ namespace BaseFunction
                     Point2dCollection p3ds = new Point2dCollection();
                     foreach (Point3d p in n2fd.FitPoints) p3ds.Add(p.GetPoint2d());
                     result = new NurbCurve2d(p3ds,
-                        n2fd.StartTangent.Convert2d(MainTrimClass.Plane),
-                        n2fd.EndTangent.Convert2d(MainTrimClass.Plane), true, true, n2fd.KnotParam
+                        n2fd.StartTangent.Convert2d(new Plane()),
+                        n2fd.EndTangent.Convert2d(new Plane()), true, true, n2fd.KnotParam
                         );
                 }
                 else
@@ -1057,7 +1061,8 @@ namespace BaseFunction
                 }
             }
             return result;
-
         }
+
+
     }
 }
