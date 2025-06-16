@@ -291,7 +291,7 @@ namespace BaseFunction
 
         #region получение ObjectId
 
-        public static List<Type> GetSubclassTypes(Type type)
+        public static List<Type> GetSubclassTypes(this Type type)
         {
             try
             {
@@ -317,23 +317,23 @@ namespace BaseFunction
         /// <summary>
         /// возвращает ObjectId выбранного элемента
         /// </summary>    
-        public static bool TryGetobjectId(out ObjectId id, Type type)
+        public static bool TryGetobjectId(out ObjectId id, Type type, bool subclassInclude = false)
         {
-            return TryGetobjectId(out id, type, "Выберите объект");
+            return TryGetobjectId(out id, type, "Выберите объект", subclassInclude);
         }
         /// <summary>
         /// возвращает ObjectId выбранного элемента
         /// </summary>    
-        public static bool TryGetobjectId(out ObjectId id, Type type, string message)
+        public static bool TryGetobjectId(out ObjectId id, Type type, string message, bool subclassInclude = false)
         {
-            return TryGetobjectId(out id, new List<Type> { type }, message);
+            return TryGetobjectId(out id, new List<Type> { type }, message, subclassInclude);
         }
         /// <summary>
         /// возвращает ObjectId выбранного элемента
         /// </summary>    
-        public static bool TryGetobjectId(out ObjectId id, List<Type> objTypes)
+        public static bool TryGetobjectId(out ObjectId id, List<Type> objTypes, bool subclassInclude = false)
         {
-            return TryGetobjectId(out id, objTypes, "Выберите объект");
+            return TryGetobjectId(out id, objTypes, "Выберите объект", subclassInclude);
         }
         /// <summary>
         /// возвращает ObjectId выбранного элемента
@@ -341,13 +341,22 @@ namespace BaseFunction
         /// <param name="objTypes">допустимые типы объектов RXObject.GetClass(typeof(Circle)).Name, null или пустой список для выбора любых элементов</param>
         /// <param name="message">сообщение пользователю при выборе</param>
         /// <returns>ObjectId объекта или ObjectId.Null если произошла отмена выбора</returns>
-        public static bool TryGetobjectId(out ObjectId id, List<Type> objTypes, string message)
+        public static bool TryGetobjectId(out ObjectId id, List<Type> objTypes, string message, bool subclassInclude = false)
         {
             List<string> typeString = new List<string>();
+            
+            if (subclassInclude)
+            {
+                for (int i = objTypes.Count - 1; i >= 0; i--)
+                {
+                    foreach (Type subclass in objTypes[i].GetSubclassTypes()) if (!objTypes.Contains(subclass)) objTypes.Add(subclass);
+                }                
+            }
+
             foreach (Type type in objTypes)
             {
                 RXClass rXClass = RXClass.GetClass(type);
-                if (rXClass != null) typeString.Add(rXClass.Name);
+                if (rXClass != null) typeString.Add(rXClass.Name);              
             }
             if (objTypes.Count > 0 && typeString.Count == 0)
             {
@@ -355,7 +364,7 @@ namespace BaseFunction
                 return false;
             }
             return TryGetobjectId(out id, typeString, message);
-        }
+        }       
         /// <summary>
         /// возвращает ObjectId выбранного элемента
         /// </summary>
