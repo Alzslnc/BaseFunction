@@ -241,33 +241,33 @@ namespace BaseFunction
 
             Point3d clickPoint;
 
+            if (precision == null) precision = Tolerance.Global.EqualPoint;
+
+            string typeString = "";
+            foreach (Type type in types)
+            {
+                if (type.Equals(typeof(ProxyEntity)))
+                {
+                    typeString += "ACAD_PROXY_ENTITY,";
+                    continue;
+                }
+                typeString += RXClass.GetClass(type).DxfName + ",";
+            }
+            if (typeString.Length > 1) typeString = typeString.Substring(0, typeString.Length - 1);
+            //выбираем типы для множественного выбора
+            TypedValue[] values = new TypedValue[]
+            {
+                  new TypedValue((int)DxfCode.Start,typeString)
+            };
+
+            //объявляем фильтр
+            SelectionFilter filter = new SelectionFilter(values);
+
             while (true)
             {
-
                 if (point.HasValue) clickPoint = point.Value;
                 else if (!TryGetPointFromUser(out clickPoint, false, message, null)) return false;
-
-                if (precision == null) precision = Tolerance.Global.EqualPoint;
-
-                string typeString = "";
-                foreach (Type type in types)
-                {
-                    if (type.Equals(typeof(ProxyEntity)))
-                    {
-                        typeString += "ACAD_PROXY_ENTITY,";
-                        continue;
-                    }
-                    typeString += RXClass.GetClass(type).DxfName + ",";
-                }
-                if (typeString.Length > 1) typeString = typeString.Substring(0, typeString.Length - 1);
-                //выбираем типы для множественного выбора
-                TypedValue[] values = new TypedValue[]
-                {
-                  new TypedValue((int)DxfCode.Start,typeString)
-                };
-
-                //объявляем фильтр
-                SelectionFilter filter = new SelectionFilter(values);
+                                
                 //создаем точки для выбора объектов в области
                 Point3d pt1 = new Point3d(clickPoint.X - precision.Value, clickPoint.Y - precision.Value, 0);
                 Point3d pt2 = new Point3d(clickPoint.X + precision.Value, clickPoint.Y + precision.Value, 0);
@@ -595,28 +595,15 @@ namespace BaseFunction
         #endregion
 
         #region добавление и удаление объектов
-        public static bool AddEntityInCurrentBTR(this Entity entity)
+        public static bool AddEntityInCurrentBTR(this Entity entity, Transaction transaction = null)
         {
-            return entity.AddEntityInCurrentBTR(out _);
+            return entity.AddEntityInCurrentBTR(out _, transaction);
         }
-        public static bool AddEntityInCurrentBTR(this Entity entity, out ObjectId id)
+        public static bool AddEntityInCurrentBTR(this Entity entity, out ObjectId id, Transaction transaction = null)
         {
-            id = ObjectId.Null;
-            if (!entity.IsNewObject) return false;
-            try
-            {
-                using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
-                {
-                    using (BlockTableRecord ms = tr.GetObject(HostApplicationServices.WorkingDatabase.CurrentSpaceId, OpenMode.ForWrite) as BlockTableRecord)
-                    {
-                        id = ms.AppendEntity(entity);
-                        tr.AddNewlyCreatedDBObject(entity, true);
-                    }
-                    tr.Commit();
-                }
-                return true;
-            }
-            catch { return false; }
+            bool result = AddEntityInCurrentBTR(new List<Entity> { entity }, out List<ObjectId> ids, transaction);
+            id = ids.Count == 0 ? ObjectId.Null : ids[0];
+            return result;           
         }
         public static bool AddEntityInCurrentBTR(this List<Entity> entities, Transaction transaction = null)
         {

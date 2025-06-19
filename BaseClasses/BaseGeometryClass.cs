@@ -251,7 +251,7 @@ namespace BaseFunction
             }
             return false;
         }
-        public static Polyline Convert3dPolylineToPolyline(Polyline3d pline, Transaction tr, bool erase)
+        public static Polyline Convert3dPolylineToPolyline(this Polyline3d pline, Transaction tr, bool erase)
         {
             if (pline == null) return null;
 

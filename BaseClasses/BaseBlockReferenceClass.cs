@@ -277,8 +277,8 @@ namespace BaseFunction
                 }
                 tr.Commit();
             }
-        }
-        public static void BlockReferenceSetAttribute(BlockReference br, Transaction tr)
+        }       
+        public static void BlockReferenceSetAttribute(this BlockReference br, Transaction tr)
         {
             DocumentLock documentLock = null;
             if (Aap.Application.DocumentManager != null && Aap.Application.DocumentManager.MdiActiveDocument != null)

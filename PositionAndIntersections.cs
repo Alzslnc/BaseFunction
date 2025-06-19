@@ -248,7 +248,7 @@ namespace BaseFunction
         {      
             return point.GetPositionType(new List<object> { c }, null);
         }
-        public static PositionType GetPositionType(this Point3d point, List<Object> objects)
+        public static PositionType GetPositionType(this Point3d point, List<object> objects)
         {
             PositionType position = PositionType.fault;
             using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
@@ -264,7 +264,7 @@ namespace BaseFunction
         /// <param name="point"></param>
         /// <param name="objects">список кривых в виде собственно самих кривых или их ObjectId</param>       
         /// <returns></returns>
-        public static PositionType GetPositionType(this Point3d point, List<Object> objects, Transaction tr)
+        public static PositionType GetPositionType(this Point3d point, List<object> objects, Transaction tr)
         {
             if (objects.Count == 0) return PositionType.fault;
             //получаем проекцию точки на проскость XY
