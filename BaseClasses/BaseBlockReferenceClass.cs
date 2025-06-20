@@ -44,7 +44,7 @@ namespace BaseFunction
                     if (allFoundFiles.Count() > 0) return BlockMigrate(blNames, allFoundFiles[0], replace);
                 }
             }
-            if (message) System.Windows.Forms.MessageBox.Show("Файл ресурсов не найден");
+            if (message) System.Windows.MessageBox.Show("Файл ресурсов не найден");
             return false;
         }
         /// <summary>
@@ -72,7 +72,7 @@ namespace BaseFunction
                 }
                 catch
                 {
-                    System.Windows.Forms.MessageBox.Show("Не удалось считать файл ресурсов");
+                    System.Windows.MessageBox.Show("Не удалось считать файл ресурсов");
                     return false;
                 }
             }
@@ -98,7 +98,7 @@ namespace BaseFunction
                         else
                         {
                             tr.Commit();
-                            System.Windows.Forms.MessageBox.Show("В файле ресурсов блоки не найдены");
+                            System.Windows.MessageBox.Show("В файле ресурсов блоки не найдены");
                             return false;
                         }
                     }                   
@@ -116,7 +116,7 @@ namespace BaseFunction
                     }
                     catch
                     {
-                        System.Windows.Forms.MessageBox.Show("Не удалось перенести блоки из файла ресурсов");
+                        System.Windows.MessageBox.Show("Не удалось перенести блоки из файла ресурсов");
                         return false;
                     }
                 }
