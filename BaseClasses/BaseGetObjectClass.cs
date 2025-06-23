@@ -422,34 +422,47 @@ namespace BaseFunction
         /// <summary>
         /// Запрашивает у пользователя выбор объектов и возвращает их ObjectId
         /// </summary>      
-        public static bool TryGetObjectsIds(out List<ObjectId> result, Type type)
+        public static bool TryGetObjectsIds(out List<ObjectId> result, Type type, bool subclassInclude = false)
         {
             return TryGetObjectsIds(out result, type, "Выберите объекты");
         }        
         /// <summary>
         /// Запрашивает у пользователя выбор объектов и возвращает их ObjectId
         /// </summary>    
-        public static bool TryGetObjectsIds(out List<ObjectId> result, Type type, string message)
+        public static bool TryGetObjectsIds(out List<ObjectId> result, Type type, string message, bool subclassInclude = false)
         {
-            return TryGetObjectsIds(out result, new List<Type> { type }, message);
+            return TryGetObjectsIds(out result, new List<Type> { type }, message, subclassInclude);
         }
         /// <summary>
         /// Запрашивает у пользователя выбор объектов и возвращает их ObjectId
         /// </summary>
         /// <param name="objectTypes">список типов для возможного выбора пользователя, null или пустой списко для выбора любых объектов</param>
         /// <returns>список ObjectId объекта или ObjectId.Null если произошла отмена выбора</returns>         
-        public static bool TryGetObjectsIds(out List<ObjectId> result, List<Type> objTypes)
+        public static bool TryGetObjectsIds(out List<ObjectId> result, List<Type> objTypes, bool subclassInclude = false)
         {
-            return TryGetObjectsIds(out result, objTypes, "Выберите объекты");
+            return TryGetObjectsIds(out result, objTypes, "Выберите объекты", subclassInclude);
         }
         /// <summary>
         /// Запрашивает у пользователя выбор объектов и возвращает их ObjectId
         /// </summary>
         /// <param name="objectTypes">список классов для возможного выбора пользователя, null или пустой списко для выбора любых объектов</param>
         /// <returns>список ObjectId объекта или ObjectId.Null если произошла отмена выбора</returns>         
-        public static bool TryGetObjectsIds(out List<ObjectId> result, List<RXClass> objTypes, string message)
+        public static bool TryGetObjectsIds(out List<ObjectId> result, List<RXClass> objTypes, string message, bool subclassInclude = false)
         {
             List<string> typeString = new List<string>();
+
+            if (subclassInclude)
+            {
+                for (int i = objTypes.Count - 1; i >= 0; i--)
+                {
+                    List<Type> types = objTypes[i].GetRuntimeType().GetSubclassTypes();
+                    foreach (Type t in types)
+                    {
+                        RXClass rXClass = RXClass.GetClass(t);
+                        if (!objTypes.Contains(rXClass)) objTypes.Add(rXClass);
+                    }
+                };
+            }          
 
             foreach (RXClass xClass in objTypes)
             {
@@ -470,9 +483,22 @@ namespace BaseFunction
         /// </summary>
         /// <param name="objectTypes">список типов для возможного выбора пользователя, null или пустой списко для выбора любых объектов</param>
         /// <returns>список ObjectId объекта или ObjectId.Null если произошла отмена выбора</returns>         
-        public static bool TryGetObjectsIds(out List<ObjectId> result, List<Type> objTypes, string message)
+        public static bool TryGetObjectsIds(out List<ObjectId> result, List<Type> objTypes, string message, bool subclassInclude = false)
         {
             List<string> typeString = new List<string>();
+
+            if (subclassInclude)
+            {
+                for (int i = objTypes.Count - 1; i >= 0; i--)
+                {
+                    List<Type> types = objTypes[i].GetSubclassTypes();
+                    foreach (Type t in types)
+                    {                    
+                        if (!objTypes.Contains(t)) objTypes.Add(t);
+                    }
+                };
+            }
+
             foreach (Type type in objTypes)
             {
                 if (type.Equals(typeof(ProxyEntity)))
