@@ -119,7 +119,9 @@ namespace BaseFunction
             return null;            
         }
     }
-
+    /// <summary>
+    /// созвращает true если значение больше нуля
+    /// </summary>
     public class NumberToBoolConverter : ConverterBase
     {
         public override object Convert(object value, Type targetType, object parameter, CultureInfo culture)
