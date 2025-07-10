@@ -32,17 +32,29 @@ using AppSystemVariableChangedEventArgs = Autodesk.AutoCAD.ApplicationServices.S
 
 namespace BaseFunction
 {
+
     internal class StartEvents
     {
         private bool Initialized { get; set; } = false;
         private bool NeedUpdRibbonDetected { get; set; } = false;        
-        public List<Button> Buttons { get; set; } = new List<Button>();
+        public List<Button> Buttons { get; private set; } = new List<Button>();
         /// <summary>
         /// Инициализация
         /// </summary>
         public void Initialize()
         {
             if (Buttons.Count == 0) return;
+
+            List<string> ribTabNames = new List<string>();
+            foreach (Button button in Buttons)
+            {
+                if (!ribTabNames.Contains(button.RibbonTabName)) ribTabNames.Add(button.RibbonTabName);
+            }
+            foreach (string ribTabName in ribTabNames)
+            {
+                Buttons.Add(new Button(ribTabName, "О программе", new List<ButtonCommand> { new ButtonCommand("О программе", "О программе", "Описание"), }));
+            }
+
             if (!Initialized)
             {
                 Initialized = true;
@@ -138,7 +150,12 @@ namespace BaseFunction
                 {
                     Source = ribSourcePanel
                 };
-                ribTab.Panels.Add(ribPanel);
+                List<string> names = new List<string>() { buttonData.RibbonPanelName };
+                foreach (RibbonPanel panel in ribTab.Panels) names.Add(panel.Source.Title);
+                names.Sort();
+                names.Remove("О программе");
+                names.Add("О программе");
+                ribTab.Panels.Insert(names.IndexOf(buttonData.RibbonPanelName), ribPanel);
             }
 
             foreach (RibbonItem item in ribPanel.Source.Items)
@@ -220,8 +237,15 @@ namespace BaseFunction
                 if (parameter is RibbonButton button)
                 {
                     Autodesk.AutoCAD.Internal.Utils.SetFocusToDwgView();
-                    Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.
-                        SendStringToExecute(button.CommandParameter + " ", true, false, true);
+                    if (button.CommandParameter.ToString() == "О программе" && button.Name == "О программе")
+                    {
+                        System.Windows.MessageBox.Show("Все вопросы можно направить по адресу alzslnc@gmail.com");
+                    }
+                    else
+                    {                        
+                        Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.
+                            SendStringToExecute(button.CommandParameter + " ", true, false, true);
+                    }
                 }
             }      
             

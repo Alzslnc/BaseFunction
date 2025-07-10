@@ -1,5 +1,4 @@
-﻿using Autodesk.AutoCAD.GraphicsSystem;
-using System;
+﻿using System;
 using System.IO;
 using System.Xml.Serialization;
 

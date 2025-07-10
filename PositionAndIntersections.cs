@@ -169,16 +169,22 @@ namespace BaseFunction
                             if (!intersections.ContainPoint(intersection)) intersections.Add(intersection);                          
                         }
                     }
-                    if (sort) intersections.SortOnCurve(curve);
+
+                    for (int i = intersections.Count - 1; i >= 0; i--)
+                    {
+                        intersections.Add(intersections[i] - transform);
+                        intersections.RemoveAt(i);
+                    };
+
+                    if (sort)
+                    {
+                        intersections.SortOnCurve(curve);
+                    }                       
                 }
                 catch { return false; }
             }
 
-            for (int i = intersections.Count - 1; i >= 0; i--)
-            {
-                intersections.Add(intersections[i] - transform);
-                intersections.RemoveAt(i);
-            }; 
+           
 
             if (intersections.Count > 0) return true; return false;            
         }
