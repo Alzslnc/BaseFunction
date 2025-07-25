@@ -10,12 +10,11 @@ using System.Windows.Markup;
 
 namespace BaseFunction
 {
-    public class BaseClass : INotifyPropertyChanged
+    public abstract class BaseClass : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler PropertyChanged;       
         protected void SetData<T>(ref T data, T value, [CallerMemberName] string name = "")
-        {
-            //если значение не поменялось то событие не вызываем
+        {          
             if (EqualityComparer<T>.Default.Equals(data, value)) return;
             data = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
