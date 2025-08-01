@@ -101,6 +101,12 @@ namespace BaseFunction
             if (value is bool bValue) return !bValue;
             return false;
         }
+        public override object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value == null) return false;
+            if (value is bool bValue) return !bValue;
+            return false;
+        }
     }
 
     public class StringToDoubleConverter : ConverterBase
