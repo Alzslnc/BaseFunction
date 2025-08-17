@@ -92,6 +92,19 @@ namespace BaseFunction
             return string.Empty;
         }
     }
+    public class BoolToInvisibleConverter : ConverterBase
+    {
+        public override object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value == null) return Visibility.Collapsed;
+            if (value is bool bValue)
+            {
+                if (bValue) return Visibility.Collapsed;
+                else return Visibility.Visible;
+            }
+            return string.Empty;
+        }
+    }
 
     public class BoolInvertedConverter : ConverterBase
     {
@@ -145,6 +158,14 @@ namespace BaseFunction
             if (value == null) return false;
             if (value is int i && i > 0) return true;
             return false;
+        }
+    }
+    public class StringToBoolConverter : ConverterBase
+    {
+        public override object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value == null) return false;
+            return !string.IsNullOrEmpty(value.ToString());
         }
     }
 }
