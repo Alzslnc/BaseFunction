@@ -13,12 +13,13 @@ namespace BaseFunction
     public abstract class BaseClass : INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler PropertyChanged;       
-        protected void SetData<T>(ref T data, T value, [CallerMemberName] string name = "")
+        public virtual bool SetData<T>(ref T data, T value, [CallerMemberName] string name = "")
         {          
-            if (EqualityComparer<T>.Default.Equals(data, value)) return;
+            if (EqualityComparer<T>.Default.Equals(data, value)) return false;
             data = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
-        }
+            return true;
+        }        
     }
 
     public class RelayCommand : ICommand
