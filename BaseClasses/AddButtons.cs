@@ -1,10 +1,12 @@
-﻿using Autodesk.Windows;
+﻿using Autodesk.AutoCAD.Runtime;
+using Autodesk.Windows;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using AppCore = Autodesk.AutoCAD.ApplicationServices.Core.Application;
 using AppSystemVariableChangedEventArgs = Autodesk.AutoCAD.ApplicationServices.SystemVariableChangedEventArgs;
-
+using Autodesk.AutoCAD.EditorInput;
 
 //Использование в плагинах
 
@@ -32,9 +34,122 @@ using AppSystemVariableChangedEventArgs = Autodesk.AutoCAD.ApplicationServices.S
 
 namespace BaseFunction
 {
-
-    internal class StartEvents
+    public static class RenameTabClass
     {
+        static RenameTabClass()
+        {
+            Load();
+        }
+        [CommandMethod("RenameTab")]
+        public static void Rename()
+        {
+
+            Editor editor = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor;
+
+            Dictionary<string, string> newTab = Tabs.ToDictionary(x => x.Key, x => x.Value);
+
+            if (Tabs.Count == 0)
+            {
+                editor.WriteMessage("\nВкладки для переименования отсутствуют");
+                return;
+            }
+
+            LoadList(editor);
+
+            while (BaseFunction.BaseGetObjectClass.TryGetKeywords(out string result, new List<string> { "Вкладки", "Переименовать", "Сохранить", "Отменить" }, "\nВыберите пункт из списка"))
+            {
+                switch (result) 
+                {
+                    case "Вкладки": 
+                        {
+                            LoadList(editor);
+                            break;
+                        }
+                    case "Переименовать":
+                        {
+                            if (BaseGetObjectClass.TryGetIntFromUser(out int numResult, 1, 1, newTab.Count, "Выберите номер вкладки для переименования"))
+                            {
+                                PromptResult stringResult = editor.GetString(new PromptStringOptions($"Выберите новое название вкладки {newTab.ElementAt(numResult - 1).Key}")
+                                {
+                                    UseDefaultValue = true,
+                                    DefaultValue = newTab.ElementAt(numResult - 1).Value,
+                                });
+                                if (stringResult.Status == PromptStatus.OK && !string.IsNullOrEmpty(stringResult.StringResult))
+                                {
+                                    newTab[newTab.ElementAt(numResult - 1).Key] = stringResult.StringResult;                               
+                                }
+                            }
+                            else
+                            {
+                                editor.WriteMessage("\nИндекс вкладки за пределами возможных значений");
+                            }                               
+
+                            break;
+                        }
+                    case "Сохранить":
+                        {
+                            Tabs = newTab.ToDictionary(x => x.Key, x => x.Value);
+                            Save();
+                            return;
+                        }
+                    case "Отменить":
+                        {                           
+                            return;
+                        }
+                }
+            }
+            Save();
+        }
+        private static void LoadList(Editor ed)
+        {
+            ed.WriteMessage("\nСписок панелей для переименования:");
+            int i = 1;
+            foreach (KeyValuePair<string, string> key in Tabs)
+            {
+                ed.WriteMessage($"\n{i++}: {key.Key} / {key.Value}");
+            }
+        }
+        private static void Save()
+        {
+            if (Tabs.Count == 0) return;
+            TabsSaveData tabsSaveData = new TabsSaveData(Tabs);
+            BaseXMLClass.SetSerialisationResult(SavePath, tabsSaveData);
+        }
+        private static void Load()
+        {
+            if (!File.Exists(SavePath)) return;
+            if (BaseXMLClass.GetSerialisationResult(SavePath, typeof(TabsSaveData)) is TabsSaveData data)
+            {
+                foreach (TabData tabData in data.TabDatas)
+                { 
+                    if (Tabs.ContainsKey(tabData.Name)) Tabs[tabData.Name] = tabData.NewName;
+                    else Tabs.Add(tabData.Name, tabData.NewName);
+                }
+            }
+        }
+
+        public class TabsSaveData
+        { 
+            public TabsSaveData() { }
+            public TabsSaveData(Dictionary<string, string> data)
+            {
+                foreach (var key in data)
+                {
+                    TabDatas.Add(new TabData { Name = key.Key, NewName = key.Value });
+                }
+            }
+            public List<TabData> TabDatas { get; set; } = new List<TabData>();        
+        }
+        public struct TabData
+        { 
+            public string Name;
+            public string NewName;
+        }
+        public static Dictionary<string, string> Tabs = new Dictionary<string, string>();
+        public static string SavePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RenameTabData.xml");
+    }
+    internal class StartEvents
+    {        
         private bool Initialized { get; set; } = false;
         private bool NeedUpdRibbonDetected { get; set; } = false;        
         public List<Button> Buttons { get; private set; } = new List<Button>();
@@ -46,12 +161,28 @@ namespace BaseFunction
             if (Buttons.Count == 0) return;
 
             List<string> ribTabNames = new List<string>();
-            foreach (Button button in Buttons)
+
+            try
             {
-                if (!ribTabNames.Contains(button.RibbonTabName)) ribTabNames.Add(button.RibbonTabName);
+                for (int i = 0; i < Buttons.Count; i++)
+                {
+                    if (!RenameTabClass.Tabs.ContainsKey(Buttons[i].RibbonTabName)) RenameTabClass.Tabs.Add(Buttons[i].RibbonTabName, Buttons[i].RibbonTabName);
+                    else
+                    {
+                        Buttons[i].RibbonTabName = RenameTabClass.Tabs[Buttons[i].RibbonTabName];
+                        Buttons[i].RibbonTabId = Buttons[i].RibbonTabName + "_Id";
+                    }
+                }
             }
+            catch { }
+
+            foreach (Button button in Buttons)
+            {             
+                if (!ribTabNames.Contains(button.RibbonTabName)) ribTabNames.Add(button.RibbonTabName);               
+            }
+
             foreach (string ribTabName in ribTabNames)
-            {
+            {              
                 Buttons.Add(new Button(ribTabName, "О программе", new List<ButtonCommand> { new ButtonCommand("О программе", "О программе", "Описание"), }));
             }
 
@@ -101,16 +232,17 @@ namespace BaseFunction
                     // добавляем свою вкладку
                     foreach (RibbonTab tab in ribCntrl.Tabs)
                     {
-                        if (tab.Id.Equals(buttonData.RibbonTabId) & tab.Title.Equals(buttonData.RibbonTabName))
+                        if (tab.Id.Equals(buttonData.RibbonTabId))
                         {
                             ribTab = tab;
                             break;
                         }
                     }
                     if (ribTab == null)
-                    {
+                    {                        
                         ribTab = new RibbonTab
                         {
+                            
                             Title = buttonData.RibbonTabName, // Заголовок вкладки
                             Id = buttonData.RibbonTabId // Идентификатор вкладки
                         };
