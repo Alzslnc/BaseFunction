@@ -46,6 +46,8 @@ namespace BaseFunction
 
             Editor editor = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor;
 
+            Load();
+
             Dictionary<string, string> newTab = Tabs.ToDictionary(x => x.Key, x => x.Value);
 
             if (Tabs.Count == 0)
@@ -109,13 +111,13 @@ namespace BaseFunction
                 ed.WriteMessage($"\n{i++}: {key.Key} / {key.Value}");
             }
         }
-        private static void Save()
+        public static void Save()
         {
             if (Tabs.Count == 0) return;
             TabsSaveData tabsSaveData = new TabsSaveData(Tabs);
             BaseXMLClass.SetSerialisationResult(SavePath, tabsSaveData);
         }
-        private static void Load()
+        public static void Load()
         {
             if (!File.Exists(SavePath)) return;
             if (BaseXMLClass.GetSerialisationResult(SavePath, typeof(TabsSaveData)) is TabsSaveData data)
@@ -164,9 +166,15 @@ namespace BaseFunction
 
             try
             {
+                RenameTabClass.Load();
                 for (int i = 0; i < Buttons.Count; i++)
                 {
-                    if (!RenameTabClass.Tabs.ContainsKey(Buttons[i].RibbonTabName)) RenameTabClass.Tabs.Add(Buttons[i].RibbonTabName, Buttons[i].RibbonTabName);
+                    if (!RenameTabClass.Tabs.ContainsKey(Buttons[i].RibbonTabName))
+                    {
+                        RenameTabClass.Tabs.Add(Buttons[i].RibbonTabName, Buttons[i].RibbonTabName);
+                        RenameTabClass.Save();
+                    }
+                        
                     else
                     {
                         Buttons[i].RibbonTabName = RenameTabClass.Tabs[Buttons[i].RibbonTabName];
