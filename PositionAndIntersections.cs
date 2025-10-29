@@ -8,8 +8,14 @@ namespace BaseFunction
 {
     public static class PositionAndIntersections
     {
-        public static int GetInnerLevel(this Curve polyline, List<Curve> polylines, bool simple = false, bool onBoundInclude = false, bool centerPoint = false, bool onBoundIsZero = false)
+        public static int GetInnerLevel(this Curve polyline, List<Curve> polylines, bool simple = false, bool onBoundInclude = false, bool centerPoint = false, bool onBoundIsZero = false, bool listChech = false)
         {
+            Dictionary<Curve, int> iLvls = new Dictionary<Curve, int>();
+            if (listChech)
+            {
+                foreach (Curve c in polylines) iLvls.Add(c, c.GetInnerLevel(polylines));            
+            }
+            int maxIlvl = -1;
             int j = 0;
             foreach (Curve poly in polylines)
             {
@@ -24,7 +30,18 @@ namespace BaseFunction
 
                 if (onBoundInclude ? position != PositionType.outer : position == PositionType.inner)
                 {
-                    j++;
+                    if (listChech)
+                    {
+                        if (iLvls[poly] > maxIlvl && iLvls[poly] % 2 < 1)
+                        {
+                            j = iLvls[poly] + 1;
+                            maxIlvl = iLvls[poly];
+                        }
+                    }
+                    else
+                    {
+                        j++;
+                    }
                     continue;
                 }
                 else if (position == PositionType.fault && !centerPoint)
