@@ -151,6 +151,21 @@ namespace BaseFunction
             return null;            
         }
     }
+    public class StringToIntConverter : ConverterBase
+    {
+        public override object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return value;
+        }
+        public override object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value == null) return null;
+
+            if (int.TryParse(value.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out int result)) return result;
+
+            return null;
+        }
+    }
     public class BaseDateConverter : ConverterBase
     {
         public override object Convert(object value, Type targetType, object parameter, CultureInfo culture)
