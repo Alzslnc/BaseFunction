@@ -1,5 +1,6 @@
 ﻿using System;
 using System.IO;
+using System.Xml;
 using System.Xml.Serialization;
 
 namespace BaseFunction
@@ -14,7 +15,8 @@ namespace BaseFunction
             {
                 using (StreamReader reader = new StreamReader(path))
                 {
-                    return new XmlSerializer(type).Deserialize(reader);
+                    XmlReader xmlReader = XmlReader.Create(reader);
+                    return new XmlSerializer(type).Deserialize(xmlReader);
                 }
             }
             catch { return null; }
