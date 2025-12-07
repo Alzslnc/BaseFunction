@@ -1,6 +1,8 @@
 ﻿using Autodesk.AutoCAD.ApplicationServices;
 using Autodesk.AutoCAD.Colors;
 using Autodesk.AutoCAD.DatabaseServices;
+using Autodesk.AutoCAD.GraphicsInterface;
+
 using Autodesk.AutoCAD.LayerManager;
 using System.Collections.Generic;
 using System.Linq;
@@ -84,6 +86,29 @@ namespace BaseFunction
         public static LayerTypeChange LayerChangeParametrs(string layer_name, short colorIndex)
         {
             return LayerChangeParametrs(layer_name, colorIndex, null, null);
+        }
+        public static void LayerChangeColor(string layer_name, Color color)
+        {
+            DocumentLock documentLock = null;
+            if (Application.DocumentManager != null && Application.DocumentManager.MdiActiveDocument != null)
+            {
+                documentLock = Application.DocumentManager.MdiActiveDocument.LockDocument();
+            }
+            //используем транзакцию что бы получить данные о слоях 
+            using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+            {
+                //получаем таблицу слоев
+                LayerTable lt = tr.GetObject(HostApplicationServices.WorkingDatabase.LayerTableId, OpenMode.ForRead) as LayerTable;
+                //если в таблице слоев есть нужный слой
+                if (lt.Has(layer_name))
+                {
+                    //открываем слой на запись 
+                    LayerTableRecord layer = tr.GetObject(lt[layer_name], OpenMode.ForWrite, false, true) as LayerTableRecord;
+                    layer.Color = color;
+                }                
+                tr.Commit();
+            }
+            documentLock?.Dispose();
         }
         /// <summary>
         /// Изменяет параметры существующего слоя

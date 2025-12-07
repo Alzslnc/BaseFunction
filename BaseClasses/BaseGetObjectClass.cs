@@ -667,25 +667,33 @@ namespace BaseFunction
             }
         }
 
-        public static bool DeleteEntity(this ObjectId id)
+        public static bool DeleteEntity(this ObjectId id, Transaction tr = null)
         {
-            return DeleteEntity(new List<ObjectId> { id });
+            return DeleteEntity(new List<ObjectId> { id }, tr);
         }
-        public static bool DeleteEntity(this List<ObjectId> ids)
+        public static bool DeleteEntity(this List<ObjectId> ids, Transaction tr = null)
         {
             try
             {
-                using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+                if (tr == null)
+                {
+                    using (tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+                    {
+                        foreach (ObjectId id in ids)
+                        {
+                            if (id == null || id == ObjectId.Null || !id.IsValid || id.IsErased) continue;
+                            (tr.GetObject(id, OpenMode.ForWrite, false, true) as Entity)?.Erase();
+                        }
+                        tr.Commit();
+                    }
+                }
+                else
                 {
                     foreach (ObjectId id in ids)
                     {
                         if (id == null || id == ObjectId.Null || !id.IsValid || id.IsErased) continue;
-                        using (Entity entity = tr.GetObject(id, OpenMode.ForWrite, false, true) as Entity)
-                        {
-                            entity?.Erase();
-                        }
+                        (tr.GetObject(id, OpenMode.ForWrite, false, true) as Entity)?.Erase();
                     }
-                    tr.Commit();
                 }
                 return true;
             }
