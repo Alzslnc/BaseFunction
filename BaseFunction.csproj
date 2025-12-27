@@ -86,6 +86,7 @@
     <Compile Include="BaseClasses\BaseExplodeClass.cs" />
     <Compile Include="BaseClasses\BaseFormClass.cs" />
     <Compile Include="BaseClasses\BaseGeometryClass.cs" />
+    <Compile Include="BaseClasses\BaseHookClass.cs" />
     <Compile Include="BaseClasses\BaseLayerClass.cs" />
     <Compile Include="BaseClasses\BaseWPF.cs" />
     <Compile Include="BaseClasses\BaseXMLClass.cs" />

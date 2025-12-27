@@ -277,13 +277,13 @@ namespace BaseFunction
                 // .MdiActiveDocument.Editor.SelectCrossingPolygon(new Point3dCollection 
                 // { pt1, pt1 + Vector3d.XAxis * precision.Value * 2, pt2, pt1 + Vector3d.YAxis * precision.Value * 2}, filter);         
 
-                if (psr.Status == PromptStatus.Error) return false;
-
-                if (psr.Value != null)
+                if (psr.Status == PromptStatus.Error && point.HasValue) return false;
+                else if (psr.Value != null)
                 {
                     if (excludes != null) result.AddRange(psr.Value.GetObjectIds().Except(excludes));
                     else result.AddRange(psr.Value.GetObjectIds());
-                    return true;
+                    if (result.Count > 0) return true;
+                    else if (point.HasValue) return false;
                 } 
             }
          
