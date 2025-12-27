@@ -10,7 +10,7 @@ namespace BaseFunction
 {
     public static class BaseBlockReferenceClass
     {
-        #region получаем название блока
+        #region получаем название блока/ObjectId
         public static string GetName(this BlockReference reference)
         {
             if (reference.IsDynamicBlock)
@@ -22,6 +22,8 @@ namespace BaseFunction
             }
             else return reference.Name;
         }
+        public static ObjectId GetBTRId(this BlockReference reference) => reference.IsDynamicBlock ? reference.DynamicBlockTableRecord : reference.BlockTableRecord;
+       
         #endregion
 
         #region перенос блоков из других чертежей
