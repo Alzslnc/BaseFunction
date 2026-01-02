@@ -152,6 +152,33 @@ namespace BaseFunction
             }
             return missBlocks;
         }
+        public static bool Migrate(string oldName, string newName, bool message)
+        {
+            try
+            {
+                using (Database newDb = new Database())
+                {
+                    if (!BlockMigrate(newDb, new System.Collections.Generic.List<string> { oldName }, HostApplicationServices.WorkingDatabase)) return false;
+
+                    using (Transaction tr = newDb.TransactionManager.StartTransaction())
+                    {
+                        BlockTable bt = tr.GetObject(newDb.BlockTableId, OpenMode.ForRead) as BlockTable;
+                        if (bt.Has(oldName))
+                        {
+                            BlockTableRecord btr = tr.GetObject(bt[oldName], OpenMode.ForWrite) as BlockTableRecord;
+                            btr.Name = newName;
+                        }
+                        tr.Commit();
+                    }
+                    if (BlockMigrate(HostApplicationServices.WorkingDatabase, new System.Collections.Generic.List<string> { newName }, newDb)) return true; return false;
+                }
+            }
+            catch
+            {
+                if (message) System.Windows.Forms.MessageBox.Show("Введенное название блока некорректно");
+                return false;
+            }
+        }
         #endregion
 
         #region изменение атрибутов в блоке
@@ -334,13 +361,17 @@ namespace BaseFunction
             result = new Dictionary<string, string>();
             if (br == null) return false;
             //проходим по всем объектам в коллекции атрибутов
-            foreach (ObjectId id in br.AttributeCollection)
+            foreach (object o in br.AttributeCollection)
             {
-                //открываем объект как атрибут
-                using (AttributeReference attRef = tr.GetObject(id, OpenMode.ForRead, false, true) as AttributeReference)
-                {
+                AttributeReference attRef = null;
+
+                if (o is AttributeReference) attRef = o as AttributeReference;
+                else if (o is ObjectId id) attRef = tr.GetObject(id, OpenMode.ForRead, false, true) as AttributeReference;
+
+                if (attRef != null)
+                {                 
                     if (names != null && !names.Contains(attRef.Tag)) continue;
-                    if (attRef != null && !result.ContainsKey(attRef.Tag))
+                    if (!result.ContainsKey(attRef.Tag))
                     {
                         if (attRef.IsMTextAttribute)
                         {
@@ -351,8 +382,7 @@ namespace BaseFunction
                         {
                             result.Add(attRef.Tag, attRef.TextString);
                         }
-                    }
-                   
+                    }                   
                 }
             }
             if (result.Count > 0) return true; return false;
@@ -375,16 +405,20 @@ namespace BaseFunction
             //запускаем транзакцию
             using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
             {
-                //проходим по всем объектам в коллекции атрибутов
-                foreach (ObjectId id in br.AttributeCollection)
+                foreach (object o in br.AttributeCollection)
                 {
-                    //открываем объект как атрибут
-                    using (AttributeReference attRef = tr.GetObject(id, OpenMode.ForRead, false, true) as AttributeReference)
+                    AttributeReference attRef = null;
+
+                    if (o is AttributeReference) attRef = o as AttributeReference;
+                    else if (o is ObjectId id) attRef = tr.GetObject(id, OpenMode.ForRead, false, true) as AttributeReference;
+
+                    if (attRef != null)
                     {
                         if (names != null && !names.Contains(attRef.Tag)) continue;
-                        if (attRef != null && !result.ContainsKey(attRef.Tag)) result.Add(attRef.Tag, attRef.TextString);
+                        if (result.ContainsKey(attRef.Tag)) result.Add(attRef.Tag, attRef.TextString);
                     }
                 }
+             
                 tr.Commit();
             }
             documentLock?.Dispose();
@@ -414,15 +448,16 @@ namespace BaseFunction
                 {
                     if (br != null)
                     {
-                        //проходим по всем объектам в коллекции атрибутов
-                        foreach (ObjectId id in br.AttributeCollection)
+
+                        foreach (object o in br.AttributeCollection)
                         {
-                            //открываем объект как атрибут
-                            using (AttributeReference attRef = tr.GetObject(id, OpenMode.ForRead, false, true) as AttributeReference)
-                            {
-                                if (attRef != null && !result.ContainsKey(attRef.Tag)) result.Add(attRef.Tag, attRef.TextString);
-                            }
-                        }
+                            AttributeReference attRef = null;
+
+                            if (o is AttributeReference) attRef = o as AttributeReference;
+                            else if (o is ObjectId id) attRef = tr.GetObject(id, OpenMode.ForRead, false, true) as AttributeReference;
+
+                            if (attRef != null && !result.ContainsKey(attRef.Tag)) result.Add(attRef.Tag, attRef.TextString);
+                        }                                              
                     }
                 }
                 tr.Commit();
@@ -449,19 +484,19 @@ namespace BaseFunction
             //запускаем транзакцию
             using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
             {
-                //проходим по всем объектам в коллекции атрибутов
-                foreach (ObjectId id in br.AttributeCollection)
+                foreach (object o in br.AttributeCollection)
                 {
-                    //открываем объект как атрибут
-                    using (AttributeReference attRef = tr.GetObject(id, OpenMode.ForRead, false, true) as AttributeReference)
+                    AttributeReference attRef = null;
+
+                    if (o is AttributeReference) attRef = o as AttributeReference;
+                    else if (o is ObjectId id) attRef = tr.GetObject(id, OpenMode.ForRead, false, true) as AttributeReference;
+
+                    if (attRef != null && attRef.Tag.Equals(tag))
                     {
-                        if (attRef != null && attRef.Tag.Equals(tag))
-                        {
-                            result = attRef.TextString;
-                            break;
-                        }
+                        result = attRef.TextString;
+                        break;
                     }
-                }
+                }               
                 tr.Commit();
             }
             documentLock?.Dispose();
@@ -491,16 +526,19 @@ namespace BaseFunction
                 {
                     if (br != null)
                     {
-                        //проходим по всем объектам в коллекции атрибутов
-                        foreach (ObjectId id in br.AttributeCollection)
+                        foreach (object o in br.AttributeCollection)
                         {
-                            //открываем объект как атрибут
-                            using (AttributeReference attRef = tr.GetObject(id, OpenMode.ForRead, false, true) as AttributeReference)
+                            AttributeReference attRef = null;
+
+                            if (o is AttributeReference) attRef = o as AttributeReference;
+                            else if (o is ObjectId id) attRef = tr.GetObject(id, OpenMode.ForRead, false, true) as AttributeReference;
+
+                            if (attRef != null && attRef.Tag.Equals(tag))
                             {
-                                if (attRef != null && attRef.Tag.Equals(tag)) result = attRef.TextString;
+                                result = attRef.TextString;
                                 break;
                             }
-                        }
+                        }                        
                     }
                 }
                 tr.Commit();

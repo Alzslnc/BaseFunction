@@ -6,20 +6,28 @@ namespace BaseFunction
 {
     public abstract class BaseHookClass : IDisposable
     {
+        public object ob = null;
+        public BaseHookClass(object o)
+        {
+            ob = o;
+        }
         public BaseHookClass()
         {           
         }
-        public BaseHookClass(List<int> keys)
+        public BaseHookClass(List<int> keys, object o = null)
         { 
             Keys.AddRange(keys);
+            ob = o;
         }
-        public BaseHookClass(int key)
+        public BaseHookClass(int key, object o = null)
         {
             Keys.Add(key);
+            ob = o;
         }
-        public BaseHookClass(System.Windows.Forms.Keys key)
+        public BaseHookClass(System.Windows.Forms.Keys key, object o = null)
         {
             Keys.Add((int)key);
+            ob = o;
         }
 
         [DllImport("accore.dll",
@@ -61,7 +69,7 @@ namespace BaseFunction
                 
                 if (value == 128)
                 {
-                    this.Action();
+                    Action();                   
                 }
             }
             return false;
@@ -71,8 +79,8 @@ namespace BaseFunction
         { 
             
         }
-
-        private static WindowHookProc callBackFunc = null;
+       
+        private WindowHookProc callBackFunc = null;
                
         public void Register()
         {
