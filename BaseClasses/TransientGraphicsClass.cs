@@ -183,6 +183,25 @@ namespace BaseFunction
         public bool AutoRedraw { get; set; } = true;
         public Circle Circle { get; set; } = null;
         public Curve Curve { get; set; } = null;
+        public bool HightLight
+        {
+            get
+            {
+                if (Entity != null) return _HightLight;
+                else return false;
+            }
+            set
+            {
+                if (Entity != null && _HightLight != value)
+                {
+                    _HightLight = value;
+                    if (_HightLight) Entity.Highlight();
+                    else Entity.Unhighlight();
+                    OnChange(this, EventArgs.Empty);
+                }
+            }
+        }
+        private bool _HightLight = false;
         public bool Disposed { get; private set; } = false;
 
 
