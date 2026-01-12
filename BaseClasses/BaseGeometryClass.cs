@@ -837,7 +837,7 @@ namespace BaseFunction
         /// </summary>   
         public static bool IsIntersect(this Curve curve, Curve curve2, List<Point3d> intersections)
         {           
-            if (intersections.Count == 0) return false;
+            if (intersections.Count == 0 || curve.GetLength().IsEqualTo(0) || curve2.GetLength().IsEqualTo(0)) return false;
 
             using (Plane plane = new Plane())
             {
