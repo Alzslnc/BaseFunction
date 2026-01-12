@@ -14,12 +14,17 @@ namespace BaseFunction
     {
         public event PropertyChangedEventHandler PropertyChanged;       
         public virtual bool SetData<T>(ref T data, T value, [CallerMemberName] string name = "")
-        {          
+        {
             if (EqualityComparer<T>.Default.Equals(data, value)) return false;
             data = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
             return true;
-        }        
+        }
+        public virtual bool Call([CallerMemberName] string name = "")
+        {            
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+            return true;
+        }
     }
 
     public class RelayCommand : ICommand
