@@ -1,12 +1,19 @@
-﻿using Autodesk.AutoCAD.Runtime;
+﻿using Autodesk.AutoCAD.EditorInput;
+using Autodesk.AutoCAD.Runtime;
 using Autodesk.Windows;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Xml.Linq;
+using static BaseFunction.RenameTabClass;
+using static System.Windows.Forms.VisualStyles.VisualStyleElement;
 using AppCore = Autodesk.AutoCAD.ApplicationServices.Core.Application;
 using AppSystemVariableChangedEventArgs = Autodesk.AutoCAD.ApplicationServices.SystemVariableChangedEventArgs;
-using Autodesk.AutoCAD.EditorInput;
 
 //Использование в плагинах
 
@@ -34,8 +41,44 @@ using Autodesk.AutoCAD.EditorInput;
 
 namespace BaseFunction
 {
+    public static class ControlVersionClass
+    {
+        static ControlVersionClass()
+        {
+            Load();
+        }
+
+        public static void Save()
+        {
+
+            ControlVersion controlVersion = new ControlVersion() { VersionDatas = VersionDatas };
+            BaseXMLClass.SetSerialisationResult(SavePath, controlVersion);
+        }
+        public static void Load()
+        {
+            if (!File.Exists(SavePath)) return;
+            if (BaseXMLClass.GetSerialisationResult(SavePath, typeof(ControlVersion)) is ControlVersion data)
+            {
+                VersionDatas = data.VersionDatas;
+            }
+        }
+
+        private static readonly string SavePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ControlVersion.xml");
+        public class ControlVersion
+        {
+            public ControlVersion() { }
+            public List<VersionData> VersionDatas { get; set; } = new List<VersionData>();
+        }
+        public class VersionData
+        {
+            public string Name;
+            public DateTime Date;
+        }
+        public static List<VersionData> VersionDatas { get; set; } = new List<VersionData>();
+    }
     public static class RenameTabClass
     {
+        
         static RenameTabClass()
         {
             Load();
@@ -142,13 +185,15 @@ namespace BaseFunction
             }
             public List<TabData> TabDatas { get; set; } = new List<TabData>();        
         }
+
         public struct TabData
         { 
             public string Name;
             public string NewName;
         }
+        
         public static Dictionary<string, string> Tabs = new Dictionary<string, string>();
-        public static string SavePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RenameTabData.xml");
+        private static string SavePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RenameTabData.xml");  
     }
     internal class StartEvents
     {        
@@ -161,6 +206,8 @@ namespace BaseFunction
         public void Initialize()
         {
             if (Buttons.Count == 0) return;
+
+            GetVersion();
 
             List<string> ribTabNames = new List<string>();
 
@@ -192,6 +239,8 @@ namespace BaseFunction
             foreach (string ribTabName in ribTabNames)
             {              
                 Buttons.Add(new Button(ribTabName, "О программе", new List<ButtonCommand> { new ButtonCommand("О программе", "О программе", "Описание"), }));
+                Buttons.Add(new Button(ribTabName, "О программе", new List<ButtonCommand> { new ButtonCommand("Проверить обновления", "Проверить обновления", "Показывает наличие обновлений."), }));
+                Buttons.Add(new Button(ribTabName, "О программе", new List<ButtonCommand> { new ButtonCommand("Открыть репозиторий", "Открыть репозиторий", "Место хранения последних версий программ."), }));
             }
 
             if (!Initialized)
@@ -201,6 +250,19 @@ namespace BaseFunction
                 AppCore.Idle += Application_Idle_RibbonUpdate;
                 AppCore.SystemVariableChanged += App_SysVarChanged_RibbonUpdate;
             }
+        }
+        private void GetVersion()
+        {            
+            FileInfo fileInfo = new FileInfo(this.GetType().Assembly.Location);
+            ControlVersionClass.Load();
+            ControlVersionClass.VersionData versionData = ControlVersionClass.VersionDatas.FirstOrDefault(x => x.Name == fileInfo.FullName);
+            if (versionData == null)
+            { 
+                versionData = new ControlVersionClass.VersionData() { Name = fileInfo.FullName};
+                ControlVersionClass.VersionDatas.Add(versionData);
+            }
+            versionData.Date = fileInfo.LastWriteTime;
+            ControlVersionClass.Save();
         }
         private void App_SysVarChanged_RibbonUpdate (object sender, AppSystemVariableChangedEventArgs e)
         {
@@ -381,8 +443,68 @@ namespace BaseFunction
                     {
                         System.Windows.MessageBox.Show("Все вопросы можно направить по адресу alzslnc@gmail.com");
                     }
+                    else if (button.CommandParameter.ToString() == "Открыть репозиторий" && button.Name == "Открыть репозиторий")
+                    {
+                        Process.Start(new ProcessStartInfo("https://github.com/Alzslnc/AcadPlugins") { UseShellExecute = true });
+                    }
+                    else if (button.CommandParameter.ToString() == "Проверить обновления" && button.Name == "Проверить обновления")
+                    {
+                        ControlVersionClass.Load();
+
+                        string report = "";
+
+                        foreach (ControlVersionClass.VersionData keyValuePair in ControlVersionClass.VersionDatas)
+                        {
+                            try
+                            {
+                                DirectoryInfo fName = new FileInfo(keyValuePair.Name).Directory;
+
+                                string dir = string.Empty;
+
+                                while (fName != null && !fName.Name.Contains(".bundle")) fName = fName.Parent;
+
+                                string name = Path.Combine($"https://raw.githubusercontent.com/Alzslnc/AcadPlugins/main/{fName.Name}.zip");
+
+                                using (HttpClient client = new HttpClient())
+                                {
+                                    // GitHub требует наличия заголовка User-Agent
+                                    client.DefaultRequestHeaders.Add("User-Agent", "C# App");
+
+                                    try
+                                    {
+                                        using (Stream stream = client.GetStreamAsync(name).Result)
+                                        using (ZipArchive archive = new ZipArchive(stream, ZipArchiveMode.Read))
+                                        {
+                                            string shortName = new FileInfo(keyValuePair.Name).Name;
+                                            var entry = archive.Entries.FirstOrDefault(x => x.Name.Contains(shortName) && !x.Name.Contains("config"));
+
+                                            if (entry == null) continue;
+
+                                            if (entry.LastWriteTime > keyValuePair.Date)
+                                            {
+                                                report += $"{new FileInfo(keyValuePair.Name).Name} - Есть новая версия.{Environment.NewLine}";
+                                            }
+                                            else
+                                            {
+                                                report += $"{new FileInfo(keyValuePair.Name).Name} - Версия актуальна.{Environment.NewLine}";
+                                            }
+                                            continue;
+                                        }
+                                    }
+                                    catch
+                                    {
+                                    }
+                                    
+                                }                               
+                            }
+                            catch { }
+                            report += $"{new FileInfo(keyValuePair.Name).Name} - Программа отсутствует в системе контроля версий.{Environment.NewLine}";
+                        }
+
+                        System.Windows.MessageBox.Show(report);
+                    }
                     else
-                    {                        
+                    {
                         Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.
                             SendStringToExecute(button.CommandParameter + " ", true, false, true);
                     }
@@ -391,7 +513,6 @@ namespace BaseFunction
             
         }
     }
-
     public class Button
     {
         public Button(string ribbonTabName, string ribbonPanelName)
