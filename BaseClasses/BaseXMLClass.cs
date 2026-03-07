@@ -27,6 +27,8 @@ namespace BaseFunction
             if (isName) path = Path.Combine(new FileInfo(type.Assembly.Location).DirectoryName, path);
             try
             {
+                string directory = Path.GetDirectoryName(path);
+                if (!Directory.Exists(directory)) Directory.CreateDirectory(directory);
                 using (StreamWriter writer = new StreamWriter(path))
                 {
                     new XmlSerializer(type).Serialize(writer, toSerialise);

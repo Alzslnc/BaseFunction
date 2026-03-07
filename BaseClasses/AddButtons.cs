@@ -1,4 +1,5 @@
-﻿using Autodesk.AutoCAD.EditorInput;
+﻿using Autodesk.AutoCAD.DatabaseServices;
+using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Runtime;
 using Autodesk.Windows;
 using System;
@@ -7,11 +8,10 @@ using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Linq;
-using System.Net;
 using System.Net.Http;
-using System.Xml.Linq;
-using static BaseFunction.RenameTabClass;
-using static System.Windows.Forms.VisualStyles.VisualStyleElement;
+using System.Net.Http.Headers;
+using System.Security.Cryptography.X509Certificates;
+using System.Text;
 using AppCore = Autodesk.AutoCAD.ApplicationServices.Core.Application;
 using AppSystemVariableChangedEventArgs = Autodesk.AutoCAD.ApplicationServices.SystemVariableChangedEventArgs;
 
@@ -36,7 +36,7 @@ using AppSystemVariableChangedEventArgs = Autodesk.AutoCAD.ApplicationServices.S
 
 //        startEvents.Initialize();
 //    }
-//    public void Terminate() { }
+//    public void Terminate() { ControlVersionClass.Terminate();}
 //}
 
 namespace BaseFunction
@@ -47,27 +47,46 @@ namespace BaseFunction
         {
             Load();
         }
-
         public static void Save()
         {
 
             ControlVersion controlVersion = new ControlVersion() { VersionDatas = VersionDatas };
+            FoldersClass folders = new FoldersClass() { Folders = Folders };
             BaseXMLClass.SetSerialisationResult(SavePath, controlVersion);
+            BaseXMLClass.SetSerialisationResult(SavePath2, folders);
         }
         public static void Load()
         {
-            if (!File.Exists(SavePath)) return;
+            if (!File.Exists(SavePath) || !File.Exists(SavePath2)) return;
             if (BaseXMLClass.GetSerialisationResult(SavePath, typeof(ControlVersion)) is ControlVersion data)
             {
                 VersionDatas = data.VersionDatas;
             }
+            if (BaseXMLClass.GetSerialisationResult(SavePath2, typeof(FoldersClass)) is FoldersClass folders)
+            {
+                Folders = folders.Folders;
+            }
+        }
+        public static void Terminate()
+        {
+            try
+            {
+                //if (File.Exists(SavePath)) File.Delete(SavePath);
+                //if (File.Exists(SavePath2)) File.Delete(SavePath2);
+            } catch { }
         }
 
         private static readonly string SavePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ControlVersion.xml");
+        private static readonly string SavePath2 = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Folders.xml");
         public class ControlVersion
         {
             public ControlVersion() { }
             public List<VersionData> VersionDatas { get; set; } = new List<VersionData>();
+        }
+        public class FoldersClass
+        {
+            public FoldersClass() { }
+            public List<string> Folders { get; set; } = new List<string>();
         }
         public class VersionData
         {
@@ -75,10 +94,251 @@ namespace BaseFunction
             public DateTime Date;
         }
         public static List<VersionData> VersionDatas { get; set; } = new List<VersionData>();
+        public static List<string> Folders { get; set; } = new List<string>();
+        public static void OpenFolder()
+        {
+            Load();
+            foreach (string path in Folders)
+            {
+                if (Directory.Exists(path))
+                {
+                    Process.Start("explorer", "\"" + path + "\"");
+                }
+            }           
+        }
+        public static void CheckVersion()
+        {
+            using (Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.LockDocument())
+            {
+
+                ControlVersionClass.Load();
+
+                string report = "";
+
+                //string nnn = Path.Combine($"https://raw.githubusercontent.com/Alzslnc/AcadPlugins/main/");
+
+
+                using (HttpClient client = new HttpClient())
+                {
+                    // GitHub API требует User-Agent
+                    client.DefaultRequestHeaders.Add("User-Agent", "C# App");
+
+                    List<string> actual = new List<string>();
+                    List<string> toUpdate = new List<string>();
+                    List<string> notInstalled = new List<string>();
+
+                    try
+                    {
+                        string json = client.GetStringAsync($"https://api.github.com/repos/Alzslnc/AcadPlugins/contents/").Result.Replace("[", "").Replace("]", "").Replace("{", "").Replace("}}", "}");
+
+                        string[] docs = json.Split('}');
+
+                        foreach (string doc in docs)
+                        {
+                            if (doc.Length < 20) continue;
+
+                            string folderName = "";
+                            string name = "";
+                            string path = "";
+                            string size = "";
+
+                            string fNamePath = "\"name\":\"";
+                            int start = doc.IndexOf(fNamePath) + fNamePath.Length;
+                            if (start >= 0)
+                            {
+                                while (doc[start] != '"')
+                                {
+                                    folderName += doc[start++];
+
+                                }
+                                folderName = folderName.Replace(".zip", "");
+                                name = folderName.Replace(".bundle", "");
+                            }
+                            if (string.IsNullOrEmpty(folderName)) continue;
+                            if (string.IsNullOrEmpty(name)) continue;
+
+
+                            fNamePath = "\"download_url\":\"";
+                            start = doc.IndexOf(fNamePath) + fNamePath.Length;
+                            if (start >= 0)
+                            {
+                                while (doc[start] != '"')
+                                {
+                                    path += doc[start++];
+                                }
+                            }
+
+                            if (string.IsNullOrEmpty(name)) continue;
+
+                            fNamePath = "\"size\":";
+                            start = doc.IndexOf(fNamePath) + fNamePath.Length;
+                            if (start >= 0)
+                            {
+                                while (doc[start] != ',')
+                                {
+                                    size += doc[start++];
+                                }
+                            }
+
+                            if (string.IsNullOrEmpty(size)) continue;
+
+                            VersionData versionData = ControlVersionClass.VersionDatas.FirstOrDefault(x => x.Name.Contains(folderName));
+
+                            if (versionData == null)
+                            {
+                                notInstalled.Add(name);
+                            }
+                            else
+                            {
+                                try
+                                {
+                                    if (uint.TryParse(size, out uint sizeL) && sizeL > 2048)
+                                    {
+                                        client.DefaultRequestHeaders.Range = new RangeHeaderValue(sizeL - 2048, sizeL);
+                                    }
+
+                                    byte[] archiveTail = client.GetByteArrayAsync(path).Result;
+                                    Stream fs = null;
+                                    try
+                                    {
+                                        fs = new MemoryStream(archiveTail);
+                                        // 1. Ищем EOCD, чтобы найти начало Центрального Каталога
+                                        fs.Seek(Math.Max(0, fs.Length - 1024), SeekOrigin.Begin);
+                                        byte[] eocdBuf = new byte[1024];
+                                        fs.Read(eocdBuf, 0, eocdBuf.Length);
+
+                                        int eocdPos = -1;
+                                        for (int i = eocdBuf.Length - 4; i >= 0; i--)
+                                        {
+                                            if (BitConverter.ToUInt32(eocdBuf, i) == 0x06054B50) { eocdPos = i; break; }
+                                        }
+
+                                        if (eocdPos == -1) return;
+
+                                        // 2. Читаем кол-во записей и смещение каталога
+                                        ushort totalEntries = BitConverter.ToUInt16(eocdBuf, eocdPos + 10);
+                                        uint cdOffset = BitConverter.ToUInt32(eocdBuf, eocdPos + 16);
+
+                                        DateTime dt = DateTime.MinValue;
+
+                                        uint newCdoff = cdOffset + 2048;
+
+                                        if (newCdoff < sizeL)
+                                        {
+                                            client.DefaultRequestHeaders.Range = new RangeHeaderValue(cdOffset, sizeL);
+                                            archiveTail = client.GetByteArrayAsync(path).Result;
+                                            fs = new MemoryStream(archiveTail);
+                                            newCdoff = 0;
+                                        }
+                                        else
+                                        {
+                                            newCdoff -= sizeL;
+                                        }
+                                        // 3. Переходим к каталогу и читаем данные каждого файла
+
+                                        fs.Seek(newCdoff, SeekOrigin.Begin);
+                                        for (int i = 0; i < totalEntries; i++)
+                                        {
+                                            byte[] h = new byte[46]; // Фиксированная часть заголовка (46 байт)
+                                            fs.Read(h, 0, 46);
+
+                                            if (BitConverter.ToUInt32(h, 0) != 0x02014B50) break;
+
+                                            // Извлекаем метаданные файла
+                                            uint crc32 = BitConverter.ToUInt32(h, 16);
+                                            uint compSize = BitConverter.ToUInt32(h, 20);
+                                            uint uncompSize = BitConverter.ToUInt32(h, 24);
+                                            ushort nLen = BitConverter.ToUInt16(h, 28); // Длина имени
+                                            ushort eLen = BitConverter.ToUInt16(h, 30); // Длина доп. полей
+                                            ushort cLen = BitConverter.ToUInt16(h, 32); // Длина комментария файла
+                                            uint localHeaderOffset = BitConverter.ToUInt32(h, 42); // Смещение данных
+
+                                            // Читаем имя файла
+                                            byte[] nameBuf = new byte[nLen];
+                                            fs.Read(nameBuf, 0, nLen);
+                                            string fileName = Encoding.UTF8.GetString(nameBuf);
+
+                                            string shortName = new FileInfo(versionData.Name).Name;
+                                            if (fileName.Contains(shortName) && !fileName.Contains("config"))
+                                            {
+                                                // Извлекаем сырые значения из массива заголовка h
+                                                ushort dosTime = BitConverter.ToUInt16(h, 12);
+                                                ushort dosDate = BitConverter.ToUInt16(h, 14);
+
+                                                // Распаковываем биты даты
+                                                int year = ((dosDate & 0xFE00) >> 9) + 1980;
+                                                int month = (dosDate & 0x01E0) >> 5;
+                                                int day = dosDate & 0x1F;
+
+                                                // Распаковываем биты времени
+                                                int hour = (dosTime & 0xF800) >> 11;
+                                                int minute = (dosTime & 0x07E0) >> 5;
+                                                int second = (dosTime & 0x1F) * 2; // ZIP хранит секунды с шагом в 2 сек.
+
+                                                try
+                                                {
+                                                    dt = new DateTime(year, month, day, hour, minute, second);
+                                                }
+                                                catch
+                                                {
+                                                }
+
+                                                break;
+                                            }
+
+                                            // Пропускаем доп. поля и комментарий файла, чтобы попасть на следующую запись
+                                            fs.Seek(eLen + cLen, SeekOrigin.Current);
+                                        }
+
+                                        if (dt == DateTime.MinValue) continue;
+                                        else if (dt > versionData.Date)
+                                        {
+                                            toUpdate.Add(name);
+                                        }
+                                        else
+                                        {
+                                            actual.Add(name);
+                                        }
+                                    }
+                                    finally
+                                    {
+                                        fs?.Dispose();
+                                    }                                   
+                                }
+                                catch
+                                {
+                                }
+                            }
+                        }
+
+                        if (actual.Count > 0)
+                        {
+                            report += $" {Environment.NewLine}Версия актуальна:{Environment.NewLine}";
+                            foreach (string s in actual) { report += s + Environment.NewLine; }
+                        }
+                        if (toUpdate.Count > 0)
+                        {
+                            report += $" {Environment.NewLine}Есть новая версия:{Environment.NewLine}";
+                            foreach (string s in toUpdate) { report += s + Environment.NewLine; }
+                        }
+                        if (notInstalled.Count > 0)
+                        {
+                            report += $" {Environment.NewLine}Программа не установлена:{Environment.NewLine}";
+                            foreach (string s in notInstalled) { report += s + Environment.NewLine; }
+                        }
+                        System.Windows.MessageBox.Show(report);
+
+                    }
+                    catch (System.Exception ex)
+                    {
+                        Console.WriteLine($"Ошибка: {ex.Message}");
+                    }
+                }
+            }
+        }
     }
     public static class RenameTabClass
-    {
-        
+    {        
         static RenameTabClass()
         {
             Load();
@@ -145,6 +405,28 @@ namespace BaseFunction
             }
             Save();
         }
+        public static void RenameTabsOnLoad(List<Button> Buttons)
+        {
+            try
+            {
+                Load();
+                for (int i = 0; i < Buttons.Count; i++)
+                {
+                    if (!RenameTabClass.Tabs.ContainsKey(Buttons[i].RibbonTabName))
+                    {
+                        RenameTabClass.Tabs.Add(Buttons[i].RibbonTabName, Buttons[i].RibbonTabName);
+                        RenameTabClass.Save();
+                    }
+
+                    else
+                    {
+                        Buttons[i].RibbonTabName = RenameTabClass.Tabs[Buttons[i].RibbonTabName];
+                        Buttons[i].RibbonTabId = Buttons[i].RibbonTabName + "_Id";
+                    }
+                }
+            }
+            catch { }
+        }
         private static void LoadList(Editor ed)
         {
             ed.WriteMessage("\nСписок панелей для переименования:");
@@ -195,8 +477,50 @@ namespace BaseFunction
         public static Dictionary<string, string> Tabs = new Dictionary<string, string>();
         private static string SavePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RenameTabData.xml");  
     }
+    public static class SpecialCommandsClass
+    {
+        public static void CreateSpecialButtons(List<Button> Buttons)
+        {
+
+            List<string> ribTabNames = new List<string>();
+
+            foreach (Button button in Buttons)
+            {
+                if (!ribTabNames.Contains(button.RibbonTabName)) ribTabNames.Add(button.RibbonTabName);
+            }
+
+            foreach (string ribTabName in ribTabNames)
+            {
+                Buttons.Add(new Button(ribTabName, "О программе", new List<ButtonCommand> { new ButtonCommand("О программе", "О программе", "Описание"), }));
+                Buttons.Add(new Button(ribTabName, "О программе", new List<ButtonCommand> { new ButtonCommand("Проверить обновления", "Проверить обновления", "Показывает наличие обновлений."), }));
+                Buttons.Add(new Button(ribTabName, "О программе", new List<ButtonCommand> { new ButtonCommand("Открыть репозиторий", "Открыть репозиторий", "Место хранения последних версий программ."), }));
+                Buttons.Add(new Button(ribTabName, "О программе", new List<ButtonCommand> { new ButtonCommand("Открыть папку с плагинами", "Открыть папку с плагинами", "Открывает папку, откуда были запущены плагины."), }));
+            }
+        }
+        public static bool SpecialCommands(string name)
+        {
+            if (name == "О программе")
+            {
+                System.Windows.MessageBox.Show("Все вопросы можно направить по адресу alzslnc@gmail.com");
+            }
+            else if (name == "Открыть репозиторий")
+            {
+                Process.Start(new ProcessStartInfo("https://github.com/Alzslnc/AcadPlugins") { UseShellExecute = true });
+            }
+            else if (name == "Открыть папку с плагинами")
+            {
+                ControlVersionClass.OpenFolder();
+            }
+            else if (name == "Проверить обновления")
+            {
+                ControlVersionClass.CheckVersion();
+            }
+            else return false;
+            return true;
+        }
+    }
     internal class StartEvents
-    {        
+    {
         private bool Initialized { get; set; } = false;
         private bool NeedUpdRibbonDetected { get; set; } = false;        
         public List<Button> Buttons { get; private set; } = new List<Button>();
@@ -209,39 +533,9 @@ namespace BaseFunction
 
             GetVersion();
 
-            List<string> ribTabNames = new List<string>();
+            RenameTabClass.RenameTabsOnLoad(Buttons);
 
-            try
-            {
-                RenameTabClass.Load();
-                for (int i = 0; i < Buttons.Count; i++)
-                {
-                    if (!RenameTabClass.Tabs.ContainsKey(Buttons[i].RibbonTabName))
-                    {
-                        RenameTabClass.Tabs.Add(Buttons[i].RibbonTabName, Buttons[i].RibbonTabName);
-                        RenameTabClass.Save();
-                    }
-                        
-                    else
-                    {
-                        Buttons[i].RibbonTabName = RenameTabClass.Tabs[Buttons[i].RibbonTabName];
-                        Buttons[i].RibbonTabId = Buttons[i].RibbonTabName + "_Id";
-                    }
-                }
-            }
-            catch { }
-
-            foreach (Button button in Buttons)
-            {             
-                if (!ribTabNames.Contains(button.RibbonTabName)) ribTabNames.Add(button.RibbonTabName);               
-            }
-
-            foreach (string ribTabName in ribTabNames)
-            {              
-                Buttons.Add(new Button(ribTabName, "О программе", new List<ButtonCommand> { new ButtonCommand("О программе", "О программе", "Описание"), }));
-                Buttons.Add(new Button(ribTabName, "О программе", new List<ButtonCommand> { new ButtonCommand("Проверить обновления", "Проверить обновления", "Показывает наличие обновлений."), }));
-                Buttons.Add(new Button(ribTabName, "О программе", new List<ButtonCommand> { new ButtonCommand("Открыть репозиторий", "Открыть репозиторий", "Место хранения последних версий программ."), }));
-            }
+            SpecialCommandsClass.CreateSpecialButtons(Buttons);           
 
             if (!Initialized)
             {
@@ -255,6 +549,7 @@ namespace BaseFunction
         {            
             FileInfo fileInfo = new FileInfo(this.GetType().Assembly.Location);
             ControlVersionClass.Load();
+
             ControlVersionClass.VersionData versionData = ControlVersionClass.VersionDatas.FirstOrDefault(x => x.Name == fileInfo.FullName);
             if (versionData == null)
             { 
@@ -262,6 +557,10 @@ namespace BaseFunction
                 ControlVersionClass.VersionDatas.Add(versionData);
             }
             versionData.Date = fileInfo.LastWriteTime;
+            DirectoryInfo directory = fileInfo.Directory;
+            while (directory.FullName.Contains(".bundle")) directory = directory.Parent;
+            if (directory != null && !ControlVersionClass.Folders.Contains(directory.FullName)) ControlVersionClass.Folders.Add(directory.FullName);
+
             ControlVersionClass.Save();
         }
         private void App_SysVarChanged_RibbonUpdate (object sender, AppSystemVariableChangedEventArgs e)
@@ -439,71 +738,8 @@ namespace BaseFunction
                 if (parameter is RibbonButton button)
                 {
                     Autodesk.AutoCAD.Internal.Utils.SetFocusToDwgView();
-                    if (button.CommandParameter.ToString() == "О программе" && button.Name == "О программе")
-                    {
-                        System.Windows.MessageBox.Show("Все вопросы можно направить по адресу alzslnc@gmail.com");
-                    }
-                    else if (button.CommandParameter.ToString() == "Открыть репозиторий" && button.Name == "Открыть репозиторий")
-                    {
-                        Process.Start(new ProcessStartInfo("https://github.com/Alzslnc/AcadPlugins") { UseShellExecute = true });
-                    }
-                    else if (button.CommandParameter.ToString() == "Проверить обновления" && button.Name == "Проверить обновления")
-                    {
-                        ControlVersionClass.Load();
 
-                        string report = "";
-
-                        foreach (ControlVersionClass.VersionData keyValuePair in ControlVersionClass.VersionDatas)
-                        {
-                            try
-                            {
-                                DirectoryInfo fName = new FileInfo(keyValuePair.Name).Directory;
-
-                                string dir = string.Empty;
-
-                                while (fName != null && !fName.Name.Contains(".bundle")) fName = fName.Parent;
-
-                                string name = Path.Combine($"https://raw.githubusercontent.com/Alzslnc/AcadPlugins/main/{fName.Name}.zip");
-
-                                using (HttpClient client = new HttpClient())
-                                {
-                                    // GitHub требует наличия заголовка User-Agent
-                                    client.DefaultRequestHeaders.Add("User-Agent", "C# App");
-
-                                    try
-                                    {
-                                        using (Stream stream = client.GetStreamAsync(name).Result)
-                                        using (ZipArchive archive = new ZipArchive(stream, ZipArchiveMode.Read))
-                                        {
-                                            string shortName = new FileInfo(keyValuePair.Name).Name;
-                                            var entry = archive.Entries.FirstOrDefault(x => x.Name.Contains(shortName) && !x.Name.Contains("config"));
-
-                                            if (entry == null) continue;
-
-                                            if (entry.LastWriteTime > keyValuePair.Date)
-                                            {
-                                                report += $"{new FileInfo(keyValuePair.Name).Name} - Есть новая версия.{Environment.NewLine}";
-                                            }
-                                            else
-                                            {
-                                                report += $"{new FileInfo(keyValuePair.Name).Name} - Версия актуальна.{Environment.NewLine}";
-                                            }
-                                            continue;
-                                        }
-                                    }
-                                    catch
-                                    {
-                                    }
-                                    
-                                }                               
-                            }
-                            catch { }
-                            report += $"{new FileInfo(keyValuePair.Name).Name} - Программа отсутствует в системе контроля версий.{Environment.NewLine}";
-                        }
-
-                        System.Windows.MessageBox.Show(report);
-                    }
-                    else
+                    if (!SpecialCommandsClass.SpecialCommands(button.Name))
                     {
                         Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.
                             SendStringToExecute(button.CommandParameter + " ", true, false, true);
