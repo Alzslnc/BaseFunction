@@ -154,6 +154,27 @@ namespace BaseFunction
             return result;
         }
         /// <summary>
+        /// очищает список от дублирующихся точек
+        /// </summary>
+        public static List<double> ClearFromDoubles(this List<double> points)
+        {
+            List<double> result = new List<double>();
+            foreach (double point in points)
+            {
+                bool none = true;
+                foreach (double newPoint in result)
+                {
+                    if (newPoint.IsEqualTo(point))
+                    {
+                        none = false;
+                        break;
+                    }
+                }
+                if (none) result.Add(point);
+            }
+            return result;
+        }
+        /// <summary>
         /// соединяет фрагменты кривой и возвращает список с результатом соединения. Возвращает false если произошла ошибка.
         /// </summary>   
         public static bool ConnectCurve(this List<Curve> fragments, out List<Curve> result)
