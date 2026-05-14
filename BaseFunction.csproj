@@ -72,6 +72,7 @@
       <SpecificVersion>False</SpecificVersion>
     </Reference>
     <Reference Include="System.Drawing" />
+    <Reference Include="System.Net.Http" />
     <Reference Include="System.Windows.Forms" />
     <Reference Include="System.Xaml" />
     <Reference Include="System.Xml" />
@@ -92,6 +93,7 @@
     <Compile Include="BaseClasses\BaseXMLClass.cs" />
     <Compile Include="BaseClasses\TextBounds.cs" />
     <Compile Include="BaseClasses\TransientGraphicsClass.cs" />
+    <Compile Include="BaseClasses\ControlVersionClass.cs" />
     <Compile Include="CheckEntityClass.cs" />
     <Compile Include="BaseClasses\BaseGetObjectClass.cs" />
     <Compile Include="EntityJigInsert.cs" />
@@ -101,5 +103,6 @@
     <Compile Include="Test.cs" />
     <Compile Include="TextMergeClass.cs" />
   </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
