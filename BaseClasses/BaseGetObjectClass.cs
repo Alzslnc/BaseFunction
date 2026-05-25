@@ -645,15 +645,15 @@ namespace BaseFunction
             try
             {
                 if (newTransaction) transaction = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction();
-                using (BlockTableRecord ms = transaction.GetObject(HostApplicationServices.WorkingDatabase.CurrentSpaceId, OpenMode.ForWrite) as BlockTableRecord)
+                BlockTableRecord ms = transaction.GetObject(HostApplicationServices.WorkingDatabase.CurrentSpaceId, OpenMode.ForWrite) as BlockTableRecord;
+
+                foreach (Entity e in entities)
                 {
-                    foreach (Entity e in entities)
-                    {
-                        if (e == null || e.IsDisposed || !e.IsNewObject) continue;
-                        ids.Add(ms.AppendEntity(e));
-                        transaction.AddNewlyCreatedDBObject(e, true);
-                    }
+                    if (e == null || e.IsDisposed || !e.IsNewObject) continue;
+                    ids.Add(ms.AppendEntity(e));
+                    transaction.AddNewlyCreatedDBObject(e, true);
                 }
+                
                 return true;
             }
             catch { return false; }

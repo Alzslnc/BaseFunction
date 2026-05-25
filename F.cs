@@ -259,6 +259,8 @@ namespace BaseFunction
             }
             return resultBuffer;
         }
+
+
         /// <summary>
         /// записывает данные в Xdata объекта
         /// </summary>
@@ -266,72 +268,94 @@ namespace BaseFunction
         /// <param name="app">приложение данны которого записывам</param>
         /// <param name="datas">список TypedValue с данными</param>
         /// <param name="reSet">перезаписывать данные?</param>
-        public static void XDataSet(this ObjectId id, string app, List<TypedValue> datas, bool reSet)
+        public static void XDataSet(this ObjectId id, string app, List<TypedValue> datas, bool reSet, Transaction transaction = null)
         {
+            Transaction tr = null;
             if (id.IsErased) return;
             try
             {
                 //если нет названия приложения или данных прекращаем
                 if (string.IsNullOrEmpty(app) || datas == null || datas.Count == 0) return;
-                using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+                try
                 {
+                    if (transaction == null) tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction();
+                    else tr = transaction;
+
                     //открываем объект на запись
                     using (DBObject ent = tr.GetObject(id, OpenMode.ForWrite, false, true) as DBObject)
                     {
-                        if (ent != null)
-                        {
-                            //регистрируем приложение если еще не зарегистрировано
-                            using (RegAppTable rat = tr.GetObject(HostApplicationServices.WorkingDatabase.RegAppTableId, OpenMode.ForWrite, false, true) as RegAppTable)
-                            {
-                                if (!rat.Has(app))
-                                {
-                                    using (RegAppTableRecord ratr = new RegAppTableRecord())
-                                    {
-                                        ratr.Name = app;
-                                        rat.Add(ratr);
-                                        tr.AddNewlyCreatedDBObject(ratr, true);
-                                    }
-                                }
-                            }
-                            //если перезаписываем то создаем новый 
-                            if (reSet)
-                            {
-                                using (ResultBuffer rb = new ResultBuffer(new TypedValue(1001, app)))
-                                {
-                                    foreach (TypedValue v in datas) rb.Add(v);
-                                    ent.XData = rb;
-                                }
-                            }
-                            //если добавляем
-                            else
-                            {
-                                //получаем данные этого приложения
-                                using (ResultBuffer rb = ent.GetXDataForApplication(app))
-                                {
-                                    //если данных нет просто записываем новые
-                                    if (rb == null)
-                                    {
-                                        using (ResultBuffer rb2 = new ResultBuffer(new TypedValue(1001, app)))
-                                        {
-                                            foreach (TypedValue v in datas) rb2.Add(v);
-                                            ent.XData = rb2;
-                                        }
-                                    }
-                                    //если данные есть то бавляем новые к уже существующим
-                                    //(возможно требуется проверка на то, есть ли уже добавляемые в списке, не реализовано)
-                                    else
-                                    {
-                                        foreach (TypedValue v in datas) rb.Add(v);
-                                        ent.XData = rb;
-                                    }
-                                }
-                            }
-                        }
+                        XDataSet(ent, app, datas, reSet);
                     }
-                    tr.Commit();
+
+                }
+                finally
+                {
+                    if (transaction == null)
+                    { 
+                        tr?.Commit();
+                        tr?.Dispose();
+                    }
                 }
             }
             catch { }
+        }
+
+        public static void XDataSet(this DBObject dBObject, string app, List<TypedValue> datas, bool reSet)
+        {
+            if (dBObject != null && dBObject.IsWriteEnabled)
+            {
+                CheckAndCreateApp(app);
+
+                //если перезаписываем то создаем новый 
+                if (reSet)
+                {
+                    using (ResultBuffer rb = new ResultBuffer(new TypedValue(1001, app)))
+                    {
+                        foreach (TypedValue v in datas) rb.Add(v);
+                        dBObject.XData = rb;
+                    }
+                }
+                //если добавляем
+                else
+                {
+                    //получаем данные этого приложения
+                    using (ResultBuffer rb = dBObject.GetXDataForApplication(app))
+                    {
+                        //если данных нет просто записываем новые
+                        if (rb == null)
+                        {
+                            using (ResultBuffer rb2 = new ResultBuffer(new TypedValue(1001, app)))
+                            {
+                                foreach (TypedValue v in datas) rb2.Add(v);
+                                dBObject.XData = rb2;
+                            }
+                        }
+                        //если данные есть то бавляем новые к уже существующим
+                        //(возможно требуется проверка на то, есть ли уже добавляемые в списке, не реализовано)
+                        else
+                        {
+                            foreach (TypedValue v in datas) rb.Add(v);
+                            dBObject.XData = rb;
+                        }
+                    }
+                }
+            }
+        }
+
+        public static void CheckAndCreateApp(string app)
+        {           
+            //регистрируем приложение если еще не зарегистрировано
+            using (RegAppTable rat = HostApplicationServices.WorkingDatabase.RegAppTableId.Open(OpenMode.ForWrite, false, true) as RegAppTable)
+            {
+                if (!rat.Has(app))
+                {
+                    using (RegAppTableRecord ratr = new RegAppTableRecord())
+                    {
+                        ratr.Name = app;
+                        rat.Add(ratr);
+                    }
+                }
+            }
         }
 
 

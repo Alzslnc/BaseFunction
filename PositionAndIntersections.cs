@@ -303,7 +303,7 @@ namespace BaseFunction
                     if (tr != null) curve = tr.GetObject(id, OpenMode.ForRead, false, true).Clone() as Curve;       
                 }
                 //если это кривая то получаем ее как кривую
-                else if (obj is Curve) curve = obj as Curve;
+                else if (obj is Curve) curve = obj as Curve;               
                 if (curve != null && curve.IsAcadCurve())
                 {
                     //проецируем кривую на плоскость XY
@@ -317,35 +317,44 @@ namespace BaseFunction
             }
             if (curves.Count == 0) return PositionType.fault;
             //если контур один и он замкнут пробуем определить положение точки используя mpolygon
-            if (curves.Count == 1 && curves[0] is Polyline poly && poly.StartPoint.IsEqualTo(poly.EndPoint))
+            if (curves.Count == 1)
             {
-                if (poly.Area == 0) return PositionType.onBound;
-                Curve curve = curves[0];
-                if (curve.Closed || curve.StartPoint.IsEqualTo(curve.EndPoint))
+                if (curves[0] is Circle circle)
                 {
-                    try
+                    double distance = circle.Center.Z0().DistanceTo(point);
+                    if (distance < circle.Radius) return PositionType.inner;
+                    else return PositionType.outer;
+                }
+                else if (curves[0] is Polyline poly && poly.StartPoint.IsEqualTo(poly.EndPoint))
+                {
+                    if (poly.Area == 0) return PositionType.onBound;
+                    Curve curve = curves[0];
+                    if (curve.Closed || curve.StartPoint.IsEqualTo(curve.EndPoint))
                     {
-                        using (MPolygon mp = new MPolygon())
+                        try
                         {
-                            using (Polyline polyline = curve.Clone() as Polyline)
+                            using (MPolygon mp = new MPolygon())
                             {
-                               
-                                if (polyline != null)
+                                using (Polyline polyline = curve.Clone() as Polyline)
                                 {
-                                    polyline.Closed = true;
-                                    if (!poly.TryGetSelfIntersect(out _))
+
+                                    if (polyline != null)
                                     {
-                                        mp.AppendLoopFromBoundary(polyline, true, Tolerance.Global.EqualPoint);
-                                        if (mp.IsPointOnLoopBoundary(point, 0, Tolerance.Global.EqualPoint)) return PositionType.onBound;
-                                        if (mp.IsPointInsideMPolygon(point, Tolerance.Global.EqualPoint).Count > 0) return PositionType.inner;
-                                        else return PositionType.outer;
+                                        polyline.Closed = true;
+                                        if (!poly.TryGetSelfIntersect(out _))
+                                        {
+                                            mp.AppendLoopFromBoundary(polyline, true, Tolerance.Global.EqualPoint);
+                                            if (mp.IsPointOnLoopBoundary(point, 0, Tolerance.Global.EqualPoint)) return PositionType.onBound;
+                                            if (mp.IsPointInsideMPolygon(point, Tolerance.Global.EqualPoint).Count > 0) return PositionType.inner;
+                                            else return PositionType.outer;
+                                        }
                                     }
                                 }
                             }
                         }
-                    }
-                    catch
-                    {
+                        catch
+                        {
+                        }
                     }
                 }
             }
@@ -555,35 +564,43 @@ namespace BaseFunction
                     //проходим по всем кривым и ищем пересечения    
                     foreach (Curve curve in curves)
                     {
-                        //список точек пересечения с конкретной кривой
-                        List<Point3d> vpoints = new List<Point3d>();
-                        //получаем геометрическую кривую и пересечения этой кривой и луча
-                        using (Curve3d curve3d = curve.GetGeCurve())
-                        using (CurveCurveIntersector3d cci = new CurveCurveIntersector3d(ray3d, curve3d, Vector3d.ZAxis))
+                        if (curve is Circle circle)
                         {
-                            //если пересечения есть
-                            if (cci.NumberOfIntersectionPoints > 0)
+                            double distance = circle.Center.Z0().DistanceTo(point);
+                            if (distance < circle.Radius) points.Add(Point3d.Origin);
+                        }
+                        else
+                        {
+                            //список точек пересечения с конкретной кривой
+                            List<Point3d> vpoints = new List<Point3d>();
+                            //получаем геометрическую кривую и пересечения этой кривой и луча
+                            using (Curve3d curve3d = curve.GetGeCurve())
+                            using (CurveCurveIntersector3d cci = new CurveCurveIntersector3d(ray3d, curve3d, Vector3d.ZAxis))
                             {
-                                for (int i = 0; i < cci.NumberOfIntersectionPoints; i++)
+                                //если пересечения есть
+                                if (cci.NumberOfIntersectionPoints > 0)
                                 {
-                                    //если пересечение проходящее то добавляем его в список
-                                    if (cci.IsTransversal(i))
+                                    for (int i = 0; i < cci.NumberOfIntersectionPoints; i++)
                                     {
-                                        vpoints.Add(cci.GetIntersectionPoint(i));
+                                        //если пересечение проходящее то добавляем его в список
+                                        if (cci.IsTransversal(i))
+                                        {
+                                            vpoints.Add(cci.GetIntersectionPoint(i));
+                                        }
                                     }
-                                }
-                                //если кривых несколько то не добавляем дублирующиеся точки
-                                //(что бы обойти задваивание пересечений в точке начала одной кривой и конца другой)
-                                if (curves.Count > 1)
-                                {
-                                    //проходим по точкам и удаляем существующие в общем списке
-                                    for (int i = vpoints.Count - 1; i > -1; i--)
+                                    //если кривых несколько то не добавляем дублирующиеся точки
+                                    //(что бы обойти задваивание пересечений в точке начала одной кривой и конца другой)
+                                    if (curves.Count > 1)
                                     {
-                                        if (points.Contains(vpoints[i])) vpoints.RemoveAt(i);
+                                        //проходим по точкам и удаляем существующие в общем списке
+                                        for (int i = vpoints.Count - 1; i > -1; i--)
+                                        {
+                                            if (points.Contains(vpoints[i])) vpoints.RemoveAt(i);
+                                        }
                                     }
+                                    //добавляем точки пересечения с этой кривой в общий список
+                                    points.AddRange(vpoints);
                                 }
-                                //добавляем точки пересечения с этой кривой в общий список
-                                points.AddRange(vpoints);
                             }
                         }
                     }
