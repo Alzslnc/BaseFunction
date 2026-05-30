@@ -1,13 +1,47 @@
 ﻿using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.Geometry;
 using Autodesk.AutoCAD.Runtime;
+using Sheets;
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 namespace BaseFunction
 {
     public static class F
     {
+        [DllImport("acad.exe", EntryPoint = "?acedHatchPalletteDialog@@YA_NPEB_W_NAEAPEA_W@Z", CharSet = CharSet.Auto)]
+
+        static extern bool acedHatchPalletteDialog(string currentPattern, bool showcustom, out IntPtr newpattern);
+        
+        internal static bool GetHatchPattern(out string hatchType, string baseHatchType)
+        {
+            hatchType = string.Empty;
+
+            try
+            {
+                string sHatchType = baseHatchType;
+
+                IntPtr ptr;
+
+                bool bRet = false;
+
+                bRet = acedHatchPalletteDialog(sHatchType, true, out ptr);
+
+                if (bRet)
+                {
+                    string sNewHatchType = Marshal.PtrToStringAuto(ptr);
+
+                    if (sNewHatchType.Length > 0) hatchType = sNewHatchType;
+
+                    return true;
+                }
+            }
+            catch { }
+
+            return false;
+        }
+
         public static void ExtensionDictionaryErase(List<ObjectId> ids)
         {              
             using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
