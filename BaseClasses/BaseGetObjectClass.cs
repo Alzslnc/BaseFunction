@@ -29,6 +29,13 @@ namespace BaseFunction
         /// <summary>
         /// Запрашивает у пользователя дробное число и если пользователь его ввел возвращает
         /// </summary>
+        public static bool TryGetDoubleFromUser(out double result, double baseValue, string message)
+        {
+            return TryGetDoubleFromUser(out result, baseValue, null, null, message);
+        }
+        /// <summary>
+        /// Запрашивает у пользователя дробное число и если пользователь его ввел возвращает
+        /// </summary>
         public static bool TryGetDoubleFromUser(out double result, double baseValue)
         {
             return TryGetDoubleFromUser(out result, baseValue, null, null, "Введите число");

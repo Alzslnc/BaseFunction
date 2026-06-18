@@ -83,7 +83,7 @@ namespace BaseFunction
         /// </summary>
         /// <param name="ent"></param>
         /// <returns></returns>
-        public static bool EntytyReplace(this Entity ent)
+        public static bool EntytyReplace(this Entity ent, bool thread = true)
         {
             try
             {
@@ -108,8 +108,12 @@ namespace BaseFunction
                 else { e.Dispose(); return false; }
                 //запускаем перенос
                 DrawJigClassEntityInsertAndReplace ijc = new DrawJigClassEntityInsertAndReplace();
+
+                Point3d? startThread;
+                if (thread) startThread = point1;
+                else startThread = null;
                 //если возврат ОК то переносим базовый объект на место клона
-                PromptResult pr = ijc.Drow(ref e, point1, true);
+                PromptResult pr = ijc.Drow(ref e, startThread, true);
                 if (pr != null && pr.Status == PromptStatus.OK)
                 {
                     //получаем координаты точки клона соответствующие точке базового объекта
