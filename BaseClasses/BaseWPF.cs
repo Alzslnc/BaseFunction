@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Windows;
@@ -95,7 +93,7 @@ namespace BaseFunction
                 if (bValue) return Visibility.Visible;
                 else return Visibility.Collapsed;
             }
-            return string.Empty;
+            return Binding.DoNothing;
         }
     }
     public class NumberToVisibleConverter : ConverterBase
@@ -108,7 +106,7 @@ namespace BaseFunction
                 if (bValue > 0) return Visibility.Visible;
                 else return Visibility.Collapsed;
             }
-            return string.Empty;
+            return Binding.DoNothing;
         }
     }
     public class BoolToInvisibleConverter : ConverterBase
@@ -121,7 +119,7 @@ namespace BaseFunction
                 if (bValue) return Visibility.Collapsed;
                 else return Visibility.Visible;
             }
-            return string.Empty;
+            return Binding.DoNothing;
         }
     }
 
@@ -149,11 +147,11 @@ namespace BaseFunction
         }
         public override object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value == null) return null;
+            if (value == null) return Binding.DoNothing;
 
             if (double.TryParse(value.ToString().Replace(",","."), NumberStyles.Any, CultureInfo.InvariantCulture, out double result)) return result;
 
-            return null;            
+            return Binding.DoNothing;            
         }
     }
     public class StringToIntConverter : ConverterBase
@@ -164,11 +162,11 @@ namespace BaseFunction
         }
         public override object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            if (value == null) return null;
+            if (value == null) return Binding.DoNothing;
 
             if (int.TryParse(value.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out int result)) return result;
 
-            return null;
+            return Binding.DoNothing;
         }
     }
     public class BaseDateConverter : ConverterBase
@@ -179,7 +177,7 @@ namespace BaseFunction
             {
                 return date.ToString("dd.MM.yyyy HH:mm");
             }
-            return null;
+            return Binding.DoNothing;
         }       
     }
     /// <summary>
