@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
-using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
@@ -83,7 +82,7 @@ namespace BaseFunction
         public static void OpenFolder()
         {
             Load();
-         
+
             foreach (string path in Folders)
             {
                 if (Directory.Exists(path))
@@ -148,7 +147,7 @@ namespace BaseFunction
             Grid rootGrid = new Grid();
 
             TextBlock textBlock = new TextBlock() { Margin = new Thickness(5), Text = "Идет проверка данных", VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, Height = 20 };
-            
+
             rootGrid.Children.Add(textBlock);
 
             return new Window { WindowStyle = WindowStyle.None, WindowStartupLocation = WindowStartupLocation.CenterOwner, Content = rootGrid, Width = 400, Height = 200, MaxHeight = 200, MaxWidth = 400 };
@@ -365,7 +364,7 @@ namespace BaseFunction
                     {
                         report += $" {Environment.NewLine}Программа не установлена:{Environment.NewLine}";
                         foreach (string s in notInstalled) { report += s + Environment.NewLine; }
-                    }                
+                    }
 
                 }
                 catch (System.Exception ex)

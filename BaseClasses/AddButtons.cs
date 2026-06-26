@@ -1,5 +1,6 @@
 ﻿using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.EditorInput;
+using Autodesk.AutoCAD.Internal;
 using Autodesk.AutoCAD.Runtime;
 using Autodesk.Windows;
 using System;
@@ -41,9 +42,9 @@ using AppSystemVariableChangedEventArgs = Autodesk.AutoCAD.ApplicationServices.S
 //}
 
 namespace BaseFunction
-{  
+{
     public static class RenameTabClass
-    {        
+    {
         static RenameTabClass()
         {
             Load();
@@ -68,9 +69,9 @@ namespace BaseFunction
 
             while (BaseFunction.BaseGetObjectClass.TryGetKeywords(out string result, new List<string> { "Вкладки", "Переименовать", "Сохранить", "Отменить" }, "\nВыберите пункт из списка"))
             {
-                switch (result) 
+                switch (result)
                 {
-                    case "Вкладки": 
+                    case "Вкладки":
                         {
                             LoadList(editor);
                             break;
@@ -86,13 +87,13 @@ namespace BaseFunction
                                 });
                                 if (stringResult.Status == PromptStatus.OK && !string.IsNullOrEmpty(stringResult.StringResult))
                                 {
-                                    newTab[newTab.ElementAt(numResult - 1).Key] = stringResult.StringResult;                               
+                                    newTab[newTab.ElementAt(numResult - 1).Key] = stringResult.StringResult;
                                 }
                             }
                             else
                             {
                                 editor.WriteMessage("\nИндекс вкладки за пределами возможных значений");
-                            }                               
+                            }
 
                             break;
                         }
@@ -103,7 +104,7 @@ namespace BaseFunction
                             return;
                         }
                     case "Отменить":
-                        {                           
+                        {
                             return;
                         }
                 }
@@ -153,7 +154,7 @@ namespace BaseFunction
             if (BaseXMLClass.GetSerialisationResult(SavePath, typeof(TabsSaveData)) is TabsSaveData data)
             {
                 foreach (TabData tabData in data.TabDatas)
-                { 
+                {
                     if (Tabs.ContainsKey(tabData.Name)) Tabs[tabData.Name] = tabData.NewName;
                     else Tabs.Add(tabData.Name, tabData.NewName);
                 }
@@ -161,7 +162,7 @@ namespace BaseFunction
         }
 
         public class TabsSaveData
-        { 
+        {
             public TabsSaveData() { }
             public TabsSaveData(Dictionary<string, string> data)
             {
@@ -170,17 +171,17 @@ namespace BaseFunction
                     TabDatas.Add(new TabData { Name = key.Key, NewName = key.Value });
                 }
             }
-            public List<TabData> TabDatas { get; set; } = new List<TabData>();        
+            public List<TabData> TabDatas { get; set; } = new List<TabData>();
         }
 
         public struct TabData
-        { 
+        {
             public string Name;
             public string NewName;
         }
-        
+
         public static Dictionary<string, string> Tabs = new Dictionary<string, string>();
-        private static string SavePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RenameTabData.xml");  
+        private static string SavePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RenameTabData.xml");
     }
     public static class SpecialCommandsClass
     {
@@ -227,7 +228,7 @@ namespace BaseFunction
     internal class StartEvents
     {
         private bool Initialized { get; set; } = false;
-        private bool NeedUpdRibbonDetected { get; set; } = false;        
+        private bool NeedUpdRibbonDetected { get; set; } = false;
         public List<Button> Buttons { get; private set; } = new List<Button>();
         /// <summary>
         /// Инициализация
@@ -240,7 +241,7 @@ namespace BaseFunction
 
             RenameTabClass.RenameTabsOnLoad(Buttons);
 
-            SpecialCommandsClass.CreateSpecialButtons(Buttons);           
+            SpecialCommandsClass.CreateSpecialButtons(Buttons);
 
             if (!Initialized)
             {
@@ -250,15 +251,41 @@ namespace BaseFunction
                 AppCore.SystemVariableChanged += App_SysVarChanged_RibbonUpdate;
             }
         }
+        public void Initialize(List<CommandGroup> groups)
+        {
+            foreach (CommandGroup group in groups)
+            {
+                if (group.Items.Count == 0) continue;
+
+                Button button = new Button(group.Ribbon, group.Panel);
+
+                foreach (CommandItem item in group.Items)
+                {
+                    button.ButtonCommands.Add(new ButtonCommand(item.Command, item.Name, item.Description));
+
+                    Utils.AddCommand(
+                        "MY_PLUGIN_GROUP",
+                        item.Command,       // Команда в консоли (например, MY_LINE)
+                        item.Command,
+                        item.Flags,         // Флаги конкретной подкоманды
+                        new CommandCallback(item.Action)
+                    );
+                }
+
+                Buttons.Add(button);
+            }
+
+            Initialize();
+        }
         private void GetVersion()
-        {            
+        {
             FileInfo fileInfo = new FileInfo(this.GetType().Assembly.Location);
             ControlVersionClass.Load();
 
             ControlVersionClass.VersionData versionData = ControlVersionClass.VersionDatas.FirstOrDefault(x => x.Name == fileInfo.FullName);
             if (versionData == null)
-            { 
-                versionData = new ControlVersionClass.VersionData() { Name = fileInfo.FullName};
+            {
+                versionData = new ControlVersionClass.VersionData() { Name = fileInfo.FullName };
                 ControlVersionClass.VersionDatas.Add(versionData);
             }
             versionData.Date = fileInfo.LastWriteTime;
@@ -268,10 +295,10 @@ namespace BaseFunction
 
             ControlVersionClass.Save();
         }
-        private void App_SysVarChanged_RibbonUpdate (object sender, AppSystemVariableChangedEventArgs e)
+        private void App_SysVarChanged_RibbonUpdate(object sender, AppSystemVariableChangedEventArgs e)
         {
             if (!NeedUpdRibbonDetected
-                && 
+                &&
                 (e.Name.Equals("WSCURRENT",
                 StringComparison.OrdinalIgnoreCase)
                 || e.Name.Equals("RIBBONSTATE",
@@ -290,11 +317,11 @@ namespace BaseFunction
                 NeedUpdRibbonDetected = false;
                 CreateRibbonTab(ribbon);
             }
-        }       
+        }
         private void CreateRibbonTab(RibbonControl ribCntrl)
         {
             try
-            {             
+            {
                 foreach (Button buttonData in Buttons)
                 {
                     if (string.IsNullOrEmpty(buttonData.RibbonTabId) ||
@@ -313,10 +340,10 @@ namespace BaseFunction
                         }
                     }
                     if (ribTab == null)
-                    {                        
+                    {
                         ribTab = new RibbonTab
                         {
-                            
+
                             Title = buttonData.RibbonTabName, // Заголовок вкладки
                             Id = buttonData.RibbonTabId // Идентификатор вкладки
                         };
@@ -330,14 +357,14 @@ namespace BaseFunction
                     ribCntrl.UpdateLayout();
                 }
             }
-            catch { }            
+            catch { }
         }
         /// <summary>
         /// Строим панели и кнопки если требуется
         /// </summary>
         private void AddExampleContent(RibbonTab ribTab, Button buttonData)
         {
-            RibbonPanel ribPanel = null;       
+            RibbonPanel ribPanel = null;
             foreach (RibbonPanel panel in ribTab.Panels)
             {
                 if (panel.Source.Title.Equals(buttonData.RibbonPanelName))
@@ -371,8 +398,8 @@ namespace BaseFunction
                     if (buttonData.ButtonCommands.Count > 1 && splitButton.Text.ToString() == buttonData.ButtonCommands[0].Name) return;
                 }
                 else if (item is RibbonButton button)
-                { 
-                    if (buttonData.ButtonCommands.Count == 1 && button.CommandParameter.ToString() == buttonData.ButtonCommands[0].Command) return;                
+                {
+                    if (buttonData.ButtonCommands.Count == 1 && button.CommandParameter.ToString() == buttonData.ButtonCommands[0].Command) return;
                 }
             }
 
@@ -430,7 +457,7 @@ namespace BaseFunction
             }
             risSplitBtn.Current = risSplitBtn.Items.First();
             return risSplitBtn;
-        }        
+        }
         private class RibbonCommandHandler : System.Windows.Input.ICommand
         {
             public bool CanExecute(object parameter)
@@ -450,47 +477,91 @@ namespace BaseFunction
                             SendStringToExecute(button.CommandParameter + " ", true, false, true);
                     }
                 }
-            }      
-            
+            }
+
         }
     }
     public class Button
     {
+        // Главный конструктор — все остальные будут вызывать его
         public Button(string ribbonTabName, string ribbonPanelName)
         {
             RibbonTabName = ribbonTabName;
             RibbonTabId = ribbonTabName + "_Id";
             RibbonPanelName = ribbonPanelName;
         }
+
+        // Вызывает первый конструктор через : this(...) и затем добавляет список
         public Button(string ribbonTabName, string ribbonPanelName, List<ButtonCommand> buttonCommnands)
+            : this(ribbonTabName, ribbonPanelName)
         {
-            RibbonTabName = ribbonTabName;
-            RibbonTabId = ribbonTabName + "_Id";
-            RibbonPanelName = ribbonPanelName;
             ButtonCommands.AddRange(buttonCommnands);
         }
+
+        // Вызывает первый конструктор через : this(...) и добавляет одну команду
         public Button(string ribbonTabName, string ribbonPanelName, ButtonCommand buttonCommand)
+            : this(ribbonTabName, ribbonPanelName)
         {
-            RibbonTabName = ribbonTabName;
-            RibbonTabId = ribbonTabName + "_Id";
-            RibbonPanelName = ribbonPanelName;
             ButtonCommands.Add(buttonCommand);
         }
+
         public string RibbonTabName { get; set; } = string.Empty;
         public string RibbonTabId { get; set; } = string.Empty;
         public string RibbonPanelName { get; set; } = string.Empty;
         public List<ButtonCommand> ButtonCommands { get; set; } = new List<ButtonCommand>();
     }
+
     public class ButtonCommand
     {
         public ButtonCommand(string command, string name, string content)
-        { 
+        {
             Command = command;
             Name = name;
             Content = content;
-        }        
-        public string Command { get; set; } = string.Empty; 
+        }
+        public string Command { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;
         public string Content { get; set; } = string.Empty;
-    } 
+    }
+    // 1. Индивидуальные параметры для каждой отдельной кнопки
+    public class CommandItem
+    {
+        public CommandItem(string name, string command, string description, Action action, CommandFlags flags = CommandFlags.Modal)
+        {
+            Name = name;
+            Command = command;
+            Description = description;
+            Action = action;
+            Flags = flags;
+        }
+
+        public string Name { get; private set; }         // Текст на кнопке
+        public string Command { get; private set; }      // Команда в консоли
+        public string Description { get; private set; }  // Подсказка (ToolTip)
+        public Action Action { get; private set; }        // C# метод
+        public CommandFlags Flags { get; private set; }  // Флаги команды
+    }
+
+    // 2. Группа кнопок (или одна кнопка), объединенная общей лентой и панелью
+    public class CommandGroup
+    {
+        // Конструктор для МУЛЬТИКНОПКИ
+        public CommandGroup(string ribbon, string panel, List<CommandItem> items)
+        {
+            Ribbon = ribbon;
+            Panel = panel;
+            Items = items ?? new List<CommandItem>(); // Защита от передачи null
+        }
+
+        // Конструктор для ОДИНОЧНОЙ кнопки 
+        public CommandGroup(string ribbon, string panel, CommandItem singleItem)
+            : this(ribbon, panel, new List<CommandItem> { singleItem })
+        {
+        }
+
+        public string Ribbon { get; private set; }       // Название вкладки ленты
+        public string Panel { get; private set; }        // Название панели
+        public List<CommandItem> Items { get; private set; }   // Список команд внутри
+        public bool IsMultiButton { get => Items.Count > 1; }  // Флаг: мультикнопка это или одиночная, чисто чт бы было, обычно не используется
+    }
 }

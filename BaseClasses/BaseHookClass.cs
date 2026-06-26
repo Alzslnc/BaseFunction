@@ -1,6 +1,6 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using System;
 
 namespace BaseFunction
 {
@@ -12,10 +12,10 @@ namespace BaseFunction
             ob = o;
         }
         public BaseHookClass()
-        {           
+        {
         }
         public BaseHookClass(List<int> keys, object o = null)
-        { 
+        {
             Keys.AddRange(keys);
             ob = o;
         }
@@ -66,22 +66,22 @@ namespace BaseFunction
 
                 int value = 128;
                 foreach (var key in Keys) value &= keys[(int)key];
-                
+
                 if (value == 128)
                 {
-                    Action();                   
+                    Action();
                 }
             }
             return false;
         }
 
         public virtual void Action()
-        { 
-            
+        {
+
         }
-       
+
         private WindowHookProc callBackFunc = null;
-               
+
         public void Register()
         {
             if (callBackFunc != null)
@@ -102,9 +102,9 @@ namespace BaseFunction
         }
 
         public void Dispose()
-        {            
+        {
             UnRegister();
-        }      
+        }
 
         public List<int> Keys = new List<int>();
     }

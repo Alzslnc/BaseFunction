@@ -181,21 +181,21 @@ namespace BaseFunction
 
         #region точки
         public static bool TryGetRegion(out Extents3d result)
-        { 
+        {
             result = new Extents3d();
             if (!TryGetPointFromUser(out Point3d firstCorner, "Выберите первый угол:")) return false;
-            
-            PromptPointResult promptPointResult = 
+
+            PromptPointResult promptPointResult =
                 Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor.GetCorner("\nВыберите второй угол:", firstCorner);
 
-            if (promptPointResult.Status != PromptStatus.OK) return false;      
+            if (promptPointResult.Status != PromptStatus.OK) return false;
 
             result.AddPoint(firstCorner.Z0());
             result.AddPoint(promptPointResult.Value.Z0());
 
-            return true;         
+            return true;
         }
-   
+
         public static bool TryGetPointFromUser(out Point3d result)
         {
             return TryGetPointFromUser(out result, true, "Выберите точку", null);
@@ -239,7 +239,7 @@ namespace BaseFunction
 
         public static bool GetObjectInPoint(out List<ObjectId> result, Type type, string message, List<ObjectId> excludes, Point3d? clickPoint = null, double? precision = null)
         {
-            return GetObjectInPoint(out result, new List<Type> { type },  message, excludes, clickPoint, precision);
+            return GetObjectInPoint(out result, new List<Type> { type }, message, excludes, clickPoint, precision);
         }
 
         public static bool GetObjectInPoint(out List<ObjectId> result, List<Type> types, string message, List<ObjectId> excludes, Point3d? point = null, double? precision = null)
@@ -274,7 +274,7 @@ namespace BaseFunction
             {
                 if (point.HasValue) clickPoint = point.Value;
                 else if (!TryGetPointFromUser(out clickPoint, false, message, null)) return false;
-                                
+
                 //создаем точки для выбора объектов в области
                 Point3d pt1 = new Point3d(clickPoint.X - precision.Value, clickPoint.Y - precision.Value, 0);
                 Point3d pt2 = new Point3d(clickPoint.X + precision.Value, clickPoint.Y + precision.Value, 0);
@@ -291,9 +291,9 @@ namespace BaseFunction
                     else result.AddRange(psr.Value.GetObjectIds());
                     if (result.Count > 0) return true;
                     else if (point.HasValue) return false;
-                } 
+                }
             }
-         
+
         }
 
         #endregion
@@ -353,19 +353,19 @@ namespace BaseFunction
         public static bool TryGetobjectId(out ObjectId id, List<Type> objTypes, string message, bool subclassInclude = false)
         {
             List<string> typeString = new List<string>();
-            
+
             if (subclassInclude)
             {
                 for (int i = objTypes.Count - 1; i >= 0; i--)
                 {
                     foreach (Type subclass in objTypes[i].GetSubclassTypes()) if (!objTypes.Contains(subclass)) objTypes.Add(subclass);
-                }                
+                }
             }
 
             foreach (Type type in objTypes)
             {
                 RXClass rXClass = RXClass.GetClass(type);
-                if (rXClass != null) typeString.Add(rXClass.Name);              
+                if (rXClass != null) typeString.Add(rXClass.Name);
             }
             if (objTypes.Count > 0 && typeString.Count == 0)
             {
@@ -373,7 +373,7 @@ namespace BaseFunction
                 return false;
             }
             return TryGetobjectId(out id, typeString, message);
-        }       
+        }
         /// <summary>
         /// возвращает ObjectId выбранного элемента
         /// </summary>
@@ -434,7 +434,7 @@ namespace BaseFunction
         public static bool TryGetObjectsIds(out List<ObjectId> result, Type type, bool subclassInclude = false)
         {
             return TryGetObjectsIds(out result, type, "Выберите объекты");
-        }        
+        }
         /// <summary>
         /// Запрашивает у пользователя выбор объектов и возвращает их ObjectId
         /// </summary>    
@@ -470,8 +470,9 @@ namespace BaseFunction
                         RXClass rXClass = RXClass.GetClass(t);
                         if (!objTypes.Contains(rXClass)) objTypes.Add(rXClass);
                     }
-                };
-            }          
+                }
+                ;
+            }
 
             foreach (RXClass xClass in objTypes)
             {
@@ -479,7 +480,7 @@ namespace BaseFunction
                 if (xClass.GetRuntimeType() == typeof(ProxyEntity)) typeString.Add("ACAD_PROXY_ENTITY");
                 else typeString.Add(xClass.DxfName);
             }
-          
+
             if (objTypes.Count > 0 && typeString.Count == 0)
             {
                 result = new List<ObjectId>();
@@ -502,10 +503,11 @@ namespace BaseFunction
                 {
                     List<Type> types = objTypes[i].GetSubclassTypes();
                     foreach (Type t in types)
-                    {                    
+                    {
                         if (!objTypes.Contains(t)) objTypes.Add(t);
                     }
-                };
+                }
+                ;
             }
 
             foreach (Type type in objTypes)
@@ -514,7 +516,7 @@ namespace BaseFunction
                 {
                     typeString.Add("ACAD_PROXY_ENTITY");
                     continue;
-                }                    
+                }
 
                 RXClass rXClass = RXClass.GetClass(type);
                 if (rXClass != null) typeString.Add(rXClass.DxfName);
@@ -562,7 +564,7 @@ namespace BaseFunction
         }
 
         public static List<ObjectId> GetSelectImplied(this Type type)
-        { 
+        {
             return GetSelectImplied(new List<RXClass> { RXClass.GetClass(type) });
         }
         public static List<ObjectId> GetSelectImplied(this RXClass type)
@@ -572,7 +574,7 @@ namespace BaseFunction
         public static List<ObjectId> GetSelectImplied(List<RXClass> types = null)
         {
             List<ObjectId> ids = new List<ObjectId>();
-            PromptSelectionResult result = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor.SelectImplied();        
+            PromptSelectionResult result = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor.SelectImplied();
             if (result.Value != null)
             {
                 if (types == null) return result.Value.GetObjectIds().ToList();
@@ -585,7 +587,7 @@ namespace BaseFunction
             return ids;
         }
         public static List<ObjectId> GetSelectImplied(this List<Type> types)
-        {           
+        {
             List<RXClass> classes = new List<RXClass>();
             if (types != null)
             {
@@ -603,7 +605,7 @@ namespace BaseFunction
         {
             result = string.Empty;
             if (variants.Count == 0) return false;
-                        
+
             PromptKeywordOptions pso = new PromptKeywordOptions(message)
             {
                 AllowNone = false
@@ -612,10 +614,10 @@ namespace BaseFunction
             foreach (string variant in variants)
             {
                 if (string.IsNullOrEmpty(variant)) continue;
-                pso.Keywords.Add(variant);               
+                pso.Keywords.Add(variant);
             }
 
-            pso.Keywords.Default = variants[0];         
+            pso.Keywords.Default = variants[0];
 
             PromptResult pr = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor.GetKeywords(pso);
 
@@ -638,7 +640,7 @@ namespace BaseFunction
         {
             bool result = AddEntityInCurrentBTR(new List<Entity> { entity }, out List<ObjectId> ids, transaction);
             id = ids.Count == 0 ? ObjectId.Null : ids[0];
-            return result;           
+            return result;
         }
         public static bool AddEntityInCurrentBTR(this List<Entity> entities, Transaction transaction = null)
         {
@@ -660,11 +662,11 @@ namespace BaseFunction
                     ids.Add(ms.AppendEntity(e));
                     transaction.AddNewlyCreatedDBObject(e, true);
                 }
-                
+
                 return true;
             }
             catch { return false; }
-            finally 
+            finally
             {
                 if (newTransaction)
                 {
@@ -728,6 +730,6 @@ namespace BaseFunction
         #endregion
     }
 
-   
+
 
 }

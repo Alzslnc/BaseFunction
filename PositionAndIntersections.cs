@@ -13,7 +13,7 @@ namespace BaseFunction
             Dictionary<Curve, int> iLvls = new Dictionary<Curve, int>();
             if (listChech)
             {
-                foreach (Curve c in polylines) iLvls.Add(c, c.GetInnerLevel(polylines));            
+                foreach (Curve c in polylines) iLvls.Add(c, c.GetInnerLevel(polylines));
             }
             int maxIlvl = -1;
             int j = 0;
@@ -22,8 +22,8 @@ namespace BaseFunction
                 if (simple && j > 1) return j;
                 if (poly == polyline) continue;
 
-                PositionType position = centerPoint 
-                    ?(polyline.GetCentrPoint(out Point3d center) ? center.GetPositionType(poly) : PositionType.fault)                   
+                PositionType position = centerPoint
+                    ? (polyline.GetCentrPoint(out Point3d center) ? center.GetPositionType(poly) : PositionType.fault)
                     : polyline.CurveOfCurve(poly);
 
                 if (onBoundIsZero && position == PositionType.onBound) return 0;
@@ -112,7 +112,7 @@ namespace BaseFunction
             }
 
             if (startType == PositionType.inner || endType == PositionType.inner || centerType == PositionType.inner) return PositionType.inner;
-            else return PositionType.onBound;           
+            else return PositionType.onBound;
         }
         public static bool PIntersect(this Curve poly1, Curve poly2)
         {
@@ -123,14 +123,14 @@ namespace BaseFunction
             }
         }
         public static bool TryGetIntersections(this Curve curve, Curve curve2, out List<Point3d> intersections, bool isTangentialinclude = true, Plane plane = null, bool sort = true)
-        { 
-            Vector3d transform = new Vector3d((Point3d.Origin - curve.StartPoint).X, (Point3d.Origin - curve.StartPoint).Y, 0);            
+        {
+            Vector3d transform = new Vector3d((Point3d.Origin - curve.StartPoint).X, (Point3d.Origin - curve.StartPoint).Y, 0);
 
             if (curve.Equals(curve2)) return curve.TryGetSelfIntersect(out intersections);
 
             if (plane == null) plane = new Plane();
 
-            intersections = new List<Point3d>();            
+            intersections = new List<Point3d>();
             using (Curve curvePr = curve.GetProjectedCurve(plane, Vector3d.ZAxis))
             using (Curve curveClone = curve.Clone() as Curve)
             using (Curve curve2Pr = curve2.GetProjectedCurve(plane, Vector3d.ZAxis))
@@ -149,10 +149,10 @@ namespace BaseFunction
 
                 double elevation = 0;
                 if (curvePr is Polyline2d p2d)
-                { 
+                {
                     elevation = p2d.Elevation;
                     p2d.Elevation = 0;
-                }   
+                }
                 if (curvePr.GetLength() == 0 || curve2Pr.GetLength() == 0) return false;
                 try
                 {
@@ -164,7 +164,7 @@ namespace BaseFunction
                         for (int i = 0; i < cci.NumberOfIntersectionPoints; i++)
                         {
                             Point3d intersection = cci.GetIntersectionPoint(i);
-                                                       
+
                             if (!elevation.IsEqualTo(0))
                             {
                                 intersection = intersection.GetPoint2d().GetPoint3d(elevation);
@@ -183,7 +183,7 @@ namespace BaseFunction
 
                             if (!isTangentialinclude && !curvePr.IsIntersect(curve2Pr, new List<Point3d> { intersection })) continue;
 
-                            if (!intersections.ContainPoint(intersection)) intersections.Add(intersection);                          
+                            if (!intersections.ContainPoint(intersection)) intersections.Add(intersection);
                         }
                     }
 
@@ -191,19 +191,20 @@ namespace BaseFunction
                     {
                         intersections.Add(intersections[i] - transform);
                         intersections.RemoveAt(i);
-                    };
+                    }
+                    ;
 
                     if (sort)
                     {
                         intersections.SortOnCurve(curve);
-                    }                       
+                    }
                 }
                 catch { return false; }
             }
 
-           
 
-            if (intersections.Count > 0) return true; return false;            
+
+            if (intersections.Count > 0) return true; return false;
         }
         public static bool TryGetSelfIntersect(this Curve curve, out List<Point3d> intersections)
         {
@@ -234,7 +235,7 @@ namespace BaseFunction
                         }
                     }
                     else if (coll.Count == 1 && coll[0] is Curve c)
-                    {                      
+                    {
                         intersections.AddRange(Intersectionts(c, c));
                     }
                 }
@@ -268,7 +269,7 @@ namespace BaseFunction
             return point.GetPositionType(new List<object> { c });
         }
         public static PositionType GetPositionType(this Point3d point, Curve c)
-        {      
+        {
             return point.GetPositionType(new List<object> { c }, null);
         }
         public static PositionType GetPositionType(this Point3d point, List<object> objects)
@@ -300,10 +301,10 @@ namespace BaseFunction
                 if (obj is ObjectId id)
                 {
                     //если кривая в виде ObjectId то получаем ее из базы данных
-                    if (tr != null) curve = tr.GetObject(id, OpenMode.ForRead, false, true).Clone() as Curve;       
+                    if (tr != null) curve = tr.GetObject(id, OpenMode.ForRead, false, true).Clone() as Curve;
                 }
                 //если это кривая то получаем ее как кривую
-                else if (obj is Curve) curve = obj as Curve;               
+                else if (obj is Curve) curve = obj as Curve;
                 if (curve != null && curve.IsAcadCurve())
                 {
                     //проецируем кривую на плоскость XY
@@ -415,7 +416,7 @@ namespace BaseFunction
             {
                 intersectCurve = poly2.GetProjectedCurve(plane, Vector3d.ZAxis);
                 if (intersectCurve is Polyline3d p3d && intersectCurve.ObjectId == ObjectId.Null)
-                { 
+                {
                     if (!p3d.AddEntityInCurrentBTR()) return false;
                 }
             }
@@ -430,7 +431,7 @@ namespace BaseFunction
             {
                 poly1.IntersectWith(intersectCurve, Intersect.OnBothOperands, coll, IntPtr.Zero, IntPtr.Zero);
 
-                if (coll.Count == 0 || !poly1.IsIntersect(intersectCurve, coll.ToList())) return false;        
+                if (coll.Count == 0 || !poly1.IsIntersect(intersectCurve, coll.ToList())) return false;
 
                 List<double> parametrs = new List<double>();
 
@@ -444,7 +445,7 @@ namespace BaseFunction
                         if (dBObject is Curve curve)
                         {
                             poly1fragments.Add(curve);
-                            if (curve is Polyline3d) curveToAppend.Add(curve);                       
+                            if (curve is Polyline3d) curveToAppend.Add(curve);
                         }
                         else dBObject?.Dispose();
                     }
@@ -487,8 +488,8 @@ namespace BaseFunction
                     continue;
                 }
 
-                curve.EntityCopySettings(poly1);     
-            }          
+                curve.EntityCopySettings(poly1);
+            }
 
             foreach (Curve curve in poly2fragments)
             {
@@ -506,13 +507,13 @@ namespace BaseFunction
                         inner.Add(curve);
                         Curve clone = curve.Clone() as Curve;
                         outer.Add(clone);
-                       
+
                         curve.EntityCopySettings(poly1);
                         clone.EntityCopySettings(poly1);
-                    }  
+                    }
                     else notInPlaneOrIncorrect = true;
                 }
-            
+
                 if (notInPlaneOrIncorrect && curve.ObjectId != ObjectId.Null) curveToDelete.Add(curve);
             }
 
@@ -535,11 +536,11 @@ namespace BaseFunction
             {
                 curveToAppend.DeleteEntity();
             }
-            
+
             return boolResult;
         }
 
-        
+
         public enum PositionType : int
         {
             //внутри

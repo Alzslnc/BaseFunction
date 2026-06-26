@@ -105,7 +105,7 @@ namespace BaseFunction
                     //открываем слой на запись 
                     LayerTableRecord layer = tr.GetObject(lt[layer_name], OpenMode.ForWrite, false, true) as LayerTableRecord;
                     layer.Color = color;
-                }                
+                }
                 tr.Commit();
             }
             documentLock?.Dispose();
@@ -132,7 +132,7 @@ namespace BaseFunction
         /// <param name="lineWeight">новый вес линий (null не изменянятся)</param>
         /// <param name="lineType">название нового типа линий (пустая строка или null то не меняется)</param>
         public static LayerTypeChange LayerChangeParametrs(string layer_name, short? colorIndex, LineWeight? lineWeight, string lineType)
-        {            
+        {
             List<LayerTypeChange> variant = new List<LayerTypeChange>();
             //если имя не задано преращаем
             if (string.IsNullOrEmpty(layer_name)) return LayerTypeChange.none;
@@ -231,7 +231,7 @@ namespace BaseFunction
         public static bool LayerGroupNew(string groupName)
         {
             using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
-            {              
+            {
                 //LayerFilterTree lf = ;
                 //LayerFilter clg = lf.Current;
                 //if (clg != null)
@@ -316,7 +316,7 @@ namespace BaseFunction
                         }
                         catch
                         {
-                            if (message) System.Windows.Forms.MessageBox.Show("Введено некорректное название слоя");                           
+                            if (message) System.Windows.Forms.MessageBox.Show("Введено некорректное название слоя");
                             result = false;
                         }
                     }
@@ -331,18 +331,18 @@ namespace BaseFunction
                         layer.IsLocked = false;
                     }
                 }
-                tr.Commit();              
+                tr.Commit();
             }
             documentLock.Dispose();
             return result;
         }
 
-        
+
     }
     public class LayerData
-    { 
-        public LayerData(LayerTableRecord layer, Transaction tr) 
-        { 
+    {
+        public LayerData(LayerTableRecord layer, Transaction tr)
+        {
             Name = layer.Name;
             Color = layer.Color;
             LineWeight = layer.LineWeight;
@@ -357,8 +357,8 @@ namespace BaseFunction
         }
         public string Name { get; set; }
         public Color Color { get; set; }
-        public ObjectId LineTypeObjectId { get; set; } 
-        public string LineTypeName { get; set; } 
+        public ObjectId LineTypeObjectId { get; set; }
+        public string LineTypeName { get; set; }
         public LineWeight LineWeight { get; set; }
         public bool IsFrozen { get; set; }
         public bool IsLocked { get; set; }

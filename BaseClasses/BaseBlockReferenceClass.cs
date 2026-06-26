@@ -16,14 +16,14 @@ namespace BaseFunction
             if (reference.IsDynamicBlock)
             {
                 using (BlockTableRecord btr = reference.DynamicBlockTableRecord.Open(OpenMode.ForRead) as BlockTableRecord)
-                { 
+                {
                     return btr.Name;
                 }
             }
             else return reference.Name;
         }
         public static ObjectId GetBTRId(this BlockReference reference) => reference.IsDynamicBlock ? reference.DynamicBlockTableRecord : reference.BlockTableRecord;
-       
+
         #endregion
 
         #region перенос блоков из других чертежей
@@ -37,7 +37,7 @@ namespace BaseFunction
         public static bool BlockMigrate(List<string> blNames, string fileName, List<string> folders, bool replace = false, bool message = true)
         {
 
-            if (blNames.Count == 0 || (GetMissBlocks(HostApplicationServices.WorkingDatabase, blNames).Count == 0 && !replace)) return true;       
+            if (blNames.Count == 0 || (GetMissBlocks(HostApplicationServices.WorkingDatabase, blNames).Count == 0 && !replace)) return true;
             foreach (string folder in folders)
             {
                 if (System.IO.Directory.Exists(folder))
@@ -103,7 +103,7 @@ namespace BaseFunction
                             System.Windows.MessageBox.Show("В файле ресурсов блоки не найдены");
                             return false;
                         }
-                    }                   
+                    }
                 }
                 //записываем блоки
                 using (IdMapping idMapping = new IdMapping())
@@ -112,8 +112,8 @@ namespace BaseFunction
                     {
                         DuplicateRecordCloning duplicateRecordCloning;
                         if (replace) duplicateRecordCloning = DuplicateRecordCloning.Replace;
-                        else duplicateRecordCloning= DuplicateRecordCloning.Ignore;
-                        targetDb.WblockCloneObjects(missBlocksId, targetDb.BlockTableId, idMapping, duplicateRecordCloning, false);                       
+                        else duplicateRecordCloning = DuplicateRecordCloning.Ignore;
+                        targetDb.WblockCloneObjects(missBlocksId, targetDb.BlockTableId, idMapping, duplicateRecordCloning, false);
                         if (GetMissBlocks(targetDb, blockNames).Count > 0) return false;
                     }
                     catch
@@ -125,7 +125,7 @@ namespace BaseFunction
             }
             return true;
         }
-       
+
         /// <summary>
         /// проверяет список блоков на наличие в базе данных и возвращает список отсутствующих
         /// </summary>
@@ -265,7 +265,7 @@ namespace BaseFunction
                     using (AttributeReference attRef = tr.GetObject(id, OpenMode.ForWrite, false, true) as AttributeReference)
                     {
                         if (attRef != null && attributes.ContainsKey(attRef.Tag))
-                        {                           
+                        {
                             attRef.TextString = attributes[attRef.Tag];
                             if (!usingTag.Contains(attRef.Tag)) usingTag.Add(attRef.Tag);
                         }
@@ -274,12 +274,12 @@ namespace BaseFunction
                 else if (o is AttributeReference attRef)
                 {
                     if (attRef != null && attributes.ContainsKey(attRef.Tag))
-                    {                        
+                    {
                         attRef.TextString = attributes[attRef.Tag];
                         if (!usingTag.Contains(attRef.Tag)) usingTag.Add(attRef.Tag);
                         attRef.AdjustAlignment(HostApplicationServices.WorkingDatabase);
                     }
-                }          
+                }
             }
             if (usingTag.Count.Equals(attributes.Count)) result = true;
             documentLock?.Dispose();
@@ -306,7 +306,7 @@ namespace BaseFunction
                 }
                 tr.Commit();
             }
-        }       
+        }
         public static void BlockReferenceSetAttribute(this BlockReference br, Transaction tr)
         {
             DocumentLock documentLock = null;
@@ -369,7 +369,7 @@ namespace BaseFunction
                 else if (o is ObjectId id) attRef = tr.GetObject(id, OpenMode.ForRead, false, true) as AttributeReference;
 
                 if (attRef != null)
-                {                 
+                {
                     if (names != null && !names.Contains(attRef.Tag)) continue;
                     if (!result.ContainsKey(attRef.Tag))
                     {
@@ -382,7 +382,7 @@ namespace BaseFunction
                         {
                             result.Add(attRef.Tag, attRef.TextString);
                         }
-                    }                   
+                    }
                 }
             }
             if (result.Count > 0) return true; return false;
@@ -418,7 +418,7 @@ namespace BaseFunction
                         if (result.ContainsKey(attRef.Tag)) result.Add(attRef.Tag, attRef.TextString);
                     }
                 }
-             
+
                 tr.Commit();
             }
             documentLock?.Dispose();
@@ -457,7 +457,7 @@ namespace BaseFunction
                             else if (o is ObjectId id) attRef = tr.GetObject(id, OpenMode.ForRead, false, true) as AttributeReference;
 
                             if (attRef != null && !result.ContainsKey(attRef.Tag)) result.Add(attRef.Tag, attRef.TextString);
-                        }                                              
+                        }
                     }
                 }
                 tr.Commit();
@@ -496,7 +496,7 @@ namespace BaseFunction
                         result = attRef.TextString;
                         break;
                     }
-                }               
+                }
                 tr.Commit();
             }
             documentLock?.Dispose();
@@ -538,7 +538,7 @@ namespace BaseFunction
                                 result = attRef.TextString;
                                 break;
                             }
-                        }                        
+                        }
                     }
                 }
                 tr.Commit();
@@ -587,9 +587,9 @@ namespace BaseFunction
                     }
 
                     if (newReference.IsDynamicBlock)
-                    {                
+                    {
                         newReference.SetBlockreferenceProperties(oldReference.GetBlockReferenceProperties());
-                    }                    
+                    }
                 }
             }
         }
@@ -597,18 +597,18 @@ namespace BaseFunction
 
         #region получение и установка параметров блока
         public static Dictionary<string, dynamic> GetBlockReferenceProperties(this BlockReference reference)
-        { 
+        {
             Dictionary<string, dynamic> result = new Dictionary<string, dynamic>();
             DynamicBlockReferencePropertyCollection collection = reference.DynamicBlockReferencePropertyCollection;
             foreach (DynamicBlockReferenceProperty property in collection)
             {
                 if (result.ContainsKey(property.PropertyName))
-                { 
+                {
                     int i = 0;
                     while (result.ContainsKey(property.PropertyName + "..." + ++i)) continue;
                     result.Add(property.PropertyName + "..." + i, property.Value);
                 }
-                else result.Add(property.PropertyName, property.Value);              
+                else result.Add(property.PropertyName, property.Value);
             }
             return result;
         }
@@ -616,7 +616,7 @@ namespace BaseFunction
         {
             Dictionary<string, (dynamic, dynamic)> result = new Dictionary<string, (dynamic, dynamic)>();
             DynamicBlockReferencePropertyCollection collection = reference.DynamicBlockReferencePropertyCollection;
-                       
+
             foreach (DynamicBlockReferenceProperty property in collection)
             {
                 if (result.ContainsKey(property.PropertyName))
@@ -625,12 +625,12 @@ namespace BaseFunction
                     while (result.ContainsKey(property.PropertyName + "..." + ++i)) continue;
                     result.Add(property.PropertyName + "..." + i, (property.Value, property.UnitsType));
                 }
-                else result.Add(property.PropertyName, (property.Value, property.UnitsType));         
+                else result.Add(property.PropertyName, (property.Value, property.UnitsType));
             }
             return result;
         }
         public static void SetBlockreferenceProperties(this BlockReference reference, Dictionary<string, object> properties)
-        {          
+        {
             DynamicBlockReferencePropertyCollection collection = reference.DynamicBlockReferencePropertyCollection;
             foreach (DynamicBlockReferenceProperty property in collection)
             {
@@ -638,7 +638,8 @@ namespace BaseFunction
                 {
                     if (properties.ContainsKey(property.PropertyName) && !property.PropertyName.Contains("Origin")) property.Value = properties[property.PropertyName];
 
-                } catch { }
+                }
+                catch { }
             }
         }
         #endregion
@@ -670,11 +671,11 @@ namespace BaseFunction
         public void Dispose()
         {
             HostApplicationServices.WorkingDatabase = PrevDb;
-            if (Save) 
+            if (Save)
             {
-                try { NextDb.SaveAs(NextDb.Filename, DwgVersion.Current); } 
+                try { NextDb.SaveAs(NextDb.Filename, DwgVersion.Current); }
                 catch { }
-            }             
+            }
         }
     }
     /// <summary>
@@ -913,5 +914,5 @@ namespace BaseFunction
                 }
             }
         }
-    }    
+    }
 }

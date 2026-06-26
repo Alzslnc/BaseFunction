@@ -12,7 +12,7 @@ namespace BaseFunction
 {
     public abstract class BaseClass : INotifyPropertyChanged
     {
-        public event PropertyChangedEventHandler PropertyChanged;       
+        public event PropertyChangedEventHandler PropertyChanged;
         public virtual bool SetData<T>(ref T data, T value, [CallerMemberName] string name = "")
         {
             if (EqualityComparer<T>.Default.Equals(data, value)) return false;
@@ -21,7 +21,7 @@ namespace BaseFunction
             return true;
         }
         public virtual bool Call([CallerMemberName] string name = "")
-        {            
+        {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
             return true;
         }
@@ -151,9 +151,9 @@ namespace BaseFunction
         {
             if (value == null) return Binding.DoNothing;
 
-            if (double.TryParse(value.ToString().Replace(",","."), NumberStyles.Any, CultureInfo.InvariantCulture, out double result)) return result;
+            if (double.TryParse(value.ToString().Replace(",", "."), NumberStyles.Any, CultureInfo.InvariantCulture, out double result)) return result;
 
-            return Binding.DoNothing;            
+            return Binding.DoNothing;
         }
     }
     public class StringToIntConverter : ConverterBase
@@ -180,7 +180,7 @@ namespace BaseFunction
                 return date.ToString("dd.MM.yyyy HH:mm");
             }
             return Binding.DoNothing;
-        }       
+        }
     }
     /// <summary>
     /// созвращает true если значение больше нуля
@@ -200,6 +200,73 @@ namespace BaseFunction
         {
             if (value == null) return false;
             return !string.IsNullOrEmpty(value.ToString());
+        }
+    }
+
+    /// <summary>
+    /// Безопасный конвертер строк в GridLength для .NET Framework (WPF).
+    /// Защищает InitializeComponent от падений при некорректных данных в кэше.
+    /// </summary>
+    public class StringToGridLengthConverter : ConverterBase
+    {
+        public override object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            // 1. Безопасная проверка на null и пустые строки в стиле .NET Framework
+            if (value == null || string.IsNullOrEmpty(value.ToString().Trim()))
+            {
+                return new GridLength(150);
+            }
+
+            string strValue = value.ToString().Trim();
+
+            // 2. Обработка пропорционального размера со звездочкой (например, "1.5*")
+            if (strValue.EndsWith("*"))
+            {
+                string numPart = strValue.Replace("*", "");
+
+                // Если перед звездой ничего нет (просто "*"), значит это 1*
+                if (string.IsNullOrEmpty(numPart))
+                {
+                    return new GridLength(1, GridUnitType.Star);
+                }
+
+                // Заменяем разделители для универсального парсинга в САПР
+                numPart = numPart.Replace(",", ".");
+
+                if (double.TryParse(numPart, NumberStyles.Any, CultureInfo.InvariantCulture, out double starValue))
+                {
+                    return new GridLength(starValue, GridUnitType.Star);
+                }
+
+                return new GridLength(1, GridUnitType.Star);
+            }
+
+            // 3. Обработка фиксированного размера в пикселях (например, "150" или "150.5")
+            strValue = strValue.Replace(",", ".");
+            if (double.TryParse(strValue, NumberStyles.Any, CultureInfo.InvariantCulture, out double pixels))
+            {
+                return new GridLength(pixels);
+            }
+
+            // Железобетонный дефолт на случай сбоя данных в файле настроек
+            return new GridLength(150);
+        }
+
+        public override object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is GridLength)
+            {
+                GridLength gl = (GridLength)value;
+
+                if (gl.IsStar)
+                {
+                    return gl.Value.ToString(CultureInfo.InvariantCulture) + "*";
+                }
+
+                return gl.Value.ToString(CultureInfo.InvariantCulture);
+            }
+
+            return "150";
         }
     }
 }

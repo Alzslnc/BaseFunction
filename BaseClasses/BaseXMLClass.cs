@@ -6,10 +6,10 @@ using System.Xml.Serialization;
 namespace BaseFunction
 {
     public static class BaseXMLClass
-    {        
+    {
         public static object GetSerialisationResult(string path, Type type, bool isName = false)
         {
-            if (isName) path = Path.Combine(new FileInfo(type.Assembly.Location).DirectoryName, path);          
+            if (isName) path = Path.Combine(new FileInfo(type.Assembly.Location).DirectoryName, path);
             if (!File.Exists(path)) return null;
             try
             {
@@ -37,5 +37,5 @@ namespace BaseFunction
             }
             catch { return false; }
         }
-    } 
+    }
 }

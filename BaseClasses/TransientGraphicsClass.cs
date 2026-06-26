@@ -26,7 +26,7 @@ namespace BaseFunction
         public void OnChange(object sender, EventArgs e)
         {
             Changed?.Invoke(this, EventArgs.Empty);
-            if (AutoRedraw) Redraw();            
+            if (AutoRedraw) Redraw();
         }
         public void Redraw()
         {
@@ -121,7 +121,7 @@ namespace BaseFunction
             }
             set
             {
-                if (Circle != null && value > 0  && !Circle.Radius.IsEqualTo(value))
+                if (Circle != null && value > 0 && !Circle.Radius.IsEqualTo(value))
                 {
                     try
                     {
@@ -155,13 +155,13 @@ namespace BaseFunction
             {
                 if (_Entity != value)
                 {
-                    
+
                     if (_Entity != null)
                     {
                         if (TDraw) TransientManager.EraseTransient(Entity, new IntegerCollection());
                         _Entity.Dispose();
                     }
-                    
+
                     _Entity = value;
                     if (_Entity == null)
                     {

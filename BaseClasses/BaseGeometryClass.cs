@@ -16,7 +16,7 @@ namespace BaseFunction
             if (!points.ContainPoint(point)) points.Add(point);
         }
         public enum ExPosition
-        { 
+        {
             none,
             Inner,
             Outer,
@@ -30,7 +30,7 @@ namespace BaseFunction
         /// <param name="ex2"></param>
         /// <returns></returns>
         public static ExPosition GetExPosition(this Extents3d ex1, Extents3d ex2)
-        { 
+        {
             ExPosition result;
             //снаружи второго
             if (
@@ -54,17 +54,17 @@ namespace BaseFunction
                 ex1.MaxPoint.Y > ex2.MaxPoint.Y
                 ) result = ExPosition.Surround;
             //иначе пересекаются
-            else result = ExPosition.Intersect;    
+            else result = ExPosition.Intersect;
             return result;
         }
         public static int GetAfterPointNumber(this string s)
         {
             if (!s.Contains(".")) return 0;
-            return s.Length - 1 - s.IndexOf(".");          
+            return s.Length - 1 - s.IndexOf(".");
         }
         public static Polyline GetClearPolyline(this Polyline poly, Tolerance? tolerance = null, bool reverse = true)
-        {            
-            if (!tolerance.HasValue) tolerance = new Tolerance (Tolerance.Global.EqualPoint, Tolerance.Global.EqualVector); 
+        {
+            if (!tolerance.HasValue) tolerance = new Tolerance(Tolerance.Global.EqualPoint, Tolerance.Global.EqualVector);
             for (int i = poly.NumberOfVertices - 2; i > 0; i--)
             {
                 Point3d nextPt = poly.GetPoint3dAt(i + 1);
@@ -75,7 +75,7 @@ namespace BaseFunction
                     poly.RemoveVertexAt(i);
                     continue;
                 }
-                    
+
                 Vector3d next = (nextPt - previousPt).GetNormal();
                 Vector3d previous = (poly.GetPoint3dAt(i - 1) - poly.GetPoint3dAt(i)).GetNormal();
                 if ((next.IsEqualTo(previous, tolerance.Value) && reverse) || next.IsEqualTo(-previous, tolerance.Value)) poly.RemoveVertexAt(i);
@@ -86,7 +86,7 @@ namespace BaseFunction
         {
             if (!tolerance.HasValue) tolerance = new Tolerance(Tolerance.Global.EqualPoint, Tolerance.Global.EqualVector);
 
-            List<PolylineVertex3d> vertices = new List<PolylineVertex3d> ();
+            List<PolylineVertex3d> vertices = new List<PolylineVertex3d>();
 
             Transaction transaction;
 
@@ -128,7 +128,7 @@ namespace BaseFunction
                 transaction.Commit();
                 transaction.Dispose();
             }
-               
+
             return poly;
         }
 
@@ -198,14 +198,14 @@ namespace BaseFunction
                 {
                     if (c is Spline)
                     {
-                        contour = c;                      
+                        contour = c;
                         break;
                     }
-                }                                
+                }
 
                 if (contour == null)
                 {
-                    contour = fragments[0];                  
+                    contour = fragments[0];
                 }
 
                 fragments.Remove(contour);
@@ -238,7 +238,7 @@ namespace BaseFunction
                         Curve fragment = fragments[i];
 
                         try
-                        {                            
+                        {
                             if (fragment.StartPoint.IsEqualTo(contour.EndPoint) || fragment.EndPoint.IsEqualTo(contour.EndPoint) ||
                                 fragment.StartPoint.IsEqualTo(contour.StartPoint) || fragment.EndPoint.IsEqualTo(contour.StartPoint))
                             {
@@ -266,9 +266,9 @@ namespace BaseFunction
         /// <returns></returns>
         public static bool ContainPoint(this List<Point3d> points, Point3d point, Tolerance? tolerance = null)
         {
-            foreach (Point3d p in points) 
-            { 
-                if (tolerance.HasValue ? p.IsEqualTo(point, tolerance.Value) : p.IsEqualTo(point)) return true; 
+            foreach (Point3d p in points)
+            {
+                if (tolerance.HasValue ? p.IsEqualTo(point, tolerance.Value) : p.IsEqualTo(point)) return true;
             }
             return false;
         }
@@ -278,7 +278,7 @@ namespace BaseFunction
 
             Polyline polyline = new Polyline();
             //счетчик вершин полилинии
-            int i = 0;            
+            int i = 0;
             //считываем вершины из 3д полилинии в список
 
             foreach (object o in pline)
@@ -343,7 +343,7 @@ namespace BaseFunction
             (Matrix3d.Rotation(-viewport.TwistAngle, viewport.ViewDirection, viewport.ViewTarget));
             return matrix.Inverse();
         }
-      
+
         /// <summary>
         /// создает замкнутую полилинию по границе
         /// </summary>     
@@ -470,7 +470,7 @@ namespace BaseFunction
             {
                 e.Transparency = ie.Transparency;
             }
-            catch { }          
+            catch { }
         }
         /// <summary>
         /// возвращает угол от оси X Autocad из точки pt1 на точку pt2 (аналог polar из лиспа)
@@ -512,7 +512,7 @@ namespace BaseFunction
         /// <param name="result">центральная точка</param>
         /// <returns>true если кривая корректна и не нулевой длины</returns>
         public static bool GetCentrPoint(this Curve curve, out Point3d result)
-        {            
+        {
             result = Point3d.Origin;
             try
             {
@@ -731,7 +731,7 @@ namespace BaseFunction
         /// находит ближайшую точку из списка, если списко пустой возвращает точку
         /// </summary>   
         public static Point3d GetClosestPoint(this List<Point3d> points, Point3d point, double mindist)
-        { 
+        {
             if (points == null || points.Count == 0) return point;
             Point3d closest = point;
             double dist = mindist;
@@ -739,7 +739,7 @@ namespace BaseFunction
             {
                 if (p.Z0().DistanceTo(point.Z0()).IsEqualTo(0)) return p;
                 else if (p.Z0().DistanceTo(point.Z0()) < dist)
-                { 
+                {
                     closest = p;
                     dist = closest.Z0().DistanceTo(point.Z0());
                 }
@@ -803,7 +803,7 @@ namespace BaseFunction
         public static bool IsEqualTo(this double d1, double d2, double delta = 0)
         {
             if (delta == 0) delta = Tolerance.Global.EqualPoint;
-            if (Math.Abs(d2 - d1) > delta) return false; return true;        
+            if (Math.Abs(d2 - d1) > delta) return false; return true;
         }
         public static bool IsIntersect(this Curve p1, Curve p2)
         {
@@ -822,7 +822,7 @@ namespace BaseFunction
                     }
                 }
             }
-            return false;        
+            return false;
         }
         /// <summary>
         /// проверяет пересекаются ли кривые или нет
@@ -857,7 +857,7 @@ namespace BaseFunction
         /// проверяет пересекаются ли кривые или нет
         /// </summary>   
         public static bool IsIntersect(this Curve curve, Curve curve2, List<Point3d> intersections)
-        {           
+        {
             if (intersections.Count == 0 || curve.GetLength().IsEqualTo(0) || curve2.GetLength().IsEqualTo(0)) return false;
 
             using (Plane plane = new Plane())
@@ -904,12 +904,12 @@ namespace BaseFunction
                     return false;
                 }
             }
-            catch 
+            catch
             {
                 return null;
             }
         }
-        private static double GetIncrementParametr(this Curve curve ,Point3d point, double increment)
+        private static double GetIncrementParametr(this Curve curve, Point3d point, double increment)
         {
             double parametr = curve.GetParameterAtPoint(curve.GetClosestPointTo(point, false));
 
@@ -930,7 +930,7 @@ namespace BaseFunction
                 points.Add(new Point3d(-points[i].X, points[i].Y, 0));
             }
         }
-       
+
         /// <summary>
         /// сортирует точки по близости к началу кривой
         /// </summary>
@@ -982,7 +982,7 @@ namespace BaseFunction
                 points.Remove(closest);
                 result.Add(closest);
             }
-            foreach (Point3d p in result) points.Add(p);    
+            foreach (Point3d p in result) points.Add(p);
         }
         /// <summary>
         /// преобразует список в коллекцию точек
@@ -1001,7 +1001,7 @@ namespace BaseFunction
             List<Point3d> result = new List<Point3d>();
             foreach (Point3d point in points) result.Add(point);
             return result;
-        }      
+        }
         /// <summary>
         /// возвращает точку с обнуленной высотой
         /// </summary>
@@ -1010,7 +1010,7 @@ namespace BaseFunction
         public static Point3d Z0(this Point3d point)
         {
             return new Point3d(point.X, point.Y, 0);
-        }        
+        }
         public static int? GetFirstPointIndex(this List<Point3d> points, Point3d point)
         {
             for (int i = 0; i < points.Count; i++)
@@ -1027,7 +1027,7 @@ namespace BaseFunction
             }
             return null;
         }
-        public static bool Under(this double number, double number2)  => !number.IsEqualTo(number2) && number < number2;
+        public static bool Under(this double number, double number2) => !number.IsEqualTo(number2) && number < number2;
         public static bool Over(this double number, double number2) => !number.IsEqualTo(number2) && number > number2;
         public static Curve2d ConvertToCurve2d(this Curve3d curve3D)
         {
