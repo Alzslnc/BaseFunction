@@ -37,5 +37,45 @@ namespace BaseFunction
             }
             catch { return false; }
         }
+        // === НОВЫЕ ЧИСТЫЕ ПЕРЕГРУЗКИ (Принимают готовый сериализатор извне) ===
+
+        /// <summary>
+        /// Универсальное чтение XML с использованием преднастроенного сериализатора
+        /// </summary>
+        public static object GetSerialisationResult(string path, XmlSerializer serializer, bool isName = false)
+        {
+            // Используем AppDomain для универсального определения базовой директории
+            if (isName) path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, path);
+            if (!File.Exists(path)) return null;
+            try
+            {
+                using (StreamReader reader = new StreamReader(path))
+                {
+                    XmlReader xmlReader = XmlReader.Create(reader);
+                    return serializer.Deserialize(xmlReader);
+                }
+            }
+            catch { return null; }
+        }
+
+        /// <summary>
+        /// Универсальная запись XML с использованием преднастроенного сериализатора
+        /// </summary>
+        public static bool SetSerialisationResult(string path, object toSerialise, XmlSerializer serializer, bool isName = false)
+        {
+            Type type = toSerialise.GetType();
+            if (isName) path = Path.Combine(new FileInfo(type.Assembly.Location).DirectoryName, path);
+            try
+            {
+                string directory = Path.GetDirectoryName(path);
+                if (!Directory.Exists(directory)) Directory.CreateDirectory(directory);
+                using (StreamWriter writer = new StreamWriter(path))
+                {
+                    serializer.Serialize(writer, toSerialise);
+                }
+                return true;
+            }
+            catch { return false; }
+        }
     }
 }
