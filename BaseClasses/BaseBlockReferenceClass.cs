@@ -358,7 +358,7 @@ namespace BaseFunction
         /// <returns>true если получено хотя бы одно значение</returns>
         public static bool BlockReferenceGetAttribute(this BlockReference br, out Dictionary<string, string> result, Transaction tr, List<string> names = null, bool fullContents = false)
         {
-            result = new Dictionary<string, string>();
+            result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             if (br == null) return false;
             //проходим по всем объектам в коллекции атрибутов
             foreach (object o in br.AttributeCollection)
@@ -395,7 +395,7 @@ namespace BaseFunction
         /// <returns>true если получено хотя бы одно значение</returns>        
         public static bool BlockReferenceGetAttribute(this BlockReference br, out Dictionary<string, string> result, List<string> names = null)
         {
-            result = new Dictionary<string, string>();
+            result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             if (br == null) return false;
             DocumentLock documentLock = null;
             if (Aap.Application.DocumentManager != null && Aap.Application.DocumentManager.MdiActiveDocument != null)
@@ -433,7 +433,7 @@ namespace BaseFunction
         /// <returns>true если получено хотя бы одно значение</returns>        
         public static bool BlockReferenceGetAttribute(this ObjectId brId, out Dictionary<string, string> result)
         {
-            result = new Dictionary<string, string>();
+            result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             if (brId == null || brId == ObjectId.Null) return false;
             DocumentLock documentLock = null;
             if (Aap.Application.DocumentManager != null && Aap.Application.DocumentManager.MdiActiveDocument != null)
