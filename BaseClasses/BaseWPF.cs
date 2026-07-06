@@ -72,6 +72,17 @@ namespace BaseFunction
             return this;
         }
     }
+    public class TypeToBoolConverter : ConverterBase
+    {
+        public override object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value == null || parameter == null) return false;
+
+            // Проверяем, совпадает ли тип объекта с типом из Parameter
+            return value.GetType() == (Type)parameter;
+        }
+    }
+
 
     internal class EnumConverter : ConverterBase
     {
@@ -85,6 +96,7 @@ namespace BaseFunction
         }
     }
 
+   
     public class BoolToVisibleConverter : ConverterBase
     {
         public override object Convert(object value, Type targetType, object parameter, CultureInfo culture)
