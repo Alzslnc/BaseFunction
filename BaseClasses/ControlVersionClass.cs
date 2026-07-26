@@ -110,9 +110,10 @@ namespace BaseFunction
                 // Отрезаем расширение (.dll или .bundle), чтобы выводить пользователю только чистое имя
                 string displayName = System.IO.Path.GetFileNameWithoutExtension(gitPlugin.Name);
 
+                string displayName2 = System.IO.Path.GetFileName(gitPlugin.Name);
                 // Ищем локальный плагин по совпадению имени файла
-                var localPlugin = datas.FirstOrDefault(x => x.Name.Equals(gitPlugin.Name, StringComparison.OrdinalIgnoreCase));
-
+                var localPlugin = datas.FirstOrDefault(x => x.Name.Equals(displayName2, StringComparison.OrdinalIgnoreCase));
+                              
                 if (localPlugin == null)
                 {
                     notInstalled.Add($" - {displayName}");
