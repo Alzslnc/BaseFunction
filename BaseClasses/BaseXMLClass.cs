@@ -68,7 +68,7 @@ namespace BaseFunction
                 }
             }
             catch { return null; }
-        }    
+        }
         public static bool SetSerialisationResult(string path, object toSerialise, bool isName = false)
         {
             if (toSerialise == null) return false;
@@ -86,7 +86,7 @@ namespace BaseFunction
                 return true;
             }
             catch { return false; }
-        }   
+        }
         /// <summary>
         /// Универсальное чтение XML с использованием преднастроенного сериализатора (Generic-версия)
         /// </summary>

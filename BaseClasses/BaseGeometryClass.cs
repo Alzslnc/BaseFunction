@@ -59,6 +59,7 @@ namespace BaseFunction
         }
         public static int GetAfterPointNumber(this string s)
         {
+            s = s.Replace(",", ".");
             if (!s.Contains(".")) return 0;
             return s.Length - 1 - s.IndexOf(".");
         }
@@ -177,8 +178,10 @@ namespace BaseFunction
         /// <summary>
         /// соединяет фрагменты кривой и возвращает список с результатом соединения. Возвращает false если произошла ошибка.
         /// </summary>   
-        public static bool ConnectCurve(this List<Curve> fragments, out List<Curve> result)
+        public static bool ConnectCurve(this List<Curve> fragments, out List<Curve> result, double tolerance = 1e-6)
         {
+            Tolerance tl = new Tolerance(tolerance / 10, tolerance);
+
             result = new List<Curve>();
 
             for (int i = fragments.Count - 1; i >= 0; i--)
@@ -1085,5 +1088,46 @@ namespace BaseFunction
         }
 
 
+    }
+
+    public class Point3dComparer : IEqualityComparer<Point3d>
+    {
+        // Сирлтоны (готовые статические экземпляры) для частых допусков
+        public static readonly Point3dComparer Global = new Point3dComparer(1e-5);
+        public static readonly Point3dComparer Precise = new Point3dComparer(1e-8);
+
+        private readonly double _toleranceValue;
+        private readonly int _decimals;
+        private readonly Tolerance _tolerance; // Кэшируем объект AutoCAD один раз!
+
+        public Point3dComparer(double tolerance = 1e-5)
+        {
+            _toleranceValue = tolerance;
+            _decimals = Math.Max(0, (int)Math.Ceiling(-Math.Log10(tolerance)));
+            // Создаем Tolerance один раз при инициализации компаратора
+            _tolerance = new Tolerance(tolerance, tolerance);
+        }
+
+        public bool Equals(Point3d p1, Point3d p2)
+        {
+            // Используем закэшированный Tolerance, ничего нового в памяти не создается!
+            return p1.IsEqualTo(p2, _tolerance);
+        }
+
+        public int GetHashCode(Point3d obj)
+        {
+            double x = Math.Round(obj.X, _decimals);
+            double y = Math.Round(obj.Y, _decimals);
+            double z = Math.Round(obj.Z, _decimals);
+
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 23 + x.GetHashCode();
+                hash = hash * 23 + y.GetHashCode();
+                hash = hash * 23 + z.GetHashCode();
+                return hash;
+            }
+        }
     }
 }

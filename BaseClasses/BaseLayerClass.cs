@@ -316,7 +316,7 @@ namespace BaseFunction
                         }
                         catch
                         {
-                            if (message) System.Windows.Forms.MessageBox.Show("Введено некорректное название слоя");
+                            if (message) System.Windows.MessageBox.Show("Введено некорректное название слоя");
                             result = false;
                         }
                     }

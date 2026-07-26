@@ -1,10 +1,12 @@
-﻿using System;
+﻿using Autodesk.AutoCAD.Runtime;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
@@ -12,78 +14,38 @@ using System.Windows.Controls;
 
 namespace BaseFunction
 {
-    public static class ControlVersionClass
+    public class ControlVersionClass
     {
-        static ControlVersionClass()
+        [CommandMethod("OpenRepositoryPage")]
+        public void OpenRepositoryPage()
         {
-            Load();
-            FirstLoad = true;
+            Process.Start(new ProcessStartInfo("https://github.com/Alzslnc/AcadPlugins") { UseShellExecute = true });
         }
-        public static void Save()
+        [CommandMethod("CheckPluginVersion")]
+        public void CheckPluginVersion()
         {
-            ControlVersion controlVersion = new ControlVersion() { VersionDatas = VersionDatas, OpenTime = OpenTime };
-            FoldersClass folders = new FoldersClass() { Folders = Folders };
-            BaseXMLClass.SetSerialisationResult(SavePath, controlVersion);
-            BaseXMLClass.SetSerialisationResult(SavePath2, folders);
-        }
-        public static void Load()
-        {
-            if (!File.Exists(SavePath) || !File.Exists(SavePath2)) return;
-            if (BaseXMLClass.GetSerialisationResult(SavePath, typeof(ControlVersion)) is ControlVersion data)
-            {
-                if ((OpenTime - data.OpenTime).TotalSeconds < 100 || !FirstLoad)
-                {
-                    VersionDatas = data.VersionDatas;
-                }
-                else Save();
-            }
-            if (BaseXMLClass.GetSerialisationResult(SavePath2, typeof(FoldersClass)) is FoldersClass folders)
-            {
-                if ((OpenTime - folders.OpenTime).TotalSeconds < 100 || !FirstLoad)
-                {
-                    Folders = folders.Folders;
-                }
-                else Save();
-            }
-        }
-        public static void Terminate()
-        {
+            List<MetaData> datas = GetOurPlugins();
+            List<MetaData> gitDatas;
             try
             {
-            }
-            catch { }
-        }
-        private static readonly object Lock = new object();
-        private static string LoadedData { get; set; } = string.Empty;
-        private static readonly string SavePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "ControlVersion.xml");
-        private static readonly string SavePath2 = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Folders.xml");
-        private static bool _ch = false;
-        private static bool FirstLoad = true;
-        public class ControlVersion
-        {
-            public ControlVersion() { }
-            public List<VersionData> VersionDatas { get; set; } = new List<VersionData>();
-            public DateTime OpenTime { get; set; } = DateTime.MinValue;
-        }
-        public class FoldersClass
-        {
-            public FoldersClass() { }
-            public List<string> Folders { get; set; } = new List<string>();
-            public DateTime OpenTime { get; set; } = DateTime.MinValue;
-        }
-        public class VersionData
-        {
-            public string Name;
-            public DateTime Date;
-        }
-        public static List<VersionData> VersionDatas { get; set; } = new List<VersionData>();
-        public static DateTime OpenTime { get; set; } = DateTime.UtcNow;
-        public static List<string> Folders { get; set; } = new List<string>();
-        public static void OpenFolder()
-        {
-            Load();
+                gitDatas = GetGitDatasProcess();
 
-            foreach (string path in Folders)
+                System.Windows.MessageBox.Show(GetResultString(datas, gitDatas));
+            }
+            catch (System.Exception ex)
+            {
+                System.Windows.MessageBox.Show($"Ошибка: {ex.Message}");
+            }
+        }
+
+        [CommandMethod("OpenPluginsFolder")]
+        public static void OpenPluginsFolder()
+        {
+            List<MetaData> datas = GetOurPlugins();
+
+            if (datas.Count == 0) return;
+
+            foreach (string path in datas.Select(x => x.Path).Distinct(StringComparer.OrdinalIgnoreCase))
             {
                 if (Directory.Exists(path))
                 {
@@ -91,57 +53,141 @@ namespace BaseFunction
                 }
             }
         }
-        public static void CheckVersion()
+        private static List<MetaData> GetGitDatasProcess()
         {
-            if (_ch) return;
-            _ch = true;
-            try
+            List<MetaData> result = new List<MetaData>();
+
+            Window window = CreateWindow();
+            window.Owner = System.Windows.Application.Current?.MainWindow;
+            bool isCheckingFinished = false; // Флаг: завершился ли фоновый поток?
+
+            // 1. Запрещаем закрытие окна (через Alt+F4 или крестик), пока идет проверка
+            window.Closing += (sender, e) =>
             {
-                using (Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.LockDocument())
+                if (!isCheckingFinished)
                 {
-                    LoadedData = string.Empty;
+                    e.Cancel = true; // Отменяем закрытие окна
+                }
+            };
 
-                    ControlVersionClass.Load();
-
-                    Task task = Task.Factory.StartNew(() => { GetGitData(); });
-
-                    Window window = null;
-
-                    Task task2 = Task.Factory.StartNew(() =>
+            // 2. Логика запуска и автоматического закрытия
+            window.Loaded += (sender, args) =>
+            {
+                Task.Run(() =>
+                {
+                    try
                     {
-                        int timer = 0;
-
-                        while (timer++ < 20 || !task.IsCompleted)
-                        {
-                            System.Threading.Thread.Sleep(500);
-                        }
-
-                        if (window != null)
-                        {
-                            try
-                            {
-                                window.Dispatcher.Invoke(() => window.Close());
-                            }
-                            catch { }
-                        }
-                    });
-
-                    window = CreateWindow();
-                    window.ShowDialog();
-
-                    System.Threading.Thread.Sleep(500);
-
-                    lock (Lock)
-                    {
-                        if (string.IsNullOrEmpty(LoadedData)) LoadedData = "Не удалось проверить.";
+                        result = GetGitData();
                     }
+                    finally
+                    {
+                        isCheckingFinished = true; // Разрешаем закрытие окна
+                                                   // Закрываем окно через Dispatcher
+                        window.Dispatcher.Invoke(() => window.Close());
+                    }
+                });
+            };
 
-                    System.Windows.MessageBox.Show(LoadedData);
+            // Блокируем AutoCAD модальным окном
+            window.ShowDialog();
+
+            return result;
+        }
+        private static string GetResultString(List<MetaData> datas, List<MetaData> gitDatas)
+        {
+            // Если с Гита ничего не пришло, сразу возвращаем ошибку
+            if (gitDatas == null || gitDatas.Count == 0)
+            {
+                return "Не удалось получить данные с сервера обновлений.";
+            }
+
+            List<string> actual = new List<string>();
+            List<string> toUpdate = new List<string>();
+            List<string> notInstalled = new List<string>();
+
+            foreach (var gitPlugin in gitDatas)
+            {
+                // Отрезаем расширение (.dll или .bundle), чтобы выводить пользователю только чистое имя
+                string displayName = System.IO.Path.GetFileNameWithoutExtension(gitPlugin.Name);
+
+                // Ищем локальный плагин по совпадению имени файла
+                var localPlugin = datas.FirstOrDefault(x => x.Name.Equals(gitPlugin.Name, StringComparison.OrdinalIgnoreCase));
+
+                if (localPlugin == null)
+                {
+                    notInstalled.Add($" - {displayName}");
+                }
+                else
+                {
+                    // Вычисляем разницу во времени между локальным файлом и файлом в ZIP
+                    TimeSpan timeDiff = gitPlugin.Date - localPlugin.Date;
+
+                    // Если файл на Гите новее локального больше чем на 2 секунды (учитывая DOS-точность)
+                    if (timeDiff.TotalSeconds > 2)
+                    {
+                        string localDateStr = localPlugin.Date.ToString("dd.MM.yyyy HH:mm");
+                        string gitDateStr = gitPlugin.Date.ToString("dd.MM.yyyy HH:mm");
+
+                        toUpdate.Add($" - {displayName} (установлен: {localDateStr}, доступно: {gitDateStr})");
+                    }
+                    else
+                    {
+                        actual.Add($" - {displayName}");
+                    }
                 }
             }
-            finally { _ch = false; }
-        }
 
+            // Собираем финальную строку отчета
+            StringBuilder sb = new StringBuilder();
+
+            if (toUpdate.Count > 0)
+            {
+                sb.AppendLine("Доступны обновления:");
+                foreach (string s in toUpdate) sb.AppendLine(s);
+                sb.AppendLine(); // Пустая строка-разделитель
+            }
+
+            if (actual.Count > 0)
+            {
+                sb.AppendLine("Версии актуальны:");
+                foreach (string s in actual) sb.AppendLine(s);
+                sb.AppendLine();
+            }
+
+            if (notInstalled.Count > 0)
+            {
+                sb.AppendLine("Доступные, но не установленные плагины:");
+                foreach (string s in notInstalled) sb.AppendLine(s);
+            }
+
+            // Если вдруг все списки пустые (маловероятно, но для безопасности)
+            if (sb.Length == 0)
+            {
+                return "Плагины не найдены.";
+            }
+
+            return sb.ToString().TrimEnd(); // Убираем лишние переносы строк в самом конце
+        }
+        private static List<MetaData> GetOurPlugins()
+        {
+            List<MetaData> result = new List<MetaData>();
+
+            foreach (Assembly assembly in AppDomain.CurrentDomain.GetAssemblies())
+            {
+                try
+                {
+                    if (assembly.IsDynamic || string.IsNullOrEmpty(assembly.Location)) continue;
+                    // Ищем тип по точному названию класса контроля версий   
+                    if (assembly.GetType(typeof(ControlVersionClass).FullName) != null)
+                    {
+                        result.Add(new MetaData(assembly));
+                    }
+                }
+                catch { }
+            }
+
+            return result;
+        }
         private static Window CreateWindow()
         {
             Grid rootGrid = new Grid();
@@ -152,10 +198,15 @@ namespace BaseFunction
 
             return new Window { WindowStyle = WindowStyle.None, WindowStartupLocation = WindowStartupLocation.CenterOwner, Content = rootGrid, Width = 400, Height = 200, MaxHeight = 200, MaxWidth = 400 };
         }
-
-        private static void GetGitData()
+        private static List<MetaData> GetGitData()
         {
-            string report = "";
+            List<MetaData> result = new List<MetaData>();
+
+            string appVersion = Autodesk.AutoCAD.ApplicationServices.Application.Version.Major < 25
+                ? "2021"
+                : (Autodesk.AutoCAD.ApplicationServices.Application.Version.Major >= 27
+                ? "2027"
+                : "2025");
 
             using (HttpClient client = new HttpClient() { Timeout = TimeSpan.FromSeconds(8) })
             {
@@ -168,12 +219,28 @@ namespace BaseFunction
 
                 try
                 {
-                    string json = client.GetStringAsync($"https://api.github.com/repos/Alzslnc/AcadPlugins/contents/").Result.Replace("[", "").Replace("]", "").Replace("{", "").Replace("}}", "}");
+                    string json = client.GetStringAsync($"https://api.github.com/repos/Alzslnc/AcadPlugins/contents/").Result;
 
-                    string[] docs = json.Split('}');
+                    int index = 0;
 
-                    foreach (string doc in docs)
+                    while (true)
                     {
+                        // Ищем каждый конкретный файл по его имени/расширению
+                        int bundlePos = json.IndexOf(".bundle", index);
+                        if (bundlePos == -1) break;
+
+                        // Находим границы именно этого JSON-объекта (от { до })
+                        int startObject = json.LastIndexOf("{", bundlePos);
+                        int endObject = json.IndexOf("}", bundlePos);
+
+                        if (startObject == -1 || endObject == -1) break;
+
+                        // Вырезаем только строку одного конкретного плагина
+                        string doc = json.Substring(startObject, endObject - startObject);
+
+                        // Смещаем индекс для следующего поиска
+                        index = endObject + 1;
+
                         if (doc.Length < 20 || !doc.Contains(".bundle")) continue;
 
                         string folderName = "";
@@ -221,162 +288,151 @@ namespace BaseFunction
 
                         if (string.IsNullOrEmpty(size)) continue;
 
-                        VersionData versionData = ControlVersionClass.VersionDatas.FirstOrDefault(x => x.Name.Contains(folderName));
+                        try
+                        {
+                            if (uint.TryParse(size, out uint sizeL) && sizeL > 2048)
+                            {
+                                client.DefaultRequestHeaders.Range = new RangeHeaderValue(sizeL - 2048, sizeL);
+                            }
 
-                        if (versionData == null)
-                        {
-                            notInstalled.Add(name);
-                        }
-                        else
-                        {
+                            byte[] archiveTail = client.GetByteArrayAsync(path).Result;
+                            MemoryStream fs = null;
                             try
                             {
-                                if (uint.TryParse(size, out uint sizeL) && sizeL > 2048)
+                                fs = new MemoryStream(archiveTail);
+                                // 1. Ищем EOCD, чтобы найти начало Центрального Каталога
+                                fs.Seek(Math.Max(0, fs.Length - 1024), SeekOrigin.Begin);
+                                byte[] eocdBuf = new byte[1024];
+                                fs.Read(eocdBuf, 0, eocdBuf.Length);
+
+                                int eocdPos = -1;
+                                for (int i = eocdBuf.Length - 4; i >= 0; i--)
                                 {
-                                    client.DefaultRequestHeaders.Range = new RangeHeaderValue(sizeL - 2048, sizeL);
+                                    if (BitConverter.ToUInt32(eocdBuf, i) == 0x06054B50) { eocdPos = i; break; }
                                 }
 
-                                byte[] archiveTail = client.GetByteArrayAsync(path).Result;
-                                Stream fs = null;
-                                try
+                                if (eocdPos == -1) continue;
+
+                                // 2. Читаем кол-во записей и смещение каталога
+                                ushort totalEntries = BitConverter.ToUInt16(eocdBuf, eocdPos + 10);
+                                uint cdOffset = BitConverter.ToUInt32(eocdBuf, eocdPos + 16);
+
+                                DateTime dt = DateTime.MinValue;
+
+                                uint newCdoff = cdOffset + 2048;
+
+                                if (newCdoff < sizeL)
                                 {
+                                    client.DefaultRequestHeaders.Range = new RangeHeaderValue(cdOffset, sizeL);
+                                    archiveTail = client.GetByteArrayAsync(path).Result;
                                     fs = new MemoryStream(archiveTail);
-                                    // 1. Ищем EOCD, чтобы найти начало Центрального Каталога
-                                    fs.Seek(Math.Max(0, fs.Length - 1024), SeekOrigin.Begin);
-                                    byte[] eocdBuf = new byte[1024];
-                                    fs.Read(eocdBuf, 0, eocdBuf.Length);
-
-                                    int eocdPos = -1;
-                                    for (int i = eocdBuf.Length - 4; i >= 0; i--)
-                                    {
-                                        if (BitConverter.ToUInt32(eocdBuf, i) == 0x06054B50) { eocdPos = i; break; }
-                                    }
-
-                                    if (eocdPos == -1) return;
-
-                                    // 2. Читаем кол-во записей и смещение каталога
-                                    ushort totalEntries = BitConverter.ToUInt16(eocdBuf, eocdPos + 10);
-                                    uint cdOffset = BitConverter.ToUInt32(eocdBuf, eocdPos + 16);
-
-                                    DateTime dt = DateTime.MinValue;
-
-                                    uint newCdoff = cdOffset + 2048;
-
-                                    if (newCdoff < sizeL)
-                                    {
-                                        client.DefaultRequestHeaders.Range = new RangeHeaderValue(cdOffset, sizeL);
-                                        archiveTail = client.GetByteArrayAsync(path).Result;
-                                        fs = new MemoryStream(archiveTail);
-                                        newCdoff = 0;
-                                    }
-                                    else
-                                    {
-                                        newCdoff -= sizeL;
-                                    }
-                                    // 3. Переходим к каталогу и читаем данные каждого файла
-
-                                    fs.Seek(newCdoff, SeekOrigin.Begin);
-                                    for (int i = 0; i < totalEntries; i++)
-                                    {
-                                        byte[] h = new byte[46]; // Фиксированная часть заголовка (46 байт)
-                                        fs.Read(h, 0, 46);
-
-                                        if (BitConverter.ToUInt32(h, 0) != 0x02014B50) break;
-
-                                        // Извлекаем метаданные файла
-                                        uint crc32 = BitConverter.ToUInt32(h, 16);
-                                        uint compSize = BitConverter.ToUInt32(h, 20);
-                                        uint uncompSize = BitConverter.ToUInt32(h, 24);
-                                        ushort nLen = BitConverter.ToUInt16(h, 28); // Длина имени
-                                        ushort eLen = BitConverter.ToUInt16(h, 30); // Длина доп. полей
-                                        ushort cLen = BitConverter.ToUInt16(h, 32); // Длина комментария файла
-                                        uint localHeaderOffset = BitConverter.ToUInt32(h, 42); // Смещение данных
-
-                                        // Читаем имя файла
-                                        byte[] nameBuf = new byte[nLen];
-                                        fs.Read(nameBuf, 0, nLen);
-                                        string fileName = Encoding.UTF8.GetString(nameBuf);
-
-                                        string shortName = new FileInfo(versionData.Name).Name;
-                                        if (fileName.Contains(shortName) && !fileName.Contains("config"))
-                                        {
-                                            // Извлекаем сырые значения из массива заголовка h
-                                            ushort dosTime = BitConverter.ToUInt16(h, 12);
-                                            ushort dosDate = BitConverter.ToUInt16(h, 14);
-
-                                            // Распаковываем биты даты
-                                            int year = ((dosDate & 0xFE00) >> 9) + 1980;
-                                            int month = (dosDate & 0x01E0) >> 5;
-                                            int day = dosDate & 0x1F;
-
-                                            // Распаковываем биты времени
-                                            int hour = (dosTime & 0xF800) >> 11;
-                                            int minute = (dosTime & 0x07E0) >> 5;
-                                            int second = (dosTime & 0x1F) * 2; // ZIP хранит секунды с шагом в 2 сек.
-
-                                            try
-                                            {
-                                                dt = new DateTime(year, month, day, hour, minute, second);
-                                            }
-                                            catch
-                                            {
-                                            }
-
-                                            break;
-                                        }
-
-                                        // Пропускаем доп. поля и комментарий файла, чтобы попасть на следующую запись
-                                        fs.Seek(eLen + cLen, SeekOrigin.Current);
-                                    }
-
-                                    if (dt == DateTime.MinValue) continue;
-                                    else if (dt > versionData.Date)
-                                    {
-                                        toUpdate.Add(name);
-                                    }
-                                    else
-                                    {
-                                        actual.Add(name);
-                                    }
+                                    newCdoff = 0;
                                 }
-                                finally
+                                else
                                 {
-                                    fs?.Dispose();
+                                    newCdoff -= sizeL;
+                                }
+                                // 3. Переходим к каталогу и читаем данные каждого файла
+
+                                fs.Seek(newCdoff, SeekOrigin.Begin);
+                                for (int i = 0; i < totalEntries; i++)
+                                {
+                                    byte[] h = new byte[46]; // Фиксированная часть заголовка (46 байт)
+                                    fs.Read(h, 0, 46);
+
+                                    if (BitConverter.ToUInt32(h, 0) != 0x02014B50) break;
+
+                                    // Извлекаем метаданные файла
+                                    uint crc32 = BitConverter.ToUInt32(h, 16);
+                                    uint compSize = BitConverter.ToUInt32(h, 20);
+                                    uint uncompSize = BitConverter.ToUInt32(h, 24);
+                                    ushort nLen = BitConverter.ToUInt16(h, 28); // Длина имени
+                                    ushort eLen = BitConverter.ToUInt16(h, 30); // Длина доп. полей
+                                    ushort cLen = BitConverter.ToUInt16(h, 32); // Длина комментария файла
+                                    uint localHeaderOffset = BitConverter.ToUInt32(h, 42); // Смещение данных
+
+                                    // Читаем имя файла
+                                    byte[] nameBuf = new byte[nLen];
+                                    fs.Read(nameBuf, 0, nLen);
+                                    string fileName = Encoding.UTF8.GetString(nameBuf);
+
+                                    if (fileName.EndsWith($"{appVersion}.dll"))
+                                    {
+                                        // Извлекаем сырые значения из массива заголовка h
+                                        ushort dosTime = BitConverter.ToUInt16(h, 12);
+                                        ushort dosDate = BitConverter.ToUInt16(h, 14);
+
+                                        // Распаковываем биты даты
+                                        int year = ((dosDate & 0xFE00) >> 9) + 1980;
+                                        int month = (dosDate & 0x01E0) >> 5;
+                                        int day = dosDate & 0x1F;
+
+                                        // Распаковываем биты времени
+                                        int hour = (dosTime & 0xF800) >> 11;
+                                        int minute = (dosTime & 0x07E0) >> 5;
+                                        int second = (dosTime & 0x1F) * 2; // ZIP хранит секунды с шагом в 2 сек.
+
+                                        try
+                                        {
+                                            dt = new DateTime(year, month, day, hour, minute, second);
+                                            result.Add(new MetaData { Name = fileName, Date = dt });
+                                        }
+                                        catch
+                                        {
+                                        }
+                                    }
+                                    // Пропускаем доп. поля и комментарий файла, чтобы попасть на следующую запись
+                                    fs.Seek(eLen + cLen, SeekOrigin.Current);
                                 }
                             }
-                            catch
+                            finally
                             {
+                                fs?.Dispose();
                             }
+                        }
+                        catch
+                        {
                         }
                     }
 
-                    if (actual.Count > 0)
-                    {
-                        report += $" {Environment.NewLine}Версия актуальна:{Environment.NewLine}";
-                        foreach (string s in actual) { report += s + Environment.NewLine; }
-                    }
-                    if (toUpdate.Count > 0)
-                    {
-                        report += $" {Environment.NewLine}Есть новая версия:{Environment.NewLine}";
-                        foreach (string s in toUpdate) { report += s + Environment.NewLine; }
-                    }
-                    if (notInstalled.Count > 0)
-                    {
-                        report += $" {Environment.NewLine}Программа не установлена:{Environment.NewLine}";
-                        foreach (string s in notInstalled) { report += s + Environment.NewLine; }
-                    }
+
 
                 }
-                catch (System.Exception ex)
+                catch
                 {
-                    report = ex.Message;
                 }
 
-                lock (Lock)
-                {
-                    LoadedData = report;
-                }
+                return result;
             }
+        }
+
+        private class MetaData
+        {
+            public MetaData(Assembly assembly)
+            {
+
+                FileInfo fileInfo = new FileInfo(assembly.Location);
+
+                //полное имя сборки
+                Name = fileInfo.Name;
+
+                //устанавливаем время записи файла
+                Date = fileInfo.LastWriteTime;
+
+                //сначала устанавливаем место именно содержащую плагин папку
+                DirectoryInfo directory = fileInfo.Directory;
+                Path = directory.FullName;
+
+                //если плагин в бандл папке то местом выбираем папку с бандл папкой
+                while (directory != null && directory.FullName.Contains(".bundle")) directory = directory.Parent;
+                if (directory != null) Path = directory.FullName;
+            }
+            public MetaData()
+            {
+            }
+            public string Name { get; set; }
+            public DateTime Date { get; set; }
+            public string Path { get; set; }
         }
     }
 }
