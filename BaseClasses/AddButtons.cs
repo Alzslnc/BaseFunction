@@ -183,8 +183,37 @@ namespace BaseFunction
         public static Dictionary<string, string> Tabs = new Dictionary<string, string>();
         private static string SavePath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "RenameTabData.xml");
     }
-    public static class SpecialCommandsClass
+
+    public class StartEvents
     {
+        [CommandMethod("AboutAlzPlugins")]
+        public static void AboutAlzPlugins()
+        {
+            System.Windows.MessageBox.Show("Все вопросы можно направить по адресу alzslnc@gmail.com");
+        }
+
+        private bool Initialized { get; set; } = false;
+        private bool NeedUpdRibbonDetected { get; set; } = false;
+        public List<Button> Buttons { get; private set; } = new List<Button>();
+        /// <summary>
+        /// Инициализация
+        /// </summary>
+        public void Initialize()
+        {
+            if (Buttons.Count == 0) return;
+
+            RenameTabClass.RenameTabsOnLoad(Buttons);
+
+            CreateSpecialButtons(Buttons);
+
+            if (!Initialized)
+            {
+                Initialized = true;
+
+                AppCore.Idle += Application_Idle_RibbonUpdate;
+                AppCore.SystemVariableChanged += App_SysVarChanged_RibbonUpdate;
+            }
+        }
         public static void CreateSpecialButtons(List<Button> Buttons)
         {
 
@@ -197,60 +226,13 @@ namespace BaseFunction
 
             foreach (string ribTabName in ribTabNames)
             {
-                Buttons.Add(new Button(ribTabName, "О программе", new List<ButtonCommand> { new ButtonCommand("О программе", "О программе", "Описание"), }));
-                Buttons.Add(new Button(ribTabName, "О программе", new List<ButtonCommand> { new ButtonCommand("Проверить обновления", "Проверить обновления", "Показывает наличие обновлений."), }));
-                Buttons.Add(new Button(ribTabName, "О программе", new List<ButtonCommand> { new ButtonCommand("Открыть репозиторий", "Открыть репозиторий", "Место хранения последних версий программ."), }));
-                Buttons.Add(new Button(ribTabName, "О программе", new List<ButtonCommand> { new ButtonCommand("Открыть папку с плагинами", "Открыть папку с плагинами", "Открывает папку, откуда были запущены плагины."), }));
+                Buttons.Add(new Button(ribTabName, "О программе", new List<ButtonCommand> { new ButtonCommand("AboutAlzPlugins", "О программе", "Описание"), }));
+                Buttons.Add(new Button(ribTabName, "О программе", new List<ButtonCommand> { new ButtonCommand("CheckPluginVersion", "Проверить обновления", "Показывает наличие обновлений."), }));
+                Buttons.Add(new Button(ribTabName, "О программе", new List<ButtonCommand> { new ButtonCommand("OpenRepositoryPage", "Открыть репозиторий", "Место хранения последних версий программ."), }));
+                Buttons.Add(new Button(ribTabName, "О программе", new List<ButtonCommand> { new ButtonCommand("OpenPluginsFolder", "Открыть папку с плагинами", "Открывает папку, откуда были запущены плагины."), }));
             }
         }
-        public static bool SpecialCommands(string name)
-        {
-            if (name == "О программе")
-            {
-                System.Windows.MessageBox.Show("Все вопросы можно направить по адресу alzslnc@gmail.com");
-            }
-            else if (name == "Открыть репозиторий")
-            {
-                Process.Start(new ProcessStartInfo("https://github.com/Alzslnc/AcadPlugins") { UseShellExecute = true });
-            }
-            else if (name == "Открыть папку с плагинами")
-            {
-                ControlVersionClass.OpenFolder();
-            }
-            else if (name == "Проверить обновления")
-            {
-                ControlVersionClass.CheckVersion();
-            }
-            else return false;
-            return true;
-        }
-    }
-    internal class StartEvents
-    {
-        private bool Initialized { get; set; } = false;
-        private bool NeedUpdRibbonDetected { get; set; } = false;
-        public List<Button> Buttons { get; private set; } = new List<Button>();
-        /// <summary>
-        /// Инициализация
-        /// </summary>
-        public void Initialize()
-        {
-            if (Buttons.Count == 0) return;
 
-            GetVersion();
-
-            RenameTabClass.RenameTabsOnLoad(Buttons);
-
-            SpecialCommandsClass.CreateSpecialButtons(Buttons);
-
-            if (!Initialized)
-            {
-                Initialized = true;
-
-                AppCore.Idle += Application_Idle_RibbonUpdate;
-                AppCore.SystemVariableChanged += App_SysVarChanged_RibbonUpdate;
-            }
-        }
         public void Initialize(List<CommandGroup> groups)
         {
             foreach (CommandGroup group in groups)
@@ -276,24 +258,6 @@ namespace BaseFunction
             }
 
             Initialize();
-        }
-        private void GetVersion()
-        {
-            FileInfo fileInfo = new FileInfo(this.GetType().Assembly.Location);
-            ControlVersionClass.Load();
-
-            ControlVersionClass.VersionData versionData = ControlVersionClass.VersionDatas.FirstOrDefault(x => x.Name == fileInfo.FullName);
-            if (versionData == null)
-            {
-                versionData = new ControlVersionClass.VersionData() { Name = fileInfo.FullName };
-                ControlVersionClass.VersionDatas.Add(versionData);
-            }
-            versionData.Date = fileInfo.LastWriteTime;
-            DirectoryInfo directory = fileInfo.Directory;
-            while (directory.FullName.Contains(".bundle")) directory = directory.Parent;
-            if (directory != null && !ControlVersionClass.Folders.Contains(directory.FullName)) ControlVersionClass.Folders.Add(directory.FullName);
-
-            ControlVersionClass.Save();
         }
         private void App_SysVarChanged_RibbonUpdate(object sender, AppSystemVariableChangedEventArgs e)
         {
@@ -471,11 +435,8 @@ namespace BaseFunction
                 {
                     Autodesk.AutoCAD.Internal.Utils.SetFocusToDwgView();
 
-                    if (!SpecialCommandsClass.SpecialCommands(button.Name))
-                    {
-                        Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.
-                            SendStringToExecute(button.CommandParameter + " ", true, false, true);
-                    }
+                    Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.
+                             SendStringToExecute(button.CommandParameter + " ", true, false, true);
                 }
             }
 

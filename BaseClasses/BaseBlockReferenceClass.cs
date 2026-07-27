@@ -175,7 +175,7 @@ namespace BaseFunction
             }
             catch
             {
-                if (message) System.Windows.Forms.MessageBox.Show("Введенное название блока некорректно");
+                if (message) System.Windows.MessageBox.Show("Введенное название блока некорректно");
                 return false;
             }
         }

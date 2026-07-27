@@ -97,7 +97,7 @@ namespace BaseFunction
         }
     }
 
-   
+
     public class BoolToVisibleConverter : ConverterBase
     {
         public override object Convert(object value, Type targetType, object parameter, CultureInfo culture)
