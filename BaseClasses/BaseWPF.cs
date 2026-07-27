@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Input;
 using System.Windows.Markup;
@@ -19,14 +20,14 @@ namespace BaseFunction
             data = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
             return true;
-        }
+        }      
         public virtual bool Call([CallerMemberName] string name = "")
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
             return true;
-        }
+        }    
     }
-
+      
     public class RelayCommand : ICommand
     {
         public RelayCommand(Action<object> execute, Func<object, bool> canExecute = null)
@@ -157,15 +158,15 @@ namespace BaseFunction
     {
         public override object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            return value;
+           return value;
         }
         public override object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
             if (value == null) return Binding.DoNothing;
-
+            
             if (double.TryParse(value.ToString().Replace(",", "."), NumberStyles.Any, CultureInfo.InvariantCulture, out double result)) return result;
 
-            return Binding.DoNothing;
+            return value.ToString();    
         }
     }
     public class StringToIntConverter : ConverterBase
@@ -180,7 +181,7 @@ namespace BaseFunction
 
             if (int.TryParse(value.ToString(), NumberStyles.Any, CultureInfo.InvariantCulture, out int result)) return result;
 
-            return Binding.DoNothing;
+            return value.ToString();
         }
     }
     public class BaseDateConverter : ConverterBase
@@ -279,6 +280,93 @@ namespace BaseFunction
             }
 
             return "150";
+        }
+    }
+
+    public static class ValidationExtensions
+    {
+        // ----------------- СВОЙСТВО ДЛЯ DOUBLE -----------------
+        public static readonly DependencyProperty EnableDoubleValidationProperty =
+            DependencyProperty.RegisterAttached("EnableDoubleValidation", typeof(bool), typeof(ValidationExtensions),
+                new PropertyMetadata(false, (d, e) => RegisterHandler(d, e, IsDoubleValid)));
+
+        public static void SetEnableDoubleValidation(DependencyObject element, bool value) => element.SetValue(EnableDoubleValidationProperty, value);
+        public static bool GetEnableDoubleValidation(DependencyObject element) => (bool)element.GetValue(EnableDoubleValidationProperty);
+
+
+        // ----------------- СВОЙСТВО ДЛЯ INT -----------------
+        public static readonly DependencyProperty EnableIntValidationProperty =
+            DependencyProperty.RegisterAttached("EnableIntValidation", typeof(bool), typeof(ValidationExtensions),
+                new PropertyMetadata(false, (d, e) => RegisterHandler(d, e, IsIntValid)));
+
+        public static void SetEnableIntValidation(DependencyObject element, bool value) => element.SetValue(EnableIntValidationProperty, value);
+        public static bool GetEnableIntValidation(DependencyObject element) => (bool)element.GetValue(EnableIntValidationProperty);
+
+
+        // ----------------- ОБЩАЯ ИНФРАСТРУКТУРА (БЕЗ РЕФЛЕКСИИ) -----------------
+        private static void RegisterHandler(DependencyObject d, DependencyPropertyChangedEventArgs e, Func<string, bool> validationFunc)
+        {
+            if (d is TextBox textBox)
+            {
+                // Метод TextChanged требует строго определенный обработчик, 
+                // поэтому используем лямбду, привязанную к конкретной функции проверки через Tag
+                textBox.TextChanged -= TextBox_TextChanged;
+
+                if ((bool)e.NewValue)
+                {
+                    textBox.Tag = validationFunc; // Временно сохраняем нужный делегат проверки в элемент
+                    textBox.TextChanged += TextBox_TextChanged;
+                    RunValidation(textBox, validationFunc);
+                }
+                else
+                {
+                    Validation.ClearInvalid(BindingOperations.GetBindingExpression(textBox, TextBox.TextProperty));
+                }
+            }
+        }
+
+        private static void TextBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (sender is TextBox textBox && textBox.Tag is Func<string, bool> validationFunc)
+            {
+                RunValidation(textBox, validationFunc);
+            }
+        }
+
+        private static void RunValidation(TextBox textBox, Func<string, bool> validationFunc)
+        {
+            var bindingExpression = BindingOperations.GetBindingExpression(textBox, TextBox.TextProperty);
+            if (bindingExpression == null) return;
+
+            string input = textBox.Text?.Trim() ?? "";
+            if (string.IsNullOrEmpty(input))
+            {
+                Validation.ClearInvalid(bindingExpression);
+                return;
+            }
+
+            // Вызываем переданную функцию проверки
+            if (validationFunc(input))
+            {
+                Validation.ClearInvalid(bindingExpression);
+            }
+            else
+            {
+                var validationError = new ValidationError(new NamespaceErrorRule(), bindingExpression) { ErrorContent = "Ошибка ввода" };
+                Validation.MarkInvalid(bindingExpression, validationError);
+            }
+        }
+
+        // Простые и понятные предикаты проверки
+        private static bool IsDoubleValid(string input) =>
+            double.TryParse(input.Replace(",", "."), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out _);
+
+        private static bool IsIntValid(string input) =>
+            int.TryParse(input, System.Globalization.NumberStyles.Integer, System.Globalization.CultureInfo.InvariantCulture, out _);
+
+        private class NamespaceErrorRule : ValidationRule
+        {
+            public override ValidationResult Validate(object value, System.Globalization.CultureInfo cultureInfo) => ValidationResult.ValidResult;
         }
     }
 }
