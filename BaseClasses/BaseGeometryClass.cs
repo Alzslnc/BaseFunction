@@ -2,6 +2,7 @@
 using Autodesk.AutoCAD.Geometry;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 
 namespace BaseFunction
@@ -175,11 +176,90 @@ namespace BaseFunction
             }
             return result;
         }
+
+        /// <summary>
+        /// соединяет фрагменты кривой и возвращает список с результатом соединения. Возвращает false если произошла ошибка.
+        /// </summary>   
+        public static bool ConnectCurve(this List<Curve> fragments, out List<Curve> result)
+        {        
+            result = new List<Curve>();
+            List<Curve> curveToUnite = new List<Curve>();
+            List<Curve> uniteResult = new List<Curve>();
+
+            List<CurveData> curveDatas = new List<CurveData>();
+            Dictionary<int, List<CurveData>> hashes = new Dictionary<int, List<CurveData>>();
+
+            Extents3d extents = new Extents3d();
+
+            foreach (Curve curve in fragments)
+            {
+                //если кривая замкнута то сразу закидываем ее в рузультат
+                if (curve.Closed || curve.StartPoint.IsEqualTo(curve.EndPoint))
+                { 
+                    result.Add(curve);
+                    continue;
+                }
+                
+                if (AllowedCurveTypes.Contains(curve.GetType()))
+                {
+                    curveToUnite.Add(curve);
+                    extents.AddExtents(curve.GeometricExtents);
+                }   
+            }
+
+            if (curveToUnite.Count == 0) return true;
+
+            //вектор смещения к началу координат в плане, высоту не трогаем,
+            //обычно большинство элементов лежит в районе 0 и добавлять координату Z из за затесавшегося объекта с высотой не стоит
+            Vector3d vector = Point3d.Origin - extents.MaxPoint + (extents.MaxPoint - extents.MinPoint) / 2;
+            vector = new Vector3d(vector.X, vector.Y, 0);
+
+            foreach (Curve curve in curveToUnite)
+            {
+                //переносим к началу координат
+                curve.TransformBy(Matrix3d.Displacement(vector));
+
+                CurveData curveData = new CurveData(curve);
+                curveDatas.Add(curveData);
+                foreach (int i in curveData.Hashes)
+                {
+                    if (hashes.TryGetValue(i, out List<CurveData> datas)) datas.Add(curveData);
+                    else hashes.Add(i, new List<CurveData> { curveData });
+                }
+            }
+
+            ///основной метод обработки
+            ///
+
+            foreach (Curve curve in uniteResult)
+            {
+                //возвращаем на место
+                curve.TransformBy(Matrix3d.Displacement(-vector));
+                result.Add(curve);
+            }
+
+            return true;
+        }
+        private static readonly HashSet<Type> AllowedCurveTypes = new HashSet<Type>
+        {
+            typeof(Spline),
+            typeof(Polyline),
+            typeof(Polyline2d),
+            typeof(Polyline3d),
+            typeof(Ellipse),
+            typeof(Line),
+            typeof(Arc)
+        };
+
+
         /// <summary>
         /// соединяет фрагменты кривой и возвращает список с результатом соединения. Возвращает false если произошла ошибка.
         /// </summary>   
         public static bool ConnectCurve(this List<Curve> fragments, out List<Curve> result, double tolerance = 1e-6)
         {
+            
+
+
             Tolerance tl = new Tolerance(tolerance / 10, tolerance);
 
             result = new List<Curve>();
@@ -1090,17 +1170,53 @@ namespace BaseFunction
 
     }
 
+    enum CurveType
+    { 
+        IsSpline,
+        IsPolyline,
+        IsEllipse,
+        IsPolyline3d,
+        none,
+    }
+
+    class CurveData
+    {
+        public CurveData(Curve curve)
+        {
+            Curve = curve;
+
+            if (Curve is Spline) CurveType = CurveType.IsSpline;
+            else if (Curve is Polyline) CurveType = CurveType.IsPolyline;
+            else if (Curve is Ellipse) CurveType = CurveType.IsEllipse;
+            else if (Curve is Polyline3d) CurveType = CurveType.IsPolyline3d;
+            else CurveType = CurveType.none;
+
+            // Собираем множественные хэши для старта и конца
+            var startHashes = Point3dComparer.Precise.GetHashes(curve.StartPoint);
+            var endHashes = Point3dComparer.Precise.GetHashes(curve.EndPoint);
+
+            // Объединяем их в один плоский список уникальных хэшей
+            foreach (var h in startHashes) Hashes.Add(h);
+            foreach (var h in endHashes) Hashes.Add(h);
+
+            // Убираем дубликаты, если они возникли на стыках
+            Hashes = Hashes.Distinct().ToList();
+        }
+        public Curve Curve;
+        public List<int> Hashes = new List<int>();
+        public CurveType CurveType;
+    }
     public class Point3dComparer : IEqualityComparer<Point3d>
     {
         // Сирлтоны (готовые статические экземпляры) для частых допусков
-        public static readonly Point3dComparer Global = new Point3dComparer(1e-5);
+        public static readonly Point3dComparer Global = new Point3dComparer(1e-6);
         public static readonly Point3dComparer Precise = new Point3dComparer(1e-8);
 
         private readonly double _toleranceValue;
         private readonly int _decimals;
         private readonly Tolerance _tolerance; // Кэшируем объект AutoCAD один раз!
 
-        public Point3dComparer(double tolerance = 1e-5)
+        public Point3dComparer(double tolerance = 1e-6)
         {
             _toleranceValue = tolerance;
             _decimals = Math.Max(0, (int)Math.Ceiling(-Math.Log10(tolerance)));
@@ -1129,5 +1245,71 @@ namespace BaseFunction
                 return hash;
             }
         }
+        // Изменяем сигнатуру, чтобы возвращать все подходящие хэши для точки
+        public IEnumerable<int> GetHashes(Point3d obj)
+        {
+            // 1. Переводим координаты в пространство сетки (масштабируем)
+            double valX = obj.X / _toleranceValue;
+            double valY = obj.Y / _toleranceValue;
+            double valZ = obj.Z / _toleranceValue;
+
+            // 2. Базовые индексы текущей ячейки
+            long baseX = (long)Math.Floor(valX);
+            long baseY = (long)Math.Floor(valY);
+            long baseZ = (long)Math.Floor(valZ);
+
+            // 3. Списки индексов по каждой оси, которые затронуты (базовая + возможные соседние)
+            // В большинстве случаев тут будет только 1 элемент, на границах — 2.
+            var gridX = GetTargetIndices(valX, baseX);
+            var gridY = GetTargetIndices(valY, baseY);
+            var gridZ = GetTargetIndices(valZ, baseZ);
+
+            // 4. Комбинируем все найденные индексы (декартово произведение осей)
+            // Если точка в центре ячейки: цикл выполнится 1 раз (1*1*1)
+            // Если на стыке плоскостей/ребер/углов: от 2 до 8 раз
+            foreach (long x in gridX)
+            {
+                foreach (long y in gridY)
+                {
+                    foreach (long z in gridZ)
+                    {
+                        yield return CombineHash(x, y, z);
+                    }
+                }
+            }
+        }
+
+        // Вспомогательный метод определения: нужно ли захватить соседнюю ячейку
+        private IEnumerable<long> GetTargetIndices(double scaledVal, long baseIdx)
+        {
+            yield return baseIdx; // Базовая ячейка нужна всегда
+
+            double fraction = scaledVal - baseIdx; // Остаток от деления (положение внутри ячейки от 0.0 до 1.0)
+
+            // Если точка прижалась к ЛЕВОЙ границе текущей ячейки (ближе чем на 1 допуск)
+            if (fraction < 0.1)
+            {
+                yield return baseIdx - 1;
+            }
+            // Если точка прижалась к ПРАВОЙ границе текущей ячейки
+            else if (fraction > 0.9)
+            {
+                yield return baseIdx + 1;
+            }
+        }
+
+        // Выносим расчет хэша на основе целочисленных координат сетки
+        private int CombineHash(long x, long y, long z)
+        {
+            unchecked
+            {
+                int hash = 17;
+                hash = hash * 23 + x.GetHashCode();
+                hash = hash * 23 + y.GetHashCode();
+                hash = hash * 23 + z.GetHashCode();
+                return hash;
+            }
+        }
+
     }
 }
