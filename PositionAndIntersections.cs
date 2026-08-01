@@ -8,12 +8,49 @@ namespace BaseFunction
 {
     public static class PositionAndIntersections
     {
+        public static int GetInnerLevel(this Curve curve, List<Curve> curves)
+        {
+            int result = 0;
+
+            //ищем точку изнутри контура
+            //что бы убрать возможность получить совпадение
+            Point3d? center = curve.GetCenterPoint();
+            if (center == null) return -1;
+
+            //ищем уровень вложения
+            foreach (Curve c in curves)
+            {
+                if (curve == c) continue;
+
+                if (center.Value.GetPositionType(c) == PositionType.inner) result++;
+            }
+
+            return result;
+        }
+
+        private static Point3d? GetCenterPoint(this Curve curve)
+        {
+            Point3d onCurve = curve.GetPointAtParameter(0.5);
+
+            Vector3d vector = curve.GetFirstDerivative(onCurve);
+
+            vector = new Vector3d(-vector.Y, vector.X, vector.Z);
+
+            Point3d offset = onCurve + vector * 0.00004;
+
+            PositionType positionType = offset.GetPositionType(curve);
+            if (positionType == PositionType.inner) return offset;
+            else if (positionType == PositionType.outer) return onCurve - vector * 0.00004;
+
+            return null;
+        }
+
         public static int GetInnerLevel(this Curve polyline, List<Curve> polylines, bool simple = false, bool onBoundInclude = false, bool centerPoint = false, bool onBoundIsZero = false, bool listChech = false)
         {
             Dictionary<Curve, int> iLvls = new Dictionary<Curve, int>();
             if (listChech)
             {
-                foreach (Curve c in polylines) iLvls.Add(c, c.GetInnerLevel(polylines));
+                foreach (Curve c in polylines) iLvls.Add(c, c.GetInnerLevel(polylines, listChech : false));
             }
             int maxIlvl = -1;
             int j = 0;
@@ -307,8 +344,12 @@ namespace BaseFunction
                 else if (obj is Curve) curve = obj as Curve;
                 if (curve != null && curve.IsAcadCurve())
                 {
-                    //проецируем кривую на плоскость XY
-                    curve = curve.GetProjectedCurve(new Plane(), Vector3d.ZAxis);
+                    try
+                    {
+                        //проецируем кривую на плоскость XY
+                        curve = curve.GetProjectedCurve(new Plane(), Vector3d.ZAxis);
+                    }
+                    catch { }
                     //если длина спроецированной кривой равна нулю то пропускаем ее 
                     if (curve.GetLength() == 0) continue;
                     //определяем находится ли точка на линии   
@@ -523,9 +564,9 @@ namespace BaseFunction
 
             bool boolResult;
 
-            boolResult = inner.ConnectCurve(out inner);
+            boolResult = inner.ConnectCurve(out inner, true, true);
 
-            if (boolResult) boolResult = outer.ConnectCurve(out outer);
+            if (boolResult) boolResult = outer.ConnectCurve(out outer, true, true);
 
             if (boolResult)
             {

@@ -180,86 +180,8 @@ namespace BaseFunction
         /// <summary>
         /// соединяет фрагменты кривой и возвращает список с результатом соединения. Возвращает false если произошла ошибка.
         /// </summary>   
-        public static bool ConnectCurve(this List<Curve> fragments, out List<Curve> result)
-        {        
-            result = new List<Curve>();
-            List<Curve> curveToUnite = new List<Curve>();
-            List<Curve> uniteResult = new List<Curve>();
-
-            List<CurveData> curveDatas = new List<CurveData>();
-            Dictionary<int, List<CurveData>> hashes = new Dictionary<int, List<CurveData>>();
-
-            Extents3d extents = new Extents3d();
-
-            foreach (Curve curve in fragments)
-            {
-                //если кривая замкнута то сразу закидываем ее в рузультат
-                if (curve.Closed || curve.StartPoint.IsEqualTo(curve.EndPoint))
-                { 
-                    result.Add(curve);
-                    continue;
-                }
-                
-                if (AllowedCurveTypes.Contains(curve.GetType()))
-                {
-                    curveToUnite.Add(curve);
-                    extents.AddExtents(curve.GeometricExtents);
-                }   
-            }
-
-            if (curveToUnite.Count == 0) return true;
-
-            //вектор смещения к началу координат в плане, высоту не трогаем,
-            //обычно большинство элементов лежит в районе 0 и добавлять координату Z из за затесавшегося объекта с высотой не стоит
-            Vector3d vector = Point3d.Origin - extents.MaxPoint + (extents.MaxPoint - extents.MinPoint) / 2;
-            vector = new Vector3d(vector.X, vector.Y, 0);
-
-            foreach (Curve curve in curveToUnite)
-            {
-                //переносим к началу координат
-                curve.TransformBy(Matrix3d.Displacement(vector));
-
-                CurveData curveData = new CurveData(curve);
-                curveDatas.Add(curveData);
-                foreach (int i in curveData.Hashes)
-                {
-                    if (hashes.TryGetValue(i, out List<CurveData> datas)) datas.Add(curveData);
-                    else hashes.Add(i, new List<CurveData> { curveData });
-                }
-            }
-
-            ///основной метод обработки
-            ///
-
-            foreach (Curve curve in uniteResult)
-            {
-                //возвращаем на место
-                curve.TransformBy(Matrix3d.Displacement(-vector));
-                result.Add(curve);
-            }
-
-            return true;
-        }
-        private static readonly HashSet<Type> AllowedCurveTypes = new HashSet<Type>
-        {
-            typeof(Spline),
-            typeof(Polyline),
-            typeof(Polyline2d),
-            typeof(Polyline3d),
-            typeof(Ellipse),
-            typeof(Line),
-            typeof(Arc)
-        };
-
-
-        /// <summary>
-        /// соединяет фрагменты кривой и возвращает список с результатом соединения. Возвращает false если произошла ошибка.
-        /// </summary>   
         public static bool ConnectCurve(this List<Curve> fragments, out List<Curve> result, double tolerance = 1e-6)
         {
-            
-
-
             Tolerance tl = new Tolerance(tolerance / 10, tolerance);
 
             result = new List<Curve>();
@@ -1168,6 +1090,320 @@ namespace BaseFunction
         }
 
 
+        #region connectCurve
+        /// <summary>
+        /// Соединяет фрагменты кривой и возвращает список с результатом соединения. Возвращает false и пусотой список если произошла ошибка.
+        /// Исходный список не трогается.
+        /// </summary>   
+        public static bool ConnectCurve(this List<Curve> fragments, out List<Curve> result, bool project, bool disposeFragments = false)
+        {
+            bool boolResult = true;
+
+            result = new List<Curve>();
+            List<Curve> curveToUnite = new List<Curve>();
+            List<Curve> uniteResult = new List<Curve>();
+
+            List<CurveData> curveDatas = new List<CurveData>();
+            Dictionary<int, List<CurveData>> hashes = new Dictionary<int, List<CurveData>>();
+
+            Extents3d extents = new Extents3d();
+
+            using (Plane plane = new Plane())
+            {
+                foreach (Curve curve in fragments)
+                {
+                    //Если кривая замкнута то сразу закидываем ее в рузультат
+                    if (curve.Closed || curve.StartPoint.IsEqualTo(curve.EndPoint))
+                    {
+                        result.Add(curve.Clone() as Curve);
+                        continue;
+                    }
+
+                    if (AllowedCurveTypes.Contains(curve.GetType()))
+                    {
+                        Curve toUnite = project
+                            ? curve.GetOrthoProjectedCurve(plane)
+                            : curve.Clone() as Curve;
+
+                        curveToUnite.Add(toUnite);
+                        extents.AddExtents(toUnite.GeometricExtents);
+                    }
+                }
+            }
+
+            if (curveToUnite.Count == 0) return true;
+
+            //Вектор смещения к началу координат в плане, высоту не трогаем,
+            //обычно большинство элементов лежит в районе 0 и добавлять координату Z из за затесавшегося объекта с высотой не стоит
+            Point3d center = extents.MaxPoint + (extents.MaxPoint - extents.MinPoint) / 2;
+            Vector3d vector = Point3d.Origin - center;
+            vector = new Vector3d(vector.X, vector.Y, 0);
+
+            foreach (Curve curve in curveToUnite)
+            {
+                //Переносим к началу координат
+                curve.TransformBy(Matrix3d.Displacement(vector));
+
+                CurveData curveData = new CurveData(curve);
+                curveDatas.Add(curveData);
+                foreach (int i in curveData.Hashes)
+                {
+                    if (hashes.TryGetValue(i, out List<CurveData> datas)) datas.Add(curveData);
+                    else hashes.Add(i, new List<CurveData> { curveData });
+                }
+            }
+
+            //Основная работа метода
+            bool splineExist = true;
+            while (boolResult && curveDatas.Count > 0)
+            {
+                CurveData first = null;
+
+                //Если возможно есть объекты, которые можно привести к сплайну
+                if (splineExist)
+                {
+                    //Пробуем найти сплайн
+                    first = curveDatas.FirstOrDefault(x => x.CurveType == CurveType.IsSpline || x.CurveType == CurveType.IsEllipse || x.CurveType == CurveType.IsPolyline3d);
+                    //Если не нашли обозначаем что сплайнов в нашем списке нет
+                    if (first == null) splineExist = false;
+                    else
+                    {
+                        //если нашли то приводим к сплайну
+                        if (first.CurveType != CurveType.IsSpline)
+                        {
+                            Spline spline = first.Curve.Spline;
+                            first.Curve?.Dispose();
+                            first.Curve = spline;
+                        }
+                    }
+
+                }
+
+                //Если сплайнов нет то пробуем найти полилинию
+                if (!splineExist) first = curveDatas.FirstOrDefault(x => x.CurveType == CurveType.IsPolyline);
+
+                //Если не нашли то в списке остались только отрезки и дуги. Приводим к полилинии
+                if (first == null)
+                {
+                    first = curveDatas[0];
+                    Polyline polyline = new Polyline(2);
+                    if (first.Curve is Arc arc)
+                    {
+                        polyline.AddVertexAt(0, new Point2d(arc.StartPoint.X, arc.StartPoint.Y), arc.GetArcBulge(), 0, 0);
+                        polyline.AddVertexAt(1, new Point2d(arc.EndPoint.X, arc.EndPoint.Y), 0, 0, 0);
+                        polyline.Normal = arc.Normal;
+
+                    }
+                    else if (first.Curve is Line line)
+                    {
+                        polyline.AddVertexAt(0, new Point2d(line.StartPoint.X, line.StartPoint.Y), 0, 0, 0);
+                        polyline.AddVertexAt(1, new Point2d(line.EndPoint.X, line.EndPoint.Y), 0, 0, 0);
+                        polyline.Normal = line.Normal;
+                    }
+                    else
+                    {
+                        boolResult = false;
+                        break;
+                    }
+                    first.Curve.Dispose();
+                    first.Curve = polyline;
+                }
+
+                //На всякий случай
+                if (first == null)
+                {
+                    boolResult = false;
+                    break;
+                }
+
+                //Удаляем из списка выбранный первым элемент
+                curveDatas.Remove(first);
+
+                //Удаляем его из хэша
+                RemoveData(hashes, first);
+
+                //пересчитываем хэш если вдруг что-то изменилось при преобразовании
+                first = new CurveData(first.Curve);
+
+                //ищем присоединенные элементы
+                while (boolResult && curveDatas.Count > 0)
+                {
+                    //ищем совпадения
+                    List<int> interscts = first.Hashes.Intersect(hashes.Keys).ToList();
+                    if (interscts.Count == 0) break;
+
+                    //ищем совпадающий элемент
+                    if (hashes.TryGetValue(interscts[0], out List<CurveData> datas) && datas.Count > 0)
+                    {
+                        CurveData curveData = null;
+
+
+                        if (datas.Count == 1)
+                        {
+                            // Развилки нет — забираем единственный элемент без расчетов
+                            curveData = datas[0];
+                        }
+                        else
+                        {
+                            // НАЙДЕНА РАЗВИЛКА! Выбираем магистральное направление
+                            try
+                            {
+                                // 1. Находим точную координату точки стыка
+                                Point3d junctionPoint = GetJunctionPoint(first.Curve, datas[0].Curve);
+
+                                // 2. Получаем вектор направления нашей растущей кривой (смотрит НАРУЖУ)
+                                Vector3d currentDir = GetCurveTangent(first.Curve, junctionPoint, lookOut: true);
+
+                                double minAngle = double.MaxValue;
+
+                                // 3. Сканируем кандидатов
+                                foreach (CurveData candidate in datas)
+                                {
+                                    // Вектор кандидата (смотрит ВНУТРЬ него)
+                                    Vector3d candidateDir = GetCurveTangent(candidate.Curve, junctionPoint, lookOut: false);
+
+                                    // Абсолютный угол между направлениями (0 ... PI)
+                                    double angle = currentDir.GetAngleTo(candidateDir);
+
+                                    if (angle < minAngle)
+                                    {
+                                        minAngle = angle;
+                                        curveData = candidate;
+                                    }
+                                }
+                            }
+                            catch
+                            {
+                                // Если на каком-то сложном сплайне расчет геометрии упал —
+                                // берем первый попавшийся элемент как фолбэк (как и было раньше)
+                                curveData = datas[0];
+                            }
+                        }
+
+                        try
+                        {
+                            //присоединияем
+                            first.Curve.JoinEntity(datas[0].Curve);
+                            //очищаем присоединенный элемент
+                            datas[0].Curve?.Dispose();
+                            //удаляем присоединенный элемент из списка
+                            curveDatas.Remove(datas[0]);
+                            //удаляем присоединенный элемент из хэша
+                            RemoveData(hashes, datas[0]);
+                            //пересоздаем первый элемент что бы пересчитать кэш с учетом новых границ
+                            first = new CurveData(first.Curve);
+                            continue;
+                        }
+                        catch
+                        {
+                        }
+                    }
+
+
+                    boolResult = false;
+                    break;
+                }
+
+
+                //Добавляем в список результа объединения
+                uniteResult.Add(first.Curve);
+            }
+
+            if (disposeFragments)
+            {
+                foreach (Curve curve in fragments) { curve?.Dispose(); }
+            }
+
+            //если все прошло нормально то возвращаем результат на место и переносим его в результирующий список
+            if (boolResult)
+            {
+                foreach (Curve curve in uniteResult)
+                {
+                    curve.TransformBy(Matrix3d.Displacement(-vector));
+                    result.Add(curve);
+                }
+            }
+            else
+            {
+
+                // Очищаем то, что успели собрать в финальный пул
+                foreach (Curve curve in uniteResult) { curve?.Dispose(); }
+                foreach (Curve curve in result) { curve?.Dispose(); }
+
+                // Очищаем то, что осталось в обработке и НЕ было уничтожено/конвертировано
+                foreach (CurveData data in curveDatas)
+                {
+                    data.Curve?.Dispose();
+                }
+            }
+
+            return boolResult;
+        }
+        private static void RemoveData(Dictionary<int, List<CurveData>> hashes, CurveData data)
+        {
+            foreach (int hash in data.Hashes)
+            {
+                if (hashes.TryGetValue(hash, out List<CurveData> datas))
+                {
+                    datas.Remove(data);
+                    if (datas.Count == 0)
+                    {
+                        hashes.Remove(hash);
+                    }
+                }
+            }
+        }
+        /// <summary>
+        /// Возвращает вектор касательной кривой в заданной точке, направленный внутрь или наружу объекта.
+        /// </summary>
+        private static Vector3d GetCurveTangent(Curve curve, Point3d point, bool lookOut)
+        {
+            // Получаем внутренний параметр AutoCAD для этой точки
+            double param = curve.GetParameterAtPoint(point);
+
+            // Берем первую производную (вектор касательной в направлении роста параметра кривой)
+            Vector3d tangent = curve.GetFirstDerivative(param).GetNormal();
+
+            // AutoCAD всегда считает производную от StartParam к EndParam. 
+            // Нам нужно сопоставить её с направлением движения.
+            bool isStartPoint = point.IsEqualTo(curve.StartPoint);
+
+            if (lookOut)
+            {
+                // Если смотрим НАРУЖУ из кривой:
+                // Из стартовой точки вектор должен смотреть против хода параметра, из конечной — по ходу.
+                return isStartPoint ? -tangent : tangent;
+            }
+            else
+            {
+                // Если смотрим ВНУТРЬ кривой-кандидата:
+                // Входя в стартовую точку, движемся по ходу параметра. Входя в конечную — против.
+                return isStartPoint ? tangent : -tangent;
+            }
+        }
+
+        /// <summary>
+        /// Находит точку соприкосновения двух кривых (сравнивает их концы).
+        /// </summary>
+        private static Point3d GetJunctionPoint(Curve c1, Curve c2)
+        {
+            if (c1.StartPoint.IsEqualTo(c2.StartPoint) || c1.StartPoint.IsEqualTo(c2.EndPoint))
+                return c1.StartPoint;
+
+            return c1.EndPoint;
+        }
+
+        private static readonly HashSet<Type> AllowedCurveTypes = new HashSet<Type>
+        {
+            typeof(Spline),
+            typeof(Polyline),
+            typeof(Polyline2d),
+            typeof(Polyline3d),
+            typeof(Ellipse),
+            typeof(Line),
+            typeof(Arc)
+        };
+        #endregion
     }
 
     enum CurveType
@@ -1175,10 +1411,9 @@ namespace BaseFunction
         IsSpline,
         IsPolyline,
         IsEllipse,
-        IsPolyline3d,
+        IsPolyline3d,    
         none,
     }
-
     class CurveData
     {
         public CurveData(Curve curve)
@@ -1186,6 +1421,14 @@ namespace BaseFunction
             Curve = curve;
 
             if (Curve is Spline) CurveType = CurveType.IsSpline;
+            else if (Curve is Polyline2d polyline2D)
+            {
+                Polyline converted = new Polyline();
+                converted.ConvertFrom(polyline2D, false);
+                polyline2D?.Dispose();
+                Curve = converted;
+                CurveType = CurveType.IsPolyline;
+            }
             else if (Curve is Polyline) CurveType = CurveType.IsPolyline;
             else if (Curve is Ellipse) CurveType = CurveType.IsEllipse;
             else if (Curve is Polyline3d) CurveType = CurveType.IsPolyline3d;
@@ -1209,14 +1452,14 @@ namespace BaseFunction
     public class Point3dComparer : IEqualityComparer<Point3d>
     {
         // Сирлтоны (готовые статические экземпляры) для частых допусков
-        public static readonly Point3dComparer Global = new Point3dComparer(1e-6);
-        public static readonly Point3dComparer Precise = new Point3dComparer(1e-8);
+        public static readonly Point3dComparer Global = new Point3dComparer(Tolerance.Global.EqualPoint);
+        public static readonly Point3dComparer Precise = new Point3dComparer(1e-7);
 
         private readonly double _toleranceValue;
         private readonly int _decimals;
         private readonly Tolerance _tolerance; // Кэшируем объект AutoCAD один раз!
 
-        public Point3dComparer(double tolerance = 1e-6)
+        public Point3dComparer(double tolerance)
         {
             _toleranceValue = tolerance;
             _decimals = Math.Max(0, (int)Math.Ceiling(-Math.Log10(tolerance)));
