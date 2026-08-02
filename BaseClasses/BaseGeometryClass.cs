@@ -1259,12 +1259,16 @@ namespace BaseFunction
                                 // 3. Сканируем кандидатов
                                 foreach (CurveData candidate in datas)
                                 {
-                                    // Вектор кандидата (смотрит ВНУТРЬ него)
-                                    Vector3d candidateDir = GetCurveTangent(candidate.Curve, junctionPoint, lookOut: false);
+                                    // Вектор кандидата (тоже смотрит НАРУЖУ из точки стыка в свое тело)
+                                    Vector3d candidateDir = GetCurveTangent(candidate.Curve, junctionPoint, lookOut: true);
 
-                                    // Абсолютный угол между направлениями (0 ... PI)
-                                    double angle = currentDir.GetAngleTo(candidateDir);
-
+                                    // ИСПРАВЛЕНО: Считаем честный плоский угол от 0 до 2*PI против часовой стрелки
+                                    double angle = currentDir.GetAngleTo(candidateDir, Vector3d.ZAxis);
+                                                                       
+                                    // Ищем кандидата с минимальным плоским углом.
+                                    // Это гарантирует, что на развилке мы всегда будем выбирать 
+                                    // самый "крайний" поворот в одну сторону (например, строго направо),
+                                    // аккуратно "отслаивая" и закрывая текущую петлю контура.
                                     if (angle < minAngle)
                                     {
                                         minAngle = angle;
@@ -1283,13 +1287,13 @@ namespace BaseFunction
                         try
                         {
                             //присоединияем
-                            first.Curve.JoinEntity(datas[0].Curve);
+                            first.Curve.JoinEntity(curveData.Curve);
                             //очищаем присоединенный элемент
-                            datas[0].Curve?.Dispose();
+                            curveData.Curve?.Dispose();
                             //удаляем присоединенный элемент из списка
-                            curveDatas.Remove(datas[0]);
+                            curveDatas.Remove(curveData);
                             //удаляем присоединенный элемент из хэша
-                            RemoveData(hashes, datas[0]);
+                            RemoveData(hashes, curveData);
                             //пересоздаем первый элемент что бы пересчитать кэш с учетом новых границ
                             first = new CurveData(first.Curve);
                             continue;

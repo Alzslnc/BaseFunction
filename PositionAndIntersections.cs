@@ -12,15 +12,31 @@ namespace BaseFunction
         {
             int result = 0;
 
-            //ищем точку изнутри контура
-            //что бы убрать возможность получить совпадение
-            Point3d? center = curve.GetCenterPoint();
-            if (center == null) return -1;
+            if (curves == null || curves.Count == 0) return result;
 
-            //ищем уровень вложения
+            // Быстрая проверка
+            // Если в списке всего 1 элемент и этот элемент — наша кривая, 
+            // то проверять заведомо некого, и мы мгновенно выходим
+            if (curves.Count == 1 && curves[0] == curve) return result;
+
+            // Точка центра инициализируется как null и вычисляется ЛЕНИВО (только при реальной необходимости)
+            Point3d? center = null;
+
+            // Ищем уровень вложения
             foreach (Curve c in curves)
             {
                 if (curve == c) continue;
+
+                // Быстрая отсечка по площади
+                if (curve.Area > c.Area) continue;
+
+                // Если мы дошли досюда, значит перед нами реальный кандидат на родителя.
+                // Вот теперь самое время ОДИН РАЗ вычислить тяжелую точку центра, если она еще не создана.
+                if (center == null)
+                {
+                    center = curve.GetCenterPoint();
+                    if (center == null) return -1; // Фолбэк при ошибке геометрии
+                }
 
                 if (center.Value.GetPositionType(c) == PositionType.inner) result++;
             }
