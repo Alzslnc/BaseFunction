@@ -11,6 +11,7 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Interop;
 
 namespace BaseFunction
 {
@@ -30,7 +31,9 @@ namespace BaseFunction
             {
                 gitDatas = GetGitDatasProcess();
 
-                System.Windows.MessageBox.Show(GetResultString(datas, gitDatas));
+                Autodesk.AutoCAD.ApplicationServices.Application.ShowModalWindow(CreateWindow(GetResultString(datas, gitDatas), true));
+
+                //System.Windows.MessageBox.Show(GetResultString(datas, gitDatas));
             }
             catch (System.Exception ex)
             {
@@ -113,7 +116,7 @@ namespace BaseFunction
                 string displayName2 = System.IO.Path.GetFileName(gitPlugin.Name);
                 // Ищем локальный плагин по совпадению имени файла
                 var localPlugin = datas.FirstOrDefault(x => x.Name.Equals(displayName2, StringComparison.OrdinalIgnoreCase));
-                              
+
                 if (localPlugin == null)
                 {
                     notInstalled.Add($" - {displayName}");
@@ -189,16 +192,81 @@ namespace BaseFunction
 
             return result;
         }
-        private static Window CreateWindow()
+        private static Window CreateWindow(string text = "", bool okButton = false)
         {
+            // 1. Проверяем, используется ли дефолтный текст
+            bool isDefaultText = string.IsNullOrEmpty(text);
+
+            // 2. Создаем сетку для разметки
             Grid rootGrid = new Grid();
+            rootGrid.RowDefinitions.Add(new RowDefinition() { Height = new GridLength(1, GridUnitType.Star) });
+            rootGrid.RowDefinitions.Add(new RowDefinition() { Height = GridLength.Auto });
 
-            TextBlock textBlock = new TextBlock() { Margin = new Thickness(5), Text = "Идет проверка данных", VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Center, Height = 20 };
-
+            // 3. Настраиваем текстовый блок с динамическим выравниванием
+            TextBlock textBlock = new TextBlock()
+            {
+                Text = isDefaultText ? "Идет проверка данных" : text,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = isDefaultText ? HorizontalAlignment.Center : HorizontalAlignment.Left,
+                TextWrapping = TextWrapping.NoWrap, // Строка никогда не переносится принудительно
+                Margin = new Thickness(25, 20, 25, okButton ? 10 : 20) // Увеличили боковые отступы
+            };
+            Grid.SetRow(textBlock, 0);
             rootGrid.Children.Add(textBlock);
 
-            return new Window { WindowStyle = WindowStyle.None, WindowStartupLocation = WindowStartupLocation.CenterOwner, Content = rootGrid, Width = 400, Height = 200, MaxHeight = 200, MaxWidth = 400 };
+            // 4. Создаем окно с минимальными размерами и перетаскиванием
+            Window window = new Window
+            {
+                WindowStyle = WindowStyle.None,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                SizeToContent = SizeToContent.WidthAndHeight, // Окно растет вслед за контентом
+                ResizeMode = ResizeMode.NoResize,
+                MinWidth = 320,   // Базовая эстетичная ширина для короткого текста
+                MinHeight = 120,  // Базовая высота
+                Content = rootGrid
+            };
+
+            // Перетаскивание окна за любую точку
+            window.MouseLeftButtonDown += (s, e) =>
+            {
+                if (e.ChangedButton == System.Windows.Input.MouseButton.Left)
+                {
+                    window.DragMove();
+                }
+            };
+
+            // 5. Добавляем кнопку ОК
+            if (okButton)
+            {
+                System.Windows.Controls.Button btnOk = new System.Windows.Controls.Button()
+                {
+                    Content = "OK",
+                    Width = 85,
+                    Height = 25,
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                    Margin = new Thickness(0, 10, 25, 15) // Выровняли отступ с текстом (25px справа)
+                };
+                btnOk.Click += (s, e) => window.Close();
+
+                Grid.SetRow(btnOk, 1);
+                rootGrid.Children.Add(btnOk);
+            }
+
+            // 6. Привязываем к главному окну AutoCAD через Win32 Handle
+            try
+            {
+                IntPtr acadMainWindowHandle = Autodesk.AutoCAD.ApplicationServices.Application.MainWindow.Handle;
+                WindowInteropHelper helper = new WindowInteropHelper(window);
+                helper.Owner = acadMainWindowHandle;
+            }
+            catch
+            {
+                window.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            }
+
+            return window;
         }
+
         private static List<MetaData> GetGitData()
         {
             List<MetaData> result = new List<MetaData>();

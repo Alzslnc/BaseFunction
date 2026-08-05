@@ -85,10 +85,11 @@ namespace BaseFunction
         /// <returns></returns>
         public static bool EntytyReplace(this Entity ent, bool thread = true)
         {
+            Entity e = null;
             try
             {
                 //копируем объект, двигаться будет копия
-                Entity e = ent.Clone() as Entity;
+                e = ent.Clone() as Entity;
                 //точка объекта, для реплейса
                 Point3d point1;
                 //вообще не помню зачем тут фолс, может быть был еще один какой-то тип, ни на что не влияет
@@ -105,7 +106,7 @@ namespace BaseFunction
                 else if (e is MLeader ml) { point1 = ml.GetFirstVertex(0); }
                 else if (e is BlockReference br) { point1 = br.Position; }
                 //если это не один из вышевыбранных типор то удаляем клон и возвращаем фолс
-                else { e.Dispose(); return false; }
+                else { return false; }
                 //запускаем перенос
                 DrawJigClassEntityInsertAndReplace ijc = new DrawJigClassEntityInsertAndReplace();
 
@@ -129,8 +130,7 @@ namespace BaseFunction
                     else if (e is Curve cu) { point2 = cu.StartPoint; }
                     else if (e is MLeader ml) { point2 = ml.GetFirstVertex(0); }
                     else if (e is BlockReference br) { point2 = br.Position; }
-                    //удаляем клон
-                    e.Dispose();
+              
                     //переносим объект 
                     //переменная для определения открыт ли объект на чтение
                     bool read = false;
@@ -148,11 +148,14 @@ namespace BaseFunction
                         ent.DowngradeOpen();
                     }
                     return true;
-                }
-                e.Dispose();
+                }           
             }
             catch
             { }
+            finally
+            {
+                e?.Dispose();
+            }
             return false;
         }
         private class DrawJigClassEntityInsertAndReplace : DrawJig
