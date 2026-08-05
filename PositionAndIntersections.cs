@@ -38,7 +38,7 @@ namespace BaseFunction
                     if (center == null) return -1; // Фолбэк при ошибке геометрии
                 }
 
-                if (center.Value.GetPositionType(c) == PositionType.inner) result++;
+                if (center.Value.GetPositionTypeOptimized(c) == PositionType.inner) result++;
             }
 
             return result;
@@ -54,7 +54,7 @@ namespace BaseFunction
 
             Point3d offset = onCurve + vector * 0.00004;
 
-            PositionType positionType = offset.GetPositionType(curve);
+            PositionType positionType = offset.GetPositionTypeOptimized(curve);
             if (positionType == PositionType.inner) return offset;
             else if (positionType == PositionType.outer) return onCurve - vector * 0.00004;
 
@@ -444,6 +444,67 @@ namespace BaseFunction
             if (per.Average() > 0.5) return PositionType.inner;
             return PositionType.outer;
         }
+        private static List<Point3d> IntersectPointsOnVector(Point3d point, Vector3d direct, List<Curve> curves)
+        {
+            //список точек пересечения
+            List<Point3d> points = new List<Point3d>();
+            //создаем луч из точки по выбранному вектору и геометрическую кривую из луча
+            using (Ray ray = new Ray() { BasePoint = point, UnitDir = direct })
+            using (Curve3d ray3d = ray.GetGeCurve())
+            {
+                try
+                {
+                    //проходим по всем кривым и ищем пересечения    
+                    foreach (Curve curve in curves)
+                    {
+                        if (curve is Circle circle)
+                        {
+                            double distance = circle.Center.Z0().DistanceTo(point);
+                            if (distance < circle.Radius) points.Add(Point3d.Origin);
+                        }
+                        else
+                        {
+                            //список точек пересечения с конкретной кривой
+                            List<Point3d> vpoints = new List<Point3d>();
+                            //получаем геометрическую кривую и пересечения этой кривой и луча
+                            using (Curve3d curve3d = curve.GetGeCurve())
+                            using (CurveCurveIntersector3d cci = new CurveCurveIntersector3d(ray3d, curve3d, Vector3d.ZAxis))
+                            {
+                                //если пересечения есть
+                                if (cci.NumberOfIntersectionPoints > 0)
+                                {
+                                    for (int i = 0; i < cci.NumberOfIntersectionPoints; i++)
+                                    {
+                                        //если пересечение проходящее то добавляем его в список
+                                        if (cci.IsTransversal(i))
+                                        {
+                                            vpoints.Add(cci.GetIntersectionPoint(i));
+                                        }
+                                    }
+                                    //если кривых несколько то не добавляем дублирующиеся точки
+                                    //(что бы обойти задваивание пересечений в точке начала одной кривой и конца другой)
+                                    if (curves.Count > 1)
+                                    {
+                                        //проходим по точкам и удаляем существующие в общем списке
+                                        for (int i = vpoints.Count - 1; i > -1; i--)
+                                        {
+                                            if (points.Contains(vpoints[i])) vpoints.RemoveAt(i);
+                                        }
+                                    }
+                                    //добавляем точки пересечения с этой кривой в общий список
+                                    points.AddRange(vpoints);
+                                }
+                            }
+                        }
+                    }
+                }
+                catch
+                {
+                    return null;
+                }
+            }
+            return points;
+        }
         /// <summary>
         /// разделяет замкнутую кривую другой замкнутой кривой и возвращает получившиеся фрагменты
         /// </summary>
@@ -609,66 +670,245 @@ namespace BaseFunction
             //ошибка определения
             fault = 0
         }
-        private static List<Point3d> IntersectPointsOnVector(Point3d point, Vector3d direct, List<Curve> curves)
+
+        /// <summary>
+        /// Перегрузка для одной кривой. Автоматически перенаправляет вызов в основной метод.
+        /// </summary>
+        public static PositionType GetPositionTypeOptimized(
+            this Point3d point,
+            Curve curve,
+            bool skipBoundaryCheck = false,
+            Tolerance? customTolerance = null)
         {
-            //список точек пересечения
-            List<Point3d> points = new List<Point3d>();
-            //создаем луч из точки по выбранному вектору и геометрическую кривую из луча
-            using (Ray ray = new Ray() { BasePoint = point, UnitDir = direct })
-            using (Curve3d ray3d = ray.GetGeCurve())
+            if (curve == null || curve.IsDisposed) return PositionType.fault;
+            return point.GetPositionTypeOptimized(new List<Curve> { curve }, skipBoundaryCheck, customTolerance);
+        }
+        /// <summary>
+        /// Высокооптимизированное определение положения точки относительно фрагментов контура.
+        /// </summary>
+        /// <param name="skipBoundaryCheck">Если true, ленивая проверка GetClosestPointTo() на нахождение строго на линии будет пропущена для прироста скорости.</param>
+        public static PositionType GetPositionTypeOptimized(
+            this Point3d point,
+            List<Curve> curves,
+            bool skipBoundaryCheck = false,
+            Tolerance? customTolerance = null)
+        {
+            // [Шаг 1: Валидация входных данных]
+            if (curves == null || curves.Count == 0) return PositionType.fault;
+
+            // Быстро отфильтровываем только те кривые, у которых гарантированно определены границы.
+            // Вырожденные, пустые и битые элементы (Bounds == null) отсекаются здесь БЕЗ try-catch.
+            List<Curve> validCurves = curves
+                .Where(c => c != null && !c.IsDisposed && c.Bounds.HasValue)
+                .ToList();
+
+            // Если после фильтрации контур штриховки потерял элементы или стал невалидным — 
+            // дальнейший расчет лучей не имеет смысла.
+            if (validCurves.Count == 0 || validCurves.Count != curves.Count)
+            {   
+                return PositionType.fault;
+            }
+
+            double px = point.X;
+            double py = point.Y;
+            Tolerance tolerance = customTolerance ?? Tolerance.Global;
+            double toleranceValue = tolerance.EqualPoint;
+
+            // [Шаг 2: Экспресс-фильтр по ОБЩИМ габаритам всего контура]
+            if (!TryGetTotalExtents(curves, out Extents3d totalExtents)) return PositionType.fault;
+
+            // Если точка вне общих границ — она 100% снаружи. Мгновенный выход.
+            if (px < totalExtents.MinPoint.X - toleranceValue || px > totalExtents.MaxPoint.X + toleranceValue ||
+                py < totalExtents.MinPoint.Y - toleranceValue || py > totalExtents.MaxPoint.Y + toleranceValue)
             {
+                return PositionType.outer;
+            }
+
+            // [Шаг 3: Экспресс-проверка простых одиночных контуров (Окружность)]
+            if (curves.Count == 1 && curves[0] is Circle circle)
+            {
+                double dist = circle.Center.DistanceTo(point);
+                if (Math.Abs(dist - circle.Radius) < toleranceValue) return PositionType.onBound;
+                return dist < circle.Radius ? PositionType.inner : PositionType.outer;
+            }
+
+            // [Шаг 4: "Ленивый" локальный фильтр "Точка на границе" - Выполняется только если флаг равен false]
+            if (!skipBoundaryCheck && IsPointOnAnyBoundary(point, validCurves, tolerance))
+            {
+                return PositionType.onBound;
+            }
+
+            // [Шаг 5: Вычисление веера лучей в сторону кратчайшего расстояния]
+            return EvaluateRayCastingVector(point, curves, totalExtents, tolerance);
+        }
+
+        /// <summary>
+        /// Сбор общих габаритов всех кривых за один проход
+        /// </summary>
+        private static bool TryGetTotalExtents(List<Curve> curves, out Extents3d totalExtents)
+        {
+            totalExtents = new Extents3d();
+            bool hasExtents = false;
+
+            foreach (Curve curve in curves)
+            {
+                if (curve == null || curve.IsDisposed || curve.GetLength() == 0) continue;
+                                    
+                // Взводим флаг валидности один раз при первом успехе
+                if (!hasExtents) hasExtents = true;
+                totalExtents.AddExtents(curve.GeometricExtents);
+            }
+            return hasExtents;
+        }
+
+        /// <summary>
+        /// Локальный вызов GetClosestPointTo только для кривых, находящихся вплотную к точке
+        /// </summary>
+        private static bool IsPointOnAnyBoundary(Point3d point, List<Curve> curves, Tolerance tolerance)
+        {
+            double tolValue = tolerance.EqualPoint;
+
+            foreach (Curve curve in curves)
+            {
+                Extents3d ext = curve.GeometricExtents;
+
+                // Быстрое инвертированное отсечение (2D)
+                if (point.X < ext.MinPoint.X - tolValue || point.X > ext.MaxPoint.X + tolValue ||
+                    point.Y < ext.MinPoint.Y - tolValue || point.Y > ext.MaxPoint.Y + tolValue)
+                {
+                    continue;
+                }
+                          
+                // Заворачиваем в локальный try-catch строго этот вызов на случай "кривой" нативной геометрии.
                 try
                 {
-                    //проходим по всем кривым и ищем пересечения    
-                    foreach (Curve curve in curves)
+                    if (curve.GetClosestPointTo(point, false).IsEqualTo(point, tolerance))
                     {
-                        if (curve is Circle circle)
-                        {
-                            double distance = circle.Center.Z0().DistanceTo(point);
-                            if (distance < circle.Radius) points.Add(Point3d.Origin);
-                        }
-                        else
-                        {
-                            //список точек пересечения с конкретной кривой
-                            List<Point3d> vpoints = new List<Point3d>();
-                            //получаем геометрическую кривую и пересечения этой кривой и луча
-                            using (Curve3d curve3d = curve.GetGeCurve())
-                            using (CurveCurveIntersector3d cci = new CurveCurveIntersector3d(ray3d, curve3d, Vector3d.ZAxis))
-                            {
-                                //если пересечения есть
-                                if (cci.NumberOfIntersectionPoints > 0)
-                                {
-                                    for (int i = 0; i < cci.NumberOfIntersectionPoints; i++)
-                                    {
-                                        //если пересечение проходящее то добавляем его в список
-                                        if (cci.IsTransversal(i))
-                                        {
-                                            vpoints.Add(cci.GetIntersectionPoint(i));
-                                        }
-                                    }
-                                    //если кривых несколько то не добавляем дублирующиеся точки
-                                    //(что бы обойти задваивание пересечений в точке начала одной кривой и конца другой)
-                                    if (curves.Count > 1)
-                                    {
-                                        //проходим по точкам и удаляем существующие в общем списке
-                                        for (int i = vpoints.Count - 1; i > -1; i--)
-                                        {
-                                            if (points.Contains(vpoints[i])) vpoints.RemoveAt(i);
-                                        }
-                                    }
-                                    //добавляем точки пересечения с этой кривой в общий список
-                                    points.AddRange(vpoints);
-                                }
-                            }
-                        }
+                        return true;
                     }
                 }
                 catch
                 {
-                    return null;
+                    // Если нативная кривая повреждена и GetClosestPointTo упал — 
+                    // просто игнорируем её и идем дальше, AutoCAD не упадет.
+                    continue;
                 }
             }
-            return points;
+            return false;
         }
+
+
+        /// <summary>
+        /// Математический веер из 3-х лучей с жестким C#-отсечением геометрии
+        /// </summary>
+        private static PositionType EvaluateRayCastingVector(Point3d point, List<Curve> curves, Extents3d totalExtents, Tolerance tolerance)
+        {
+            double px = point.X;
+            double py = point.Y;
+            double toleranceValue = tolerance.EqualPoint;
+
+            // Выбираем кратчайшее направление до границы контейнера
+            double distToLeft = px - totalExtents.MinPoint.X;
+            double distToRight = totalExtents.MaxPoint.X - px;
+            double distToBottom = py - totalExtents.MinPoint.Y;
+            double distToTop = totalExtents.MaxPoint.Y - py;
+
+            double minDist = Math.Min(Math.Min(distToLeft, distToRight), Math.Min(distToBottom, distToTop));
+            double maxRayLength = minDist + 10.0;
+
+            Vector3d baseDirection;
+            int shootSide = 0;
+
+            if (minDist == distToRight) { baseDirection = Vector3d.XAxis; shootSide = 0; }
+            else if (minDist == distToLeft) { baseDirection = -Vector3d.XAxis; shootSide = 1; }
+            else if (minDist == distToTop) { baseDirection = Vector3d.YAxis; shootSide = 2; }
+            else { baseDirection = -Vector3d.YAxis; shootSide = 3; }
+
+            List<int> per = new List<int>();
+
+            Vector3d[] directions = new Vector3d[]
+            {
+        baseDirection.TransformBy(Matrix3d.Rotation(Math.PI / 200, Vector3d.ZAxis, point)),
+        baseDirection.TransformBy(Matrix3d.Rotation(Math.PI / 100, Vector3d.ZAxis, point)),
+        baseDirection.TransformBy(Matrix3d.Rotation(-Math.PI / 200, Vector3d.ZAxis, point))
+            };
+
+            // Обходим направления ПО ОЧЕРЕДИ
+            foreach (Vector3d dir in directions)
+            {
+                Point3d rayEnd = point + (dir * maxRayLength);
+
+                using (Line rayLine = new Line(point, rayEnd))
+                using (Curve3d rayGe = rayLine.GetGeCurve())
+                {
+                    int currentRayIntersections = 0;
+                    List<Point3d> uniquePoints = new List<Point3d>();
+
+                    foreach (Curve curve in curves)
+                    {
+                        // C#-отсечение по направлению луча (остается без изменений)
+                        Extents3d ext = curve.GeometricExtents;
+                        switch (shootSide)
+                        {
+                            case 0: // Веер летит ВПРАВО (+X). Проверяем коридор по Y и отсекаем то, что СЛЕВА
+                                if (py < ext.MinPoint.Y - toleranceValue || py > ext.MaxPoint.Y + toleranceValue) continue;
+                                if (ext.MaxPoint.X < px - toleranceValue) continue;
+                                break;
+
+                            case 1: // Веер летит ВЛЕВО (-X). Проверяем коридор по Y и отсекаем то, что СПРАВА
+                                if (py < ext.MinPoint.Y - toleranceValue || py > ext.MaxPoint.Y + toleranceValue) continue;
+                                if (ext.MinPoint.X > px + toleranceValue) continue;
+                                break;
+
+                            case 2: // Веер летит ВВЕРХ (+Y). Проверяем коридор по X и отсекаем то, что СНИЗУ
+                                if (px < ext.MinPoint.X - toleranceValue || px > ext.MaxPoint.X + toleranceValue) continue;
+                                if (ext.MaxPoint.Y < py - toleranceValue) continue; // ИСПРАВЛЕНО (сравниваем MaxPoint.Y)
+                                break;
+
+                            case 3: // Веер летит ВНИЗ (-Y). Проверяем коридор по X и отсекаем то, что СВЕРХУ
+                                if (px < ext.MinPoint.X - toleranceValue || px > ext.MaxPoint.X + toleranceValue) continue;
+                                if (ext.MinPoint.Y > py + toleranceValue) continue; // ИСПРАВЛЕНО (сравниваем MinPoint.Y)
+                                break;
+                        }
+
+                        try
+                        {
+                            using (Curve3d curveGe = curve.GetGeCurve())
+                            using (CurveCurveIntersector3d cci = new CurveCurveIntersector3d(rayGe, curveGe, Vector3d.ZAxis))
+                            {
+                                if (cci.NumberOfIntersectionPoints > 0)
+                                {
+                                    for (int i = 0; i < cci.NumberOfIntersectionPoints; i++)
+                                    {
+                                        Point3d intersectPoint = cci.GetIntersectionPoint(i);
+                                        uniquePoints.AddNewPoint(intersectPoint, tolerance);
+                                    }
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+
+                    currentRayIntersections = uniquePoints.Count;
+                                       
+                    if (currentRayIntersections == 0)
+                    {
+                        return PositionType.outer; // Мгновенный выход из всего метода!
+                    }
+
+                    per.Add(currentRayIntersections % 2);
+                }
+            }
+
+            // Если дошли сюда, значит все лучи нашли хоть какие-то пересечения.
+            // Запускаем стандартное голосование веера.
+            double average = 0;
+            foreach (int p in per) average += p;
+            average /= per.Count;
+
+            return (average > 0.5) ? PositionType.inner : PositionType.outer;
+        }
+
+
     }
 }

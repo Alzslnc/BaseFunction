@@ -8,14 +8,7 @@ using System.Reflection;
 namespace BaseFunction
 {
     public static class BaseGeometryClass
-    {
-        /// <summary>
-        /// добавляет в список новую точку, если она в нем отсутствовала ранее
-        /// </summary>
-        public static void AddNewPoint(this List<Point3d> points, Point3d point)
-        {
-            if (!points.ContainPoint(point)) points.Add(point);
-        }
+    {        
         public enum ExPosition
         {
             none,
@@ -262,6 +255,13 @@ namespace BaseFunction
                 result.Add(contour);
             }
             return true;
+        }
+        /// <summary>
+        /// добавляет в список новую точку, если она в нем отсутствовала ранее
+        /// </summary>
+        public static void AddNewPoint(this List<Point3d> points, Point3d point, Tolerance? tolerance = null)
+        {
+            if (!points.ContainPoint(point, tolerance)) points.Add(point);
         }
         /// <summary>
         /// Проверяет, содержит ли список точку
@@ -1559,4 +1559,59 @@ namespace BaseFunction
         }
 
     }
+    /// <summary>
+    /// Пространственный сеточный фильтр для мгновенного поиска уникальных точек 2D/3D.
+    /// Обоспечивает O(1) поиск с учетом геометрического допуска AutoCAD.
+    /// </summary>
+    public class UniquePointGridFilter
+    {
+        // Ключ — хэш ячейки сетки, значение — список точек, попавших в этот бакет
+        private readonly Dictionary<int, List<Point3d>> _grid = new Dictionary<int, List<Point3d>>();
+        private readonly Point3dComparer _comparer;
+
+        public UniquePointGridFilter(Point3dComparer comparer)
+        {
+            _comparer = comparer ?? throw new ArgumentNullException(nameof(comparer));
+        }
+
+        /// <summary>
+        /// Пытается добавить точку в фильтр. 
+        /// Возвращает true, если точка уникальна (такой еще нет в сетке с учетом допуска).
+        /// Возвращает false, если точка является геометрическим дубликатом.
+        /// </summary>
+        public bool Add(Point3d point)
+        {
+            // 1. Извлекаем из вашего компаратора все затронутые хэши (базовый + соседние границы)
+            var targetHashes = _comparer.GetHashes(point);
+
+            // Проверяем, нет ли уже этой точки в какой-либо из соседних ячеек
+            foreach (int hash in targetHashes)
+            {
+                if (_grid.TryGetValue(hash, out List<Point3d> pointsInBucket))
+                {
+                    foreach (Point3d existingPoint in pointsInBucket)
+                    {
+                        // Вызов вашего оптимизированного Equals (внутри IsEqualTo с кэшированным Tolerance)
+                        if (_comparer.Equals(point, existingPoint))
+                        {
+                            return false; // Обнаружен дубликат на стыке фрагментов петель!
+                        }
+                    }
+                }
+            }
+
+            // 2. Если точка уникальна, записываем её в её базовую (родную) ячейку
+            int baseHash = _comparer.GetHashCode(point);
+
+            if (!_grid.TryGetValue(baseHash, out List<Point3d> bucket))
+            {
+                bucket = new List<Point3d>(4); // Минимальный аллокатор памяти, в бакете редко будет больше 2 точек
+                _grid[baseHash] = bucket;
+            }
+
+            bucket.Add(point);
+            return true;
+        }
+    }
+
 }
