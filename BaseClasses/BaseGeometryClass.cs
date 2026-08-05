@@ -1264,7 +1264,7 @@ namespace BaseFunction
 
                                     // ИСПРАВЛЕНО: Считаем честный плоский угол от 0 до 2*PI против часовой стрелки
                                     double angle = currentDir.GetAngleTo(candidateDir, Vector3d.ZAxis);
-                                                                       
+
                                     // Ищем кандидата с минимальным плоским углом.
                                     // Это гарантирует, что на развилке мы всегда будем выбирать 
                                     // самый "крайний" поворот в одну сторону (например, строго направо),
@@ -1410,15 +1410,15 @@ namespace BaseFunction
         #endregion
     }
 
-    enum CurveType
-    { 
+    internal enum CurveType
+    {
         IsSpline,
         IsPolyline,
         IsEllipse,
-        IsPolyline3d,    
+        IsPolyline3d,
         none,
     }
-    class CurveData
+    internal class CurveData
     {
         public CurveData(Curve curve)
         {

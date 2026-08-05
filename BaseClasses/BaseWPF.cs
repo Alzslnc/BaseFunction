@@ -20,14 +20,14 @@ namespace BaseFunction
             data = value;
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
             return true;
-        }      
+        }
         public virtual bool Call([CallerMemberName] string name = "")
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
             return true;
-        }    
+        }
     }
-      
+
     public class RelayCommand : ICommand
     {
         public RelayCommand(Action<object> execute, Func<object, bool> canExecute = null)
@@ -158,15 +158,15 @@ namespace BaseFunction
     {
         public override object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
-           return value;
+            return value;
         }
         public override object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
             if (value == null) return Binding.DoNothing;
-            
+
             if (double.TryParse(value.ToString().Replace(",", "."), NumberStyles.Any, CultureInfo.InvariantCulture, out double result)) return result;
 
-            return value.ToString();    
+            return value.ToString();
         }
     }
     public class StringToIntConverter : ConverterBase

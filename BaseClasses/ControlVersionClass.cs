@@ -116,7 +116,7 @@ namespace BaseFunction
                 string displayName2 = System.IO.Path.GetFileName(gitPlugin.Name);
                 // Ищем локальный плагин по совпадению имени файла
                 var localPlugin = datas.FirstOrDefault(x => x.Name.Equals(displayName2, StringComparison.OrdinalIgnoreCase));
-                              
+
                 if (localPlugin == null)
                 {
                     notInstalled.Add($" - {displayName}");
@@ -199,7 +199,7 @@ namespace BaseFunction
 
             // 2. Создаем сетку для разметки
             Grid rootGrid = new Grid();
-            rootGrid.RowDefinitions.Add(new RowDefinition() { Height = GridLength.Auto });
+            rootGrid.RowDefinitions.Add(new RowDefinition() { Height = new GridLength(1, GridUnitType.Star) });
             rootGrid.RowDefinitions.Add(new RowDefinition() { Height = GridLength.Auto });
 
             // 3. Настраиваем текстовый блок с динамическим выравниванием
@@ -208,32 +208,43 @@ namespace BaseFunction
                 Text = isDefaultText ? "Идет проверка данных" : text,
                 VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = isDefaultText ? HorizontalAlignment.Center : HorizontalAlignment.Left,
-                TextWrapping = TextWrapping.NoWrap,
-                Margin = new Thickness(15, 15, 15, okButton ? 20 : 15)
+                TextWrapping = TextWrapping.NoWrap, // Строка никогда не переносится принудительно
+                Margin = new Thickness(25, 20, 25, okButton ? 10 : 20) // Увеличили боковые отступы
             };
             Grid.SetRow(textBlock, 0);
             rootGrid.Children.Add(textBlock);
 
-            // 4. Создаем окно с автоматическим размером под контент
+            // 4. Создаем окно с минимальными размерами и перетаскиванием
             Window window = new Window
             {
                 WindowStyle = WindowStyle.None,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                SizeToContent = SizeToContent.WidthAndHeight,
+                SizeToContent = SizeToContent.WidthAndHeight, // Окно растет вслед за контентом
                 ResizeMode = ResizeMode.NoResize,
+                MinWidth = 320,   // Базовая эстетичная ширина для короткого текста
+                MinHeight = 120,  // Базовая высота
                 Content = rootGrid
             };
 
-            // 5. Добавляем кнопку ОК, используя полное пространство имен для предотвращения конфликтов
+            // Перетаскивание окна за любую точку
+            window.MouseLeftButtonDown += (s, e) =>
+            {
+                if (e.ChangedButton == System.Windows.Input.MouseButton.Left)
+                {
+                    window.DragMove();
+                }
+            };
+
+            // 5. Добавляем кнопку ОК
             if (okButton)
             {
                 System.Windows.Controls.Button btnOk = new System.Windows.Controls.Button()
                 {
                     Content = "OK",
-                    Width = 75,
-                    Height = 23,
+                    Width = 85,
+                    Height = 25,
                     HorizontalAlignment = HorizontalAlignment.Right,
-                    Margin = new Thickness(0, 0, 15, 15)
+                    Margin = new Thickness(0, 10, 25, 15) // Выровняли отступ с текстом (25px справа)
                 };
                 btnOk.Click += (s, e) => window.Close();
 
@@ -248,13 +259,14 @@ namespace BaseFunction
                 WindowInteropHelper helper = new WindowInteropHelper(window);
                 helper.Owner = acadMainWindowHandle;
             }
-            catch 
+            catch
             {
                 window.WindowStartupLocation = WindowStartupLocation.CenterScreen;
             }
 
             return window;
         }
+
         private static List<MetaData> GetGitData()
         {
             List<MetaData> result = new List<MetaData>();
