@@ -22,6 +22,17 @@ namespace BaseFunction
             }
             else return reference.Name;
         }
+        public static string GetName(this BlockReference reference, Transaction tr)
+        {
+            if (reference.IsDynamicBlock)
+            {
+                // Используем существующую транзакцию вместо тяжелого и опасного .Open()
+                var btr = tr.GetObject(reference.DynamicBlockTableRecord, OpenMode.ForRead) as BlockTableRecord;
+                return btr?.Name ?? string.Empty;
+            }
+
+            return reference.Name;
+        }
         public static ObjectId GetBTRId(this BlockReference reference) => reference.IsDynamicBlock ? reference.DynamicBlockTableRecord : reference.BlockTableRecord;
 
         #endregion
