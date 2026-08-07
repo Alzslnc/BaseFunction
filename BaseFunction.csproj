@@ -88,6 +88,7 @@
   <ItemGroup>
     <Compile Include="BaseClasses\AddButtons.cs" />
     <Compile Include="BaseClasses\BaseBlockReferenceClass.cs" />
+    <Compile Include="BaseClasses\BaseCreateClass.cs" />
     <Compile Include="BaseClasses\BaseExplodeClass.cs" />
     <Compile Include="BaseClasses\BaseFormClass.cs" />
     <Compile Include="BaseClasses\BaseGeometryClass.cs" />
