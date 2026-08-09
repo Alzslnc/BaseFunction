@@ -8,7 +8,7 @@ namespace BaseFunction
 {
     public static class PositionAndIntersections
     {
-        public static int GetInnerLevel(this Curve curve, List<Curve> curves)
+        public static int GetInnerLevel(this Curve curve, List<Curve> curves, bool onLine = false)
         {
             int result = 0;
 
@@ -34,7 +34,7 @@ namespace BaseFunction
                 // Вот теперь самое время ОДИН РАЗ вычислить тяжелую точку центра, если она еще не создана.
                 if (center == null)
                 {
-                    center = curve.GetCenterPoint();
+                    center = curve.GetCenterPoint(onLine);
                     if (center == null) return -1; // Фолбэк при ошибке геометрии
                 }
 
@@ -44,8 +44,14 @@ namespace BaseFunction
             return result;
         }
 
-        private static Point3d? GetCenterPoint(this Curve curve)
+        private static Point3d? GetCenterPoint(this Curve curve, bool onLine = false)
         {
+            if (onLine)
+            {
+                if (curve.GetCentrPoint(out Point3d result)) return result;
+                return null;
+            }
+
             Point3d onCurve = curve.GetPointAtParameter(0.5);
 
             Vector3d vector = curve.GetFirstDerivative(onCurve);
@@ -61,12 +67,12 @@ namespace BaseFunction
             return null;
         }
 
-        public static int GetInnerLevel(this Curve polyline, List<Curve> polylines, bool simple = false, bool onBoundInclude = false, bool centerPoint = false, bool onBoundIsZero = false, bool listChech = false)
+        public static int GetInnerLevelOld(this Curve polyline, List<Curve> polylines, bool simple = false, bool onBoundInclude = false, bool centerPoint = false, bool onBoundIsZero = false, bool listChech = false)
         {
             Dictionary<Curve, int> iLvls = new Dictionary<Curve, int>();
             if (listChech)
             {
-                foreach (Curve c in polylines) iLvls.Add(c, c.GetInnerLevel(polylines, listChech : false));
+                foreach (Curve c in polylines) iLvls.Add(c, c.GetInnerLevelOld(polylines, listChech : false));
             }
             int maxIlvl = -1;
             int j = 0;
@@ -111,7 +117,7 @@ namespace BaseFunction
             }
             return j;
         }
-        public static int GetInnerLevel(this Polyline polyline, List<Polyline> polylines, bool simple = false)
+        public static int GetInnerLevelOld(this Polyline polyline, List<Polyline> polylines, bool simple = false)
         {
             int j = 0;
             foreach (Polyline poly in polylines)

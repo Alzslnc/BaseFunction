@@ -1,0 +1,68 @@
+﻿<Window x:Class="Progress.ProgressWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:Progress"
+        mc:Ignorable="d"
+        xmlns:bf="clr-namespace:BaseFunction" 
+        d:DataContext="{d:DesignInstance local:ProgressViewModel, IsDesignTimeCreatable=True}"
+        Width="450" 
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner" 
+        ResizeMode="NoResize" 
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent">
+
+    <Window.Effect>
+        <DropShadowEffect BlurRadius="15" Direction="0" ShadowDepth="0" Opacity="0.3"/>
+    </Window.Effect>
+
+    <Border Background="White" BorderBrush="#CCCCCC" BorderThickness="1" CornerRadius="3" Margin="10">
+        <!-- Используем Grid вместо StackPanel для фиксации позиций элементов -->
+        <Grid Margin="15">
+            <Grid.RowDefinitions>
+                <!-- Строка 0: Основной текст (резервируем авто-высоту, которая будет зафиксирована кодом) -->
+                <RowDefinition Height="Auto"/>
+                <!-- Строка 1: Основной прогресс-бар -->
+                <RowDefinition Height="Auto"/>
+                <!-- Строка 2: Вторичный блок (текст + прогресс) -->
+                <RowDefinition Height="Auto"/>
+                <!-- Строка 3: Кнопка отмены -->
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Основной блок -->
+            <!-- Заворачиваем текст в Grid, чтобы фиксировать его минимальную высоту на лету -->
+            <Grid Grid.Row="0" x:Name="MainStatusContainer">
+                <TextBlock Text="{Binding MainStatus}" TextAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,5"/>
+            </Grid>
+            <ProgressBar Grid.Row="1" Value="{Binding MainProgress}" Minimum="0" Maximum="100" Height="20" Margin="20,5,20,15" IsHitTestVisible="False"/>
+
+            <!-- Вторичный блок -->
+            <Grid Grid.Row="2" Visibility="{Binding IsSubProgressVisible, Converter={bf:BoolToVisibleConverter}}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <!-- Заворачиваем второй текст для фиксации его высоты -->
+                <Grid Grid.Row="0" x:Name="SubStatusContainer">
+                    <TextBlock Text="{Binding SubStatus}" TextAlignment="Center" VerticalAlignment="Center" TextWrapping="Wrap" Margin="0,0,0,5"/>
+                </Grid>
+                <ProgressBar Grid.Row="1" Value="{Binding SubProgress}" Minimum="0" Maximum="100" Height="18" Margin="20,5,20,15" IsHitTestVisible="False"/>
+            </Grid>
+
+            <!-- Кнопка отмены -->
+            <Button Grid.Row="3" Content="Отмена" 
+                    Command="{Binding CancelCommand}" 
+                    Width="100" 
+                    Height="26" 
+                    HorizontalAlignment="Center" 
+                    Margin="0,5,0,0"
+                    Visibility="{Binding IsCancelButtonVisible, Converter={bf:BoolToVisibleConverter}}"/>
+
+        </Grid>
+    </Border>
+</Window>
