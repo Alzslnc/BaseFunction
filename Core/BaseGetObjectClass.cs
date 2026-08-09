@@ -128,6 +128,13 @@ namespace BaseFunction
         /// <summary>
         /// Запрашивает у пользователя дробное число и если пользователь его ввел возвращает
         /// </summary>
+        public static bool TryGetIntFromUser(out int result, int baseValue, string message)
+        {
+            return TryGetIntFromUser(out result, baseValue, null, null, message);
+        }
+        /// <summary>
+        /// Запрашивает у пользователя дробное число и если пользователь его ввел возвращает
+        /// </summary>
         public static bool TryGetIntFromUser(out int result, int? minValue, int? maxValue)
         {
             return TryGetIntFromUser(out result, 0, minValue, maxValue, "Введите целое число");

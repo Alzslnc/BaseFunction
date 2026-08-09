@@ -9,6 +9,52 @@ namespace BaseFunction
 {
     public static class BaseGeometryClass
     {
+        public static double AcadTextLength(string str, ObjectId styleId, double height)
+        {
+            if (string.IsNullOrEmpty(str)) return 0;
+            // Переменная для значения длины
+            double len = 0.0;
+
+            using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
+            {
+                if (styleId == ObjectId.Null)
+                {
+                    styleId = HostApplicationServices.WorkingDatabase.Textstyle;
+                }
+
+                DBText dbTxt = new DBText
+                {
+                    // Задаем стиль тексту
+                    TextStyleId = styleId,
+
+                    // Дополнительные настройки
+                    Normal = Vector3d.ZAxis,
+                    Rotation = 0.0,
+                    Position = Point3d.Origin,
+
+                    // Задаем строку тексту
+                    TextString = str
+                };
+
+                // Помимо назначения стиля, нужно еще дополнительно
+                // назначить угол наклона букв и коэффициент ширины
+
+                TextStyleTableRecord txtStyle = tr.GetObject(styleId, OpenMode.ForRead) as TextStyleTableRecord;
+                if (txtStyle != null)
+                {
+                    dbTxt.Oblique = txtStyle.ObliquingAngle;
+                    dbTxt.WidthFactor = txtStyle.XScale;
+                    // Задаем желаемую
+                    dbTxt.Height = height;
+                }
+                // Вычисляем длину текста
+                Point3d ptMin = dbTxt.GeometricExtents.MinPoint;
+                Point3d ptMax = dbTxt.GeometricExtents.MaxPoint;
+                len = ptMax.X - ptMin.X;
+                tr.Commit();
+            }
+            return len;
+        }
         public enum ExPosition
         {
             none,
@@ -519,10 +565,19 @@ namespace BaseFunction
         public static bool GetCentrPoint(this Curve curve, out Point3d result)
         {
             result = Point3d.Origin;
+            if (curve == null || curve.IsDisposed || curve.IsErased) return false;
             try
-            {
-                if (curve == null || curve.IsDisposed || curve.IsErased || curve.GetLength() == 0) return false;
-                result = curve.GetPointAtDist((curve.GetDistanceAtParameter(curve.StartParam) + curve.GetDistanceAtParameter(curve.EndParam)) / 2);
+            {              
+                // Получаем дистанции параметров за один проход
+                double startDist = curve.GetDistanceAtParameter(curve.StartParam);
+                double endDist = curve.GetDistanceAtParameter(curve.EndParam);
+                double fullLength = endDist - startDist;
+
+                // Быстрая проверка на нулевую длину без вызова тяжелого метода GetLength()
+                if (Math.Abs(fullLength) < 1e-6) return false;
+
+                // Вычисляем точку ровно на половине пути
+                result = curve.GetPointAtDist(startDist + (fullLength / 2.0));
                 return true;
             }
             catch { return false; }
@@ -782,17 +837,51 @@ namespace BaseFunction
             Point3d vpoint = (Point3d)Autodesk.AutoCAD.ApplicationServices.Application.GetSystemVariable("VIEWDIR");
             return vpoint.GetAsVector().GetNormal();
         }
-        /// <summary>
-        /// проверяет объект на пренадлежность типу Acad Curve
-        /// </summary>
-        /// <param name="ent"></param>
-        /// <returns></returns>
-        public static bool IsAcadCurve(this Entity ent, bool includeLeader = false)
+        // Строгий белый список типов ванильного AutoCAD.
+        // Проверка через GetType() гарантирует, что наследники из Civil 3D (например, FeatureLine) сюда не попадут.
+        public static readonly HashSet<Type> BaseCurveTypes = new HashSet<Type>
         {
-            if (ent is Arc || ent is Circle || ent is Ellipse || ent is Line ||
-                ent is Polyline || ent is Polyline2d || ent is Polyline3d ||
-                ent is Ray || ent is Spline || ent is Xline || (includeLeader && ent is Leader)) return true;
-            else return false;
+            typeof(Arc),
+            typeof(Circle),
+            typeof(Ellipse),
+            typeof(Line),
+            typeof(Polyline),
+            typeof(Polyline2d),
+            typeof(Polyline3d),
+            typeof(Spline),
+            typeof(Helix) 
+        };
+
+        public static readonly HashSet<Type> NonLengthCurveTypes = new HashSet<Type>
+        {
+            typeof(Ray),
+            typeof(Xline)
+        };
+
+        public static readonly HashSet<Type> LeaderTypes = new HashSet<Type>
+        {
+            typeof(Leader)
+        };
+
+        /// <summary>
+        /// Проверяет объект на принадлежность к типам кривых AutoCAD.
+        /// </summary>
+        /// <param name="ent">Проверяемый объект.</param>
+        /// <param name="includeLeader">Включать ли Leader в проверку.</param>
+        /// <param name="includeNonLength">Включать ли бесконечные линии (Ray, Xline) в проверку.</param>
+        /// <returns>True, если тип объекта строго соответствует разрешенным стандартным примитивам.</returns>
+        public static bool IsAcadCurve(this Entity ent, bool includeLeader = false, bool includeNonLength = false)
+        {
+            if (ent == null) return false;
+
+            // Получаем точный тип объекта без учета базовых классов
+            Type entType = ent.GetType();
+
+            if (BaseCurveTypes.Contains(entType)) return true;
+            if (includeNonLength && NonLengthCurveTypes.Contains(entType)) return true;
+            if (includeLeader && LeaderTypes.Contains(entType)) return true;
+
+            return false;
         }
 
         public static bool IsEqualTo(this double d1, double d2)

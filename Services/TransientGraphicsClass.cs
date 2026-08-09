@@ -7,118 +7,163 @@ namespace BaseFunction
 {
     public class SpEntity : IDisposable
     {
+        private agi.TransientManager _transientManager;
+        private Entity _entity = null;
+        private bool _tDraw = false;
+        private bool _visible = true;
+        private bool _highlight = false;
+
         public SpEntity()
         {
-            Ini();
+            Initialize();
         }
+
         public SpEntity(Entity e)
         {
-            Ini();
+            Initialize();
             Entity = e;
         }
 
-        private void Ini()
+        private void Initialize()
         {
-            TransientManager = agi.TransientManager.CurrentTransientManager;
+            _transientManager = agi.TransientManager.CurrentTransientManager;
         }
 
         public event EventHandler Changed;
-        public void OnChange(object sender, EventArgs e)
+
+        protected virtual void OnChange()
         {
             Changed?.Invoke(this, EventArgs.Empty);
             if (AutoRedraw) Redraw();
         }
+
         public void Redraw()
         {
-            if (Entity != null)
+            if (_entity == null) return;
+
+            if (_tDraw)
             {
-                if (TDraw)
-                {
-                    TransientManager.EraseTransient(Entity, new IntegerCollection());
-                    TDraw = false;
-                }
-                if (Visible)
-                {
-                    TransientManager.AddTransient(Entity, DrawingMode, 128, new IntegerCollection());
-                    TDraw = true;
-                }
+                _transientManager.EraseTransient(_entity, new IntegerCollection());
+                _tDraw = false;
+            }
+            if (Visible)
+            {
+                _transientManager.AddTransient(_entity, DrawingMode, 128, new IntegerCollection());
+                _tDraw = true;
             }
         }
 
-
         public agi.TransientDrawingMode DrawingMode { get; set; } = agi.TransientDrawingMode.DirectTopmost;
+        public bool AutoRedraw { get; set; } = true;
+        public bool Disposed { get; private set; } = false;
+
+        // Сеттеры сделаны приватными для защиты от случайного изменения извне
+        public Circle Circle { get; private set; } = null;
+        public Curve Curve { get; private set; } = null;
+
+        public Entity Entity
+        {
+            get => _entity;
+            set
+            {
+                if (_entity == value) return;
+
+                // Очищаем старый объект и графику
+                if (_entity != null)
+                {
+                    if (_tDraw) _transientManager.EraseTransient(_entity, new IntegerCollection());
+                    _entity.Dispose();
+                }
+
+                _entity = value;
+
+                if (_entity == null)
+                {
+                    Circle = null;
+                    Curve = null;
+                }
+                else
+                {
+                    // Безопасная валидация типа с учетом нашего IsAcadCurve метода расширения
+                    // (Замените на вашу прямую проверку типов, если метод расширения в другом месте)
+                    Circle = _entity as Circle;
+
+                    // Проверяем, что это строго стандартная кривая ванильного AutoCAD (защита от Civil 3D)
+                    Curve = _entity.IsAcadCurve() ? (_entity as Curve) : null;
+                }
+
+                OnChange();
+            }
+        }
+
         public Point3d? Center
         {
             get
             {
                 if (Circle != null) return Circle.Center;
-                else if (Entity is Solid3d s) return s.MassProperties.Centroid;
-                else return null;
+                if (_entity is Solid3d s) return s.MassProperties.Centroid;
+                return null;
             }
             set
             {
                 if (Circle != null && value.HasValue && !Circle.Center.IsEqualTo(value.Value))
                 {
                     Circle.Center = value.Value;
-                    OnChange(this, EventArgs.Empty);
+                    OnChange();
                 }
             }
         }
+
         public Point3d? StartPoint
         {
-            get
-            {
-                if (Curve != null) return Curve.StartPoint;
-                else return Point3d.Origin;
-            }
+            get => Curve?.StartPoint; // Возвращает null, если кривой нет (вместо обманчивого Origin)
             set
             {
                 if (Curve != null && value.HasValue && !Curve.StartPoint.IsEqualTo(value.Value))
                 {
                     Curve.StartPoint = value.Value;
-                    OnChange(this, EventArgs.Empty);
+                    OnChange();
                 }
             }
         }
+
         public Point3d? EndPoint
         {
-            get
-            {
-                if (Curve != null) return Curve.EndPoint;
-                else return Point3d.Origin;
-            }
+            get => Curve?.EndPoint;
             set
             {
                 if (Curve != null && value.HasValue && !Curve.EndPoint.IsEqualTo(value.Value))
                 {
                     Curve.EndPoint = value.Value;
-                    OnChange(this, EventArgs.Empty);
+                    OnChange();
                 }
             }
         }
+
         public int ColorIndex
         {
-            get
-            {
-                if (Entity != null) return Entity.ColorIndex;
-                else return 0;
-            }
+            get => _entity != null ? _entity.ColorIndex : 0;
             set
             {
-                if (Entity != null && Entity.ColorIndex != value)
+                // Проверяем диапазон индексов ACI (0 - ByBlock, 256 - ByLayer)
+                if (_entity != null && value >= 0 && value <= 256 && _entity.ColorIndex != value)
                 {
-                    Entity.ColorIndex = value;
-                    OnChange(this, EventArgs.Empty);
+                    try
+                    {
+                        _entity.ColorIndex = value;
+                        OnChange();
+                    }
+                    catch
+                    {
+                        // Игнорируем ошибку, если AutoCAD не смог применить ByLayer/ByBlock к временному объекту
+                    }
                 }
             }
         }
+
         public double Radius
         {
-            get
-            {
-                if (Circle != null) return Circle.Radius;
-                else return double.NaN;
-            }
+            get => Circle != null ? Circle.Radius : double.NaN;
             set
             {
                 if (Circle != null && value > 0 && !Circle.Radius.IsEqualTo(value))
@@ -126,99 +171,77 @@ namespace BaseFunction
                     try
                     {
                         Circle.Radius = value;
-                        OnChange(this, EventArgs.Empty);
+                        OnChange();
                     }
-                    catch { }
+                    catch { /* Игнорируем некорректную геометрию */ }
                 }
             }
         }
+
         public bool Visible
         {
-            get
-            {
-                return _Visible;
-            }
+            get => _visible;
             set
             {
-                if (_Visible != value)
+                if (_visible != value)
                 {
-                    _Visible = value;
-                    OnChange(this, EventArgs.Empty);
+                    _visible = value;
+                    OnChange();
                 }
             }
         }
-        private bool _Visible = true;
-        public Entity Entity
-        {
-            get { return _Entity; }
-            set
-            {
-                if (_Entity != value)
-                {
 
-                    if (_Entity != null)
-                    {
-                        if (TDraw) TransientManager.EraseTransient(Entity, new IntegerCollection());
-                        _Entity.Dispose();
-                    }
-
-                    _Entity = value;
-                    if (_Entity == null)
-                    {
-                        Entity?.Dispose();
-                        Circle = null;
-                        Curve = null;
-                    }
-                    else
-                    {
-                        if (_Entity is Circle c) Circle = c;
-                        if (_Entity is Curve cur) Curve = cur;
-                    }
-                    OnChange(this, EventArgs.Empty);
-                }
-            }
-
-        }
-        private Entity _Entity = null;
-        public bool AutoRedraw { get; set; } = true;
-        public Circle Circle { get; set; } = null;
-        public Curve Curve { get; set; } = null;
         public bool HightLight
         {
-            get
-            {
-                if (Entity != null) return _HightLight;
-                else return false;
-            }
+            get => _entity != null && _highlight;
             set
             {
-                if (Entity != null && _HightLight != value)
+                if (_entity != null && _highlight != value)
                 {
-                    _HightLight = value;
-                    if (_HightLight) Entity.Highlight();
-                    else Entity.Unhighlight();
-                    OnChange(this, EventArgs.Empty);
+                    _highlight = value;
+                    if (_highlight) _entity.Highlight();
+                    else _entity.Unhighlight();
+                    OnChange();
                 }
             }
         }
-        private bool _HightLight = false;
-        public bool Disposed { get; private set; } = false;
 
+        // --- Правильная реализация паттерна IDisposable ---
 
-
-        private agi.TransientManager TransientManager { get; set; } = null;
-        private bool TDraw { get; set; } = false;
         public void Dispose()
         {
-            if (Disposed) return;
-            Disposed = true;
+            Dispose(true);
+            GC.SuppressFinalize(this); // Запрещаем сборщику мусора вызывать деструктор, так как память уже очищена
+        }
 
-            if (Entity != null)
+        protected virtual void Dispose(bool disposing)
+        {
+            if (Disposed) return;
+
+            if (disposing)
             {
-                if (TDraw) TransientManager.EraseTransient(Entity, new IntegerCollection());
-                Entity?.Dispose();
-                Entity = null;
+                // Очистка управляемых ресурсов (если они есть)
             }
+
+            // Очистка неуправляемых ресурсов AutoCAD графики
+            if (_entity != null)
+            {
+                if (_tDraw && _transientManager != null)
+                    _transientManager.EraseTransient(_entity, new IntegerCollection());
+
+                _entity.Dispose();
+                _entity = null;
+            }
+
+            Circle = null;
+            Curve = null;
+            Disposed = true;
+        }
+
+        // Деструктор на случай, если разработчик забыл вызвать Dispose() вручную
+        ~SpEntity()
+        {
+            Dispose(false);
         }
     }
 }
