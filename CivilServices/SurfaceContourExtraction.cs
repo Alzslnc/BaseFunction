@@ -6,6 +6,7 @@ using Progress;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Entity = Autodesk.AutoCAD.DatabaseServices.Entity;
 using Region = Autodesk.AutoCAD.DatabaseServices.Region;
 
 namespace BaseFunction
@@ -15,7 +16,49 @@ namespace BaseFunction
         // Хранилище вектора смещения для текущего сеанса расчета
         private static Vector3d _coordinateShift = new Vector3d(0, 0, 0);
         private static bool _isShiftCalculated = false;
-               
+
+        public static bool GetElevationZoneContours(
+            out List<Polyline> positive,
+            out List<Polyline> negative,
+            out List<Polyline> zero,
+            TinSurface VolumeSurfaceAsTinSurface,
+            ProgressScope dialog,
+            bool main,
+            out double positiveArea,
+            out double negativeArea,
+            out double zeroArea,
+            double elevation = 0)
+        {
+
+            positiveArea = 0;
+            negativeArea = 0;
+            zeroArea = 0;
+
+            positive = new List<Polyline>();
+            negative = new List<Polyline>();
+            zero = new List<Polyline>();
+
+            bool result = GetElevationZoneContours(out List<Curve> pos, out List<Curve> neg, out List<Curve> zer, VolumeSurfaceAsTinSurface, dialog, main, out positiveArea, out negativeArea, out zeroArea, elevation);
+
+            foreach (Curve c in pos)
+            {
+                if (c is Polyline poly) positive.Add(poly);
+                else c?.Dispose();
+            }
+            foreach (Curve c in neg)
+            {
+                if (c is Polyline poly) negative.Add(poly);
+                else c?.Dispose();
+            }
+            foreach (Curve c in zer)
+            {
+                if (c is Polyline poly) zero.Add(poly);
+                else c?.Dispose();
+            }
+
+            return result;
+        }
+
         public static bool GetElevationZoneContours(
             out List<Curve> positive,
             out List<Curve> negative,
@@ -179,7 +222,8 @@ namespace BaseFunction
             List<double> rawElevations,
             Action incrementProgress,
             Func<bool> isCancelled,
-            double epsilon = 1e-5)
+            double epsilon = 1e-5,
+            bool replaceBack = false)
         {
             List<SlicedPiece> finalResults = new List<SlicedPiece>();
 
@@ -209,7 +253,11 @@ namespace BaseFunction
                 // Быстрая предварительная фильтрация Гаусса на чистых регистрах ЦП (Рубеж №1)
                 // Отсекаем исходные вырожденные треугольники Civil 3D до выделения памяти под массивы конвейера
                 double gaussArea = 0.5 * Math.Abs(p1.X * (p2.Y - p3.Y) + p2.X * (p3.Y - p1.Y) + p3.X * (p1.Y - p2.Y));
-                if (gaussArea < epsilon) continue;
+                if (gaussArea < epsilon)
+                {
+                    incrementProgress.Invoke();
+                    continue;
+                }
 
                 cleanedTriangles.Add(new Point3d[] { p1, p2, p3 });
             }
@@ -229,6 +277,12 @@ namespace BaseFunction
 
             return finalResults;
         }
+        public static void ReplaceBack(IEnumerable<Entity> entities)
+        {
+            Matrix3d back = Matrix3d.Displacement(_coordinateShift);
+
+            foreach (Entity e in entities) e.TransformBy(back);
+        }
 
         #region private
         // Метод для сброса смещения перед началом обработки новой поверхности
@@ -237,7 +291,7 @@ namespace BaseFunction
             _coordinateShift = new Vector3d(0, 0, 0);
             _isShiftCalculated = false;
         }
-        private static List<SlicedPiece> SliceSurfaceMultipleLevels(List<Point3d[]> cleanedTriangles, 
+        private static List<SlicedPiece> SliceSurfaceMultipleLevels(List<Point3d[]> cleanedTriangles,
             List<SliceLevel> activeLevels, Action incrementProgress, Func<bool> isCancelled, double epsilon)
         {
             List<SlicedPiece> globalResults = new List<SlicedPiece>();
