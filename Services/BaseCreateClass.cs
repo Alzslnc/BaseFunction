@@ -38,10 +38,7 @@ namespace BaseFunction
             Vector3d actualDirection = direction ?? Vector3d.XAxis;
 
             MLeader mLeader = new MLeader()
-            {
-                TextHeight = mText.TextHeight,
-                Layer = mText.Layer,
-                Color = mText.Color,
+            {     
                 ArrowSize = 0,
                 LandingGap = 0,
                 ContentType = ContentType.MTextContent

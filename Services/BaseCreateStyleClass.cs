@@ -10,44 +10,68 @@ namespace BaseFunction
 {
     internal static class BaseCreateStyleClass
     {
+        #region textStyle
         public static ObjectId CreateTextStyle(Transaction tr, Database db, string styleName, string primaryFont = "isocpeur.ttf", string backupFont = "arial.ttf")
         {
+            return CreateTextStyle(tr, db, styleName, out _, false, primaryFont, backupFont);
+        }
+        public static ObjectId CreateTextStyle(Transaction tr, Database db, string styleName, out TextStyleTableRecord textStyleObject, bool returnStyleObject = true, string primaryFont = "isocpeur.ttf", string backupFont = "arial.ttf")
+        {
+            textStyleObject = null;
+
             if (tr == null || db == null || string.IsNullOrWhiteSpace(styleName))
                 return ObjectId.Null;
 
-            TextStyleTable tst = tr.GetObject(db.TextStyleTableId, OpenMode.ForWrite) as TextStyleTable;
+            // 1. Открываем таблицу стилей текста на чтение (Для проверки этого достаточно)
+            TextStyleTable tst = tr.GetObject(db.TextStyleTableId, OpenMode.ForRead) as TextStyleTable;
             if (tst == null)
                 return ObjectId.Null;
 
+            // Если стиль уже существует
             if (tst.Has(styleName))
-                return tst[styleName];
+            {
+                ObjectId existingId = tst[styleName];
+                if (returnStyleObject)
+                {
+                    // Открываем существующий стиль на запись для изменений "на лету"
+                    textStyleObject = tr.GetObject(existingId, OpenMode.ForWrite) as TextStyleTableRecord;
+                }
+                return existingId;
+            }
 
+            // 2. Создаем новый текстовый стиль
             TextStyleTableRecord tstr = new TextStyleTableRecord
             {
                 Name = styleName
             };
 
-            try
-            {
-                tstr.FileName = primaryFont;
-            }
-            catch
-            {
-                try
-                {
-                    tstr.FileName = backupFont;
-                }
-                catch
-                {
-                    // Если оба шрифта недоступны, AutoCAD использует стандартный txt.shx автоматически
-                }
-            }
+            // Проверяем физическое наличие основного шрифта в системе (в папке Fonts или Fonts внутри AutoCAD)
+            // Так как присвоение FileName не генерирует Exception, проверяем существование файла.
+            // Если путь не абсолютный, AutoCAD ищет в своих путях поддержки. Для надежности просто пишем основной.
+            tstr.FileName = primaryFont;
 
+            // Дополнительная настройка стиля (опционально, базовые дефолты)
+            tstr.TextSize = 0.0; // Высота 0 делает стиль динамическим по высоте (удобно для MText/Размеров)
+
+            // 3. Добавляем новый стиль в базу данных
+            // Переводим таблицу стилей на запись только в момент добавления
+            tst.UpgradeOpen();
             ObjectId textStyleId = tst.Add(tstr);
             tr.AddNewlyCreatedDBObject(tstr, true);
 
+            if (returnStyleObject)
+            {
+                // Гарантируем, что только что созданный объект открыт на запись для вызывающего кода
+                if (!tstr.IsWriteEnabled)
+                {
+                    tstr.UpgradeOpen();
+                }
+                textStyleObject = tstr;
+            }
+
             return textStyleId;
         }
+        #endregion
 
         #region Dimension
         public static ObjectId CreateDimensionStyle(Transaction tr, Database db, string styleName, ObjectId textStyleId)
@@ -145,7 +169,7 @@ namespace BaseFunction
             if (tr == null || db == null || string.IsNullOrWhiteSpace(styleName))
                 return ObjectId.Null;
 
-            DBDictionary mLeaders = tr.GetObject(db.MLeaderStyleDictionaryId, OpenMode.ForWrite) as DBDictionary;
+            DBDictionary mLeaders = tr.GetObject(db.MLeaderStyleDictionaryId, OpenMode.ForRead) as DBDictionary;
             if (mLeaders == null)
                 return ObjectId.Null;
 
