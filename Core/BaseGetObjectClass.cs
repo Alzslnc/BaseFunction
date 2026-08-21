@@ -641,38 +641,60 @@ namespace BaseFunction
         #region добавление и удаление объектов
         public static bool AddEntityInCurrentBTR(this Entity entity, Transaction transaction = null)
         {
-            return entity.AddEntityInCurrentBTR(out _, transaction);
+            return entity.AddEntityInCurrentBTR(out _, ObjectId.Null, transaction);
         }
-        public static bool AddEntityInCurrentBTR(this Entity entity, out ObjectId id, Transaction transaction = null)
+        public static bool AddEntityInCurrentBTR(this Entity entity, ObjectId targetSpaceId, Transaction transaction = null)
         {
-            bool result = AddEntityInCurrentBTR(new List<Entity> { entity }, out List<ObjectId> ids, transaction);
+            return entity.AddEntityInCurrentBTR(out _, targetSpaceId, transaction);
+        }
+
+        public static bool AddEntityInCurrentBTR(this Entity entity, out ObjectId id, ObjectId targetSpaceId = default, Transaction transaction = null)
+        {
+            bool result = AddEntityInCurrentBTR(new List<Entity> { entity }, out List<ObjectId> ids, targetSpaceId, transaction);
             id = ids.Count == 0 ? ObjectId.Null : ids[0];
             return result;
         }
+
         public static bool AddEntityInCurrentBTR(this List<Entity> entities, Transaction transaction = null)
         {
-            return entities.AddEntityInCurrentBTR(out _, transaction);
+            return entities.AddEntityInCurrentBTR(ObjectId.Null, transaction);
         }
-        public static bool AddEntityInCurrentBTR(this List<Entity> entities, out List<ObjectId> ids, Transaction transaction = null)
+
+        public static bool AddEntityInCurrentBTR(this List<Entity> entities, ObjectId targetSpaceId, Transaction transaction = null)
+        {
+            return entities.AddEntityInCurrentBTR(out _, targetSpaceId, transaction);
+        }
+
+        public static bool AddEntityInCurrentBTR(this List<Entity> entities, out List<ObjectId> ids, ObjectId targetSpaceId = default, Transaction transaction = null)
         {
             ids = new List<ObjectId>();
+            if (entities == null || entities.Count == 0) return false;
+
+            Database db = HostApplicationServices.WorkingDatabase;
             bool newTransaction = transaction == null;
 
             try
             {
-                if (newTransaction) transaction = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction();
-                BlockTableRecord ms = transaction.GetObject(HostApplicationServices.WorkingDatabase.CurrentSpaceId, OpenMode.ForWrite) as BlockTableRecord;
+                if (newTransaction) transaction = db.TransactionManager.StartTransaction();
+
+                // Если пространство не передано или передано как Null/default, пишем в текущее пространство
+                ObjectId actualSpaceId = targetSpaceId == ObjectId.Null ? db.CurrentSpaceId : targetSpaceId;
+
+                BlockTableRecord btr = (BlockTableRecord)transaction.GetObject(actualSpaceId, OpenMode.ForWrite);
 
                 foreach (Entity e in entities)
                 {
                     if (e == null || e.IsDisposed || !e.IsNewObject) continue;
-                    ids.Add(ms.AppendEntity(e));
+                    ids.Add(btr.AppendEntity(e));
                     transaction.AddNewlyCreatedDBObject(e, true);
                 }
 
                 return true;
             }
-            catch { return false; }
+            catch
+            {
+                return false;
+            }
             finally
             {
                 if (newTransaction)
