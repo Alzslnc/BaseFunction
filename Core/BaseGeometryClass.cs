@@ -9,6 +9,31 @@ namespace BaseFunction
 {
     public static class BaseGeometryClass
     {
+        /// <summary>
+        /// Универсальный метод зеркалирования: принимает точки правой стороны (снизу вверх) 
+        /// и возвращает полный замкнутый контур (Право: снизу-вверх + Лево: сверху-вниз).
+        /// </summary>
+        /// <param name="rightPoints">Список координат правой половины (X >= 0) снизу вверх</param>
+        /// <returns>Полный замкнутый список плоских координат для построения Polyline в метрах</returns>
+        public static List<Point2d> MirrorRightPointsToFullContour(List<Point2d> rightPoints)
+        {
+            var fullContour = new List<Point2d>();
+
+            if (rightPoints == null || rightPoints.Count == 0) return fullContour;
+
+            // 1. Прямой проход: добавляем правую сторону сечения (снизу вверх)
+            fullContour.AddRange(rightPoints);
+
+            // 2. Обратный проход: добавляем левую сторону сечения (сверху вниз) с инверсией знака X
+            for (int i = rightPoints.Count - 1; i >= 0; i--)
+            {
+                // Координата X инвертируется, Y остается неизменной
+                fullContour.Add(new Point2d(-rightPoints[i].X, rightPoints[i].Y));
+            }
+
+            return fullContour;
+        }
+
         public static double AcadTextLength(string str, ObjectId styleId, double height)
         {
             if (string.IsNullOrEmpty(str)) return 0;
