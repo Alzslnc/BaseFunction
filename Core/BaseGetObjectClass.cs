@@ -639,6 +639,33 @@ namespace BaseFunction
         #endregion
 
         #region добавление и удаление объектов
+        public static bool AddInSpace(Transaction tr, BlockTable bt, List<Entity> entitiesToInsert)
+        {
+            // 3. ⚡ ФИНАЛЬНЫЙ АККОРД: Выгружаем все вхождения блоков в текущее активное пространство
+            if (entitiesToInsert.Count > 0)
+            {
+                BlockTableRecord btrToJig = new BlockTableRecord { Name = "*U" };
+                ObjectId btrToJigId = bt.Add(btrToJig);
+                tr.AddNewlyCreatedDBObject(btrToJig, true);
+                entitiesToInsert.AddEntityInCurrentBTR(btrToJigId, tr);
+                BlockReference refToJig = new BlockReference(Point3d.Origin, btrToJigId);
+                if (refToJig.EntityInsert(out ObjectId refToJigId))
+                {
+                    // 1. Взрываем (AutoCAD неявно переводит refToJig в режим ForRead)
+                    refToJig.ExplodeToOwnerSpace();
+
+                    // 2. Возвращаем режим записи и удаляем ссылку
+                    refToJig.UpgradeOpen();
+                    refToJig.Erase();
+
+                    // 3. Возвращаем режим записи и удаляем описание
+                    btrToJig.UpgradeOpen();
+                    btrToJig.Erase();
+                    return true;
+                }
+            }
+            return false;
+        }
         public static bool AddEntityInCurrentBTR(this Entity entity, Transaction transaction = null)
         {
             return entity.AddEntityInCurrentBTR(out _, ObjectId.Null, transaction);

@@ -233,12 +233,12 @@ namespace BaseFunction
         }
 
         public static ObjectId CreateTableStyle(
-            Transaction tr,
-            Database db,
-            string styleName,
-            ObjectId textStyleId,
-            bool returnStyleObject,
-            out TableStyle tableStyleObject)
+    Transaction tr,
+    Database db,
+    string styleName,
+    ObjectId textStyleId,
+    bool returnStyleObject,
+    out TableStyle tableStyleObject)
         {
             tableStyleObject = null;
 
@@ -249,7 +249,7 @@ namespace BaseFunction
             if (tableStyles == null)
                 return ObjectId.Null;
 
-            // Если стиль уже существует
+            // ЗАЩИТА СТАРОГО: Если стиль с таким именем уже есть, просто возвращаем его
             if (tableStyles.Contains(styleName))
             {
                 ObjectId existingId = tableStyles.GetAt(styleName);
@@ -260,21 +260,41 @@ namespace BaseFunction
                 return existingId;
             }
 
-            // Создаем новый чистый стиль таблицы
+            // 1. Создаем новый изолированный стиль таблицы
             TableStyle ts = new TableStyle();
 
-            // Настраиваем только базовые стандартные группы
-            SetDefaultSettings(ts, "Title", textStyleId);
-            SetDefaultSettings(ts, "Header", textStyleId);
-            SetDefaultSettings(ts, "Data", textStyleId);
-
-            // Специфические высоты шрифтов для иерархии заголовков
-            ts.SetTextHeight(3.5, "Title");
-            ts.SetTextHeight(3.0, "Header");
-
-            // Сохраняем стиль в словарь базы данных
+            // 2. СНАЧАЛА СОХРАНЯЕМ В БАЗУ ДАННЫХ (Ваше правильное решение со скриншота!)
+            // Это открывает объекту доступ к системной таблице стилей ячеек чертежа.
             ObjectId tableStyleId = tableStyles.SetAt(styleName, ts);
             tr.AddNewlyCreatedDBObject(ts, true);
+
+            // 3. НАСТРОЙКА СТИЛЕЙ ЯЧЕЕК ЧЕРЕЗ СИСТЕМНЫЕ ИМЕНА AutoCAD:
+            // В .NET API встроенные дефолтные стили называются строго "_TITLE", "_HEADER" и "_DATA"
+            string[] myCellStyles = { "_TITLE", "_HEADER", "_DATA" };
+
+            foreach (string cellStyle in myCellStyles)
+            {
+                // Теперь ключ гарантированно существует в базе данных чертежа!
+                if (textStyleId != ObjectId.Null)
+                {
+                    ts.SetTextStyle(textStyleId, cellStyle);
+                }
+
+                // Настраиваем отступы текста внутри ячеек (SetMargin теперь отработает без ошибок)
+                ts.SetMargin(CellMargins.Left | CellMargins.Right, 0.5, cellStyle);
+                ts.SetMargin(CellMargins.Top | CellMargins.Bottom, 0.5, cellStyle);               
+            }
+            // Выравнивание по центру ячейки
+            ts.SetAlignment(CellAlignment.MiddleCenter, (int)RowType.DataRow);
+
+            // Включаем видимость линий сетки (границ ячеек)
+            ts.SetGridVisibility(true, (int)GridLineType.AllGridLines, (int)RowType.DataRow);
+            ts.SetGridLineWeight(LineWeight.LineWeight013, (int)GridLineType.AllGridLines, (int)RowType.DataRow);
+
+            // Задаем индивидуальную иерархию высоты текста для разных типов ячеек
+            ts.SetTextHeight(2.5, "_TITLE");
+            ts.SetTextHeight(2.5, "_HEADER");
+            ts.SetTextHeight(2.5, "_DATA");
 
             if (returnStyleObject)
             {
@@ -283,20 +303,7 @@ namespace BaseFunction
 
             return tableStyleId;
         }
-        // 1. Метод для установки дефолтных геометрических параметров стиля ячейки
-        private static void SetDefaultSettings(TableStyle ts, string styleName, ObjectId textStyleId)
-        {
-            if (textStyleId != ObjectId.Null)
-            {
-                ts.SetTextStyle(textStyleId, styleName);
-            }
 
-            ts.SetTextHeight(2.5, styleName);
-
-            // Установка отступов (Margins) 0.5 со всех сторон
-            ts.SetMargin(CellMargins.Left | CellMargins.Right, 0.5, styleName);
-            ts.SetMargin(CellMargins.Top | CellMargins.Bottom, 0.5, styleName);
-        }
 
         // 2. Метод форматирования ячейки существующей таблицы
         public static void FormatCell(this Cell cell, TableCellDataType cellDataType)
