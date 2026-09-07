@@ -20,7 +20,7 @@ namespace BaseFunction
                 {
                     MText mText = TextMerge(t, dopusk);
                     if (mText != null) result.Add(mText);
-                }                
+                }
             }
             return result;
         }
@@ -66,7 +66,7 @@ namespace BaseFunction
                 TextStyleId = dBText.TextStyleId,
                 LineWeight = dBText.LineWeight,
                 Layer = text.Layer,
-                Rotation = dBText.Rotation - csr,             
+                Rotation = dBText.Rotation - csr,
             };
 
             string contents = "";
@@ -81,7 +81,7 @@ namespace BaseFunction
             }
 
             double width = 0;
-            
+
             List<double> xLeft = new List<double>();
             List<double> xRight = new List<double>();
 
@@ -121,10 +121,10 @@ namespace BaseFunction
                 foreach (ObjectAndBound t in xList)
                 {
                     if (t.DBText != null)
-                    { 
+                    {
                         if (!string.IsNullOrEmpty(line)) line += " ";
                         line += t.DBText.TextString;
-                    }   
+                    }
                 }
 
                 if (!string.IsNullOrEmpty(line))
@@ -151,7 +151,7 @@ namespace BaseFunction
 
             location = new Point3d(xLeft[0], location.Y, 0);
 
-            locationRight = location + v * width;         
+            locationRight = location + v * width;
 
             AttachmentPoint attachmentPoint = AttachmentPoint.BottomCenter;
             if (((xLeft[xLeft.Count - 1] - xLeft[0]) / width) < 0.1) attachmentPoint = AttachmentPoint.BottomLeft;
@@ -203,9 +203,9 @@ namespace BaseFunction
                 {
                     List<Curve3d> curCurves = new List<Curve3d>() { current[0].Bound.GetGeCurve() };
                     bool Added = true;
-                    
+
                     while (Added)
-                    {          
+                    {
                         Added = false;
                         for (int i = objectAndBounds.Count - 1; i >= 0; i--)
                         {

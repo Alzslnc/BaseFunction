@@ -282,7 +282,7 @@ namespace BaseFunction
 
                 // Настраиваем отступы текста внутри ячеек (SetMargin теперь отработает без ошибок)
                 ts.SetMargin(CellMargins.Left | CellMargins.Right, 0.5, cellStyle);
-                ts.SetMargin(CellMargins.Top | CellMargins.Bottom, 0.5, cellStyle);               
+                ts.SetMargin(CellMargins.Top | CellMargins.Bottom, 0.5, cellStyle);
             }
             // Выравнивание по центру ячейки
             ts.SetAlignment(CellAlignment.MiddleCenter, (int)RowType.DataRow);

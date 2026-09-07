@@ -1,11 +1,12 @@
 ﻿using Autodesk.AutoCAD.DatabaseServices;
 using Autodesk.AutoCAD.Geometry;
+using System;
 using System.Collections.Generic;
 
 namespace BaseFunction
 {
     public static class BaseCreateClass
-    { 
+    {
         /// <summary>
         /// Базовый метод-помощник для ультра-быстрого создания объекта Polyline по списку плоских координат.
         /// </summary>
@@ -38,7 +39,7 @@ namespace BaseFunction
             Vector3d actualDirection = direction ?? Vector3d.XAxis;
 
             MLeader mLeader = new MLeader()
-            {     
+            {
                 ArrowSize = 0,
                 LandingGap = 0,
                 ContentType = ContentType.MTextContent
@@ -71,8 +72,8 @@ namespace BaseFunction
             mLeader.SetTextAttachmentType(TextAttachmentType.AttachmentBottomOfTopLine, LeaderDirectionType.TopLeader);
 
             return mLeader;
-    }
-      
+        }
+
         /// <summary>
         /// Универсальный метод создания штриховки с поддержкой многоуровневого контроля вложенности островков.
         /// </summary>
@@ -160,6 +161,94 @@ namespace BaseFunction
 
             return hatch;
         }
+        public static Dimension CreateDimension(Point3d startPoint, Point3d endPoint, double offset)
+        {
+            // Создаем временную линию. Поскольку мы не добавляем её в базу данных (ms), 
+            // блок using корректно уничтожит её в памяти после завершения работы.
+            using (Line temporaryLine = new Line(startPoint, endPoint))
+            {
+                // Передаем временную линию в основной метод. 
+                // Флаги returnArcLength и returnDiameter здесь не имеют значения, так как это Line.
+                return CreateDimension(temporaryLine, offset);
+            }
+        }
+        public static Dimension CreateDimension(Curve curve, double offset, bool returnArcLength = false, bool returnDiameter = true)
+        {
+            CoordinateSystem3d coordinate = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor.CurrentUserCoordinateSystem.CoordinateSystem3d;
+
+            if (curve is Line)
+            {
+                if (!curve.GetCentrPoint(out Point3d point)) return null;
+
+                AlignedDimension dim = new AlignedDimension();
+                dim.Normal = coordinate.Zaxis;
+                dim.XLine1Point = curve.StartPoint;
+                dim.XLine2Point = curve.EndPoint;
+                dim.DimLinePoint = point + (curve.EndPoint - curve.StartPoint).TransformBy(Matrix3d.Rotation(Math.PI / 2, Vector3d.ZAxis, point)).GetNormal() * offset;
+                dim.Layer = "!_dimension";
+                return dim;
+            }
+
+            if (curve is Circle circle)
+            {
+                if (returnDiameter)
+                {
+                    DiametricDimension dim = new DiametricDimension();
+                    dim.Normal = coordinate.Zaxis;
+                    dim.FarChordPoint = circle.StartPoint + (circle.Center - circle.StartPoint) * 2;
+                    dim.ChordPoint = circle.StartPoint;
+                    dim.Layer = "!_dimension";
+                    return dim;
+                }
+                else
+                {
+                    RadialDimension dim = new RadialDimension();
+                    dim.Normal = coordinate.Zaxis;
+                    dim.Center = circle.Center;
+                    dim.ChordPoint = circle.StartPoint;
+                    dim.Layer = "!_dimension";
+                    return dim;
+                }
+            }
+
+            if (curve is Arc arc)
+            {
+                if (!curve.GetCentrPoint(out Point3d point)) return null;
+
+                // 1. Наивысший приоритет для дуги — длина, если флаг включен
+                if (returnArcLength)
+                {
+                    ArcDimension dim = new ArcDimension(arc.Center, arc.StartPoint, arc.EndPoint, point + (point - arc.Center).GetNormal() * offset,
+                        "<>", HostApplicationServices.WorkingDatabase.Dimstyle);
+                    dim.Normal = coordinate.Zaxis;
+                    dim.Layer = "!_dimension";
+                    return dim;
+                }
+
+                // 2. Вторичный приоритет — диаметр или радиус по первому флагу
+                if (returnDiameter)
+                {
+                    DiametricDimension dim = new DiametricDimension();
+                    dim.Normal = coordinate.Zaxis;
+                    dim.FarChordPoint = point + (arc.Center - point) * 2;
+                    dim.ChordPoint = point;
+                    dim.Layer = "!_dimension";
+                    return dim;
+                }
+                else
+                {
+                    RadialDimension dim = new RadialDimension();
+                    dim.Normal = coordinate.Zaxis;
+                    dim.Center = arc.Center;
+                    dim.ChordPoint = point;
+                    dim.Layer = "!_dimension";
+                    return dim;
+                }
+            }
+
+            return null;
+        }
+
     }
 }
 

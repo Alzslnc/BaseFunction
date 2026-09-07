@@ -72,7 +72,7 @@ namespace BaseFunction
             Dictionary<Curve, int> iLvls = new Dictionary<Curve, int>();
             if (listChech)
             {
-                foreach (Curve c in polylines) iLvls.Add(c, c.GetInnerLevelOld(polylines, listChech : false));
+                foreach (Curve c in polylines) iLvls.Add(c, c.GetInnerLevelOld(polylines, listChech: false));
             }
             int maxIlvl = -1;
             int j = 0;
@@ -711,7 +711,7 @@ namespace BaseFunction
             // Если после фильтрации контур штриховки потерял элементы или стал невалидным — 
             // дальнейший расчет лучей не имеет смысла.
             if (validCurves.Count == 0 || validCurves.Count != curves.Count)
-            {   
+            {
                 return PositionType.fault;
             }
 
@@ -759,7 +759,7 @@ namespace BaseFunction
             foreach (Curve curve in curves)
             {
                 if (curve == null || curve.IsDisposed || curve.GetLength() == 0) continue;
-                                    
+
                 // Взводим флаг валидности один раз при первом успехе
                 if (!hasExtents) hasExtents = true;
                 totalExtents.AddExtents(curve.GeometricExtents);
@@ -784,7 +784,7 @@ namespace BaseFunction
                 {
                     continue;
                 }
-                          
+
                 // Заворачиваем в локальный try-catch строго этот вызов на случай "кривой" нативной геометрии.
                 try
                 {
@@ -896,7 +896,7 @@ namespace BaseFunction
                     }
 
                     currentRayIntersections = uniquePoints.Count;
-                                       
+
                     if (currentRayIntersections == 0)
                     {
                         return PositionType.outer; // Мгновенный выход из всего метода!

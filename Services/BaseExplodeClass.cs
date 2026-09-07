@@ -16,18 +16,18 @@ namespace BaseFunction
             using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
             {
                 using (BlockTableRecord ms = tr.GetObject(HostApplicationServices.WorkingDatabase.CurrentSpaceId, OpenMode.ForWrite) as BlockTableRecord)
-                { 
+                {
                     List<ObjectId> result = ExplodeObject(e, tr, ms, erase);
                     tr.Commit();
                     return result;
-                }                   
+                }
             }
         }
         /// <summary>
         /// получает составные элементы объекта и добавляет их в чертеж, возвращает их ObjectId
         /// </summary>
         public static List<ObjectId> ExplodeObject(Entity e, Transaction tr, BlockTableRecord ms, bool erase)
-        { 
+        {
             List<ObjectId> result = new List<ObjectId>();
             try
             {
@@ -57,25 +57,25 @@ namespace BaseFunction
                     }
                 }
             }
-            catch { }        
-            return result;  
+            catch { }
+            return result;
         }
         /// <summary>
         /// расчленияет блок и возвращает ObjectId полученных элементов
         /// </summary>
         public static List<ObjectId> ExplodeBlock(Transaction tr, Database db, ObjectId id, bool erase, bool inLayer, bool recursive, bool explodeProxy, Matrix3d matrix, BlockReference br = null)
         {
-            
-            List <ObjectId> result = new List<ObjectId>();
+
+            List<ObjectId> result = new List<ObjectId>();
             List<ObjectId> attrList = new List<ObjectId>();
             List<ObjectId> dimList = new List<ObjectId>();
             List<ObjectId> toExplode = new List<ObjectId>();
             // Открываем вставку блока – для расчленения достаточно возможности
             // открыть «для чтения»т.к. эта операция не меняет исходный примитив          
-            if (br == null) br = tr.GetObject(id, OpenMode.ForRead, false, true) as BlockReference;           
+            if (br == null) br = tr.GetObject(id, OpenMode.ForRead, false, true) as BlockReference;
             if (br == null) { return result; }
 
-            matrix = br.BlockTransform ;
+            matrix = br.BlockTransform;
 
             Scale3d scale3D = br.ScaleFactors;
             double scale = 1;
@@ -118,14 +118,14 @@ namespace BaseFunction
                                     result.Add(ms.AppendEntity(nText));
                                     tr.AddNewlyCreatedDBObject(nText, true);
                                 }
-                            }                          
+                            }
                         }
                     }
                 }
             }
             if (explodeProxy)
             {
-                
+
 
                 ObjectId btrId = ObjectId.Null;
 
@@ -138,7 +138,7 @@ namespace BaseFunction
                     {
                         BlockTableRecord btr = tr.GetObject(btrId, OpenMode.ForRead, false, true) as BlockTableRecord;
                         foreach (ObjectId prId in btr)
-                        {                       
+                        {
                             ProxyEntity proxyEntity = tr.GetObject(prId, OpenMode.ForRead, false, true) as ProxyEntity;
                             if (proxyEntity != null && proxyEntity.GraphicsMetafileType == GraphicsMetafileType.FullGraphics)
                             {
@@ -160,7 +160,7 @@ namespace BaseFunction
 
                         }
                     }
-                }      
+                }
             }
             // Создаем обработчик для получения вложенных вставок блока
             void handler(object s, ObjectEventArgs e)
@@ -180,7 +180,7 @@ namespace BaseFunction
             foreach (ObjectId bid in toExplode)
             {
                 result.AddRange(ExplodeBlock(tr, db, bid, erase, inLayer, recursive, explodeProxy, matrix));
-            }   
+            }
             //удаляем атрибуты, они уже преобразованы в тексты
             foreach (ObjectId objectId in attrList)
             {
@@ -202,7 +202,7 @@ namespace BaseFunction
                             {
                                 dstr.Dimscale *= scale;
                             }
-                            catch { }                         
+                            catch { }
                             result.Add(objectId);
                         }
                     }

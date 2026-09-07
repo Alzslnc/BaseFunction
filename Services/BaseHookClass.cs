@@ -6,6 +6,7 @@ namespace BaseFunction
 {
     public abstract class BaseHookClass : IDisposable
     {
+        private GCHandle _gcHandle;
         public object ob = null;
         public BaseHookClass(object o)
         {
@@ -87,8 +88,10 @@ namespace BaseFunction
             if (callBackFunc != null)
             {
                 acedRemoveFilterWinMsg(callBackFunc);
+                if (_gcHandle.IsAllocated) _gcHandle.Free();
             }
             callBackFunc = new WindowHookProc(Hook);
+            _gcHandle = GCHandle.Alloc(callBackFunc);
             acedRegisterFilterWinMsg(callBackFunc);
         }
 
@@ -98,6 +101,11 @@ namespace BaseFunction
             {
                 acedRemoveFilterWinMsg(callBackFunc);
                 callBackFunc = null;
+            }
+
+            if (_gcHandle.IsAllocated)
+            {
+                _gcHandle.Free();
             }
         }
 

@@ -58,7 +58,8 @@ namespace BaseFunction
                     Position = Point3d.Origin,
 
                     // Задаем строку тексту
-                    TextString = str
+                    TextString = str,
+                    Height = height,
                 };
 
                 // Помимо назначения стиля, нужно еще дополнительно
@@ -69,8 +70,6 @@ namespace BaseFunction
                 {
                     dbTxt.Oblique = txtStyle.ObliquingAngle;
                     dbTxt.WidthFactor = txtStyle.XScale;
-                    // Задаем желаемую
-                    dbTxt.Height = height;
                 }
                 // Вычисляем длину текста
                 Point3d ptMin = dbTxt.GeometricExtents.MinPoint;
@@ -592,7 +591,7 @@ namespace BaseFunction
             result = Point3d.Origin;
             if (curve == null || curve.IsDisposed || curve.IsErased) return false;
             try
-            {              
+            {
                 // Получаем дистанции параметров за один проход
                 double startDist = curve.GetDistanceAtParameter(curve.StartParam);
                 double endDist = curve.GetDistanceAtParameter(curve.EndParam);
@@ -874,7 +873,7 @@ namespace BaseFunction
             typeof(Polyline2d),
             typeof(Polyline3d),
             typeof(Spline),
-            typeof(Helix) 
+            typeof(Helix)
         };
 
         public static readonly HashSet<Type> NonLengthCurveTypes = new HashSet<Type>
@@ -908,7 +907,66 @@ namespace BaseFunction
 
             return false;
         }
+        /// <summary>
+        /// Проверяет, является ли объект чистым примитивом AutoCAD без наследников Civil 3D.
+        /// </summary>
+        public static bool IsVanillaCurve(this System.Type type)
+        {
+            return type != null && BaseCurveTypes.Contains(type);
+        }
+        /// <summary>
+        /// Метод расширения для ОДИНОЧНОГО типа: если передан базовый Curve, возвращает список чистых кривых AutoCAD.
+        /// Если передан конкретный тип, возвращает список из одного этого типа.
+        /// </summary>
+        public static List<Type> FilterVanillaCurves(this Type sourceType)
+        {
+            if (sourceType == null) return new List<Type>();
 
+            // Если запрошен абстрактный Curve — разворачиваем его в безопасный белый список
+            if (sourceType == typeof(Curve))
+            {
+                return new List<Type>(BaseCurveTypes);
+            }
+
+            // Если запрошен любой другой конкретный тип (ванильный или Civil 3D) — возвращаем его
+            return new List<Type> { sourceType };
+        }
+
+        /// <summary>
+        /// Метод расширения для СПИСКА типов: если в списке есть базовый тип Curve, заменяет его на строгий список чистых кривых.
+        /// </summary>
+        public static List<Type> FilterVanillaCurves(this List<Type> sourceTypes)
+        {
+            if (sourceTypes == null) return new List<Type>();
+
+            var result = new List<Type>();
+            bool hasGenericCurve = false;
+
+            foreach (Type t in sourceTypes)
+            {
+                if (t == typeof(Curve))
+                {
+                    hasGenericCurve = true;
+                }
+                else if (t != null && !result.Contains(t))
+                {
+                    result.Add(t);
+                }
+            }
+
+            if (hasGenericCurve)
+            {
+                foreach (Type vanillaType in BaseCurveTypes)
+                {
+                    if (!result.Contains(vanillaType))
+                    {
+                        result.Add(vanillaType);
+                    }
+                }
+            }
+
+            return result;
+        }
         public static bool IsEqualTo(this double d1, double d2)
         {
             return d1.IsEqualTo(d2, 0);

@@ -306,8 +306,8 @@ namespace BaseFunction
         /// </summary>
         public class ParametrClass
         {
-            public ParametrClass(Entity e) 
-            { 
+            public ParametrClass(Entity e)
+            {
                 Color = e.Color;
                 Layer = e.Layer;
                 LineWeight = e.LineWeight;
@@ -319,7 +319,7 @@ namespace BaseFunction
             public LineWeight LineWeight { get; private set; }
             public Type Type { get; private set; }
             public string LineType { get; private set; }
-        }        
+        }
         public void Dispose()
         {
             if (IsDisposed) return;

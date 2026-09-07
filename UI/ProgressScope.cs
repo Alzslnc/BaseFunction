@@ -132,7 +132,7 @@ namespace Progress
         }
 
         public void RestartMain(string message, int totalSteps, bool showCounter = true)
-        {           
+        {
             ViewModel.BaseMainStatus = message;
             ViewModel.MainTotalSteps = totalSteps;
             ViewModel.MainCurrentSteps = 0;
@@ -177,7 +177,7 @@ namespace Progress
             ViewModel.SubCurrentSteps++;
             RefreshProgressAndTexts();
         }
-              
+
 
         /// <summary>
         /// Единый метод для одновременного пересчета процентов и обновления текстовых статусов
@@ -240,7 +240,7 @@ namespace Progress
             if (mainMessage != null) ViewModel.BaseMainStatus = mainMessage;
 
             // Обновление дополнительного прогресс-бара
-            if (subTotal.HasValue) 
+            if (subTotal.HasValue)
             {
                 ViewModel.SubTotalSteps = subTotal.Value;
                 ViewModel.RecalculateSubLerp();  // Пересчитываем если изменился лимит

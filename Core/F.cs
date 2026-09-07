@@ -12,7 +12,7 @@ namespace BaseFunction
         [DllImport("acad.exe", EntryPoint = "?acedHatchPalletteDialog@@YA_NPEB_W_NAEAPEA_W@Z", CharSet = CharSet.Auto)]
 
         static extern bool acedHatchPalletteDialog(string currentPattern, bool showcustom, out IntPtr newpattern);
-        
+
         internal static bool GetHatchPattern(out string hatchType, string baseHatchType)
         {
             hatchType = string.Empty;
@@ -42,7 +42,7 @@ namespace BaseFunction
         }
 
         public static void ExtensionDictionaryErase(List<ObjectId> ids)
-        {              
+        {
             using (Transaction tr = HostApplicationServices.WorkingDatabase.TransactionManager.StartTransaction())
             {
                 foreach (ObjectId id in ids)
@@ -96,8 +96,8 @@ namespace BaseFunction
         }
 
 
-        
-               
+
+
         /// <summary>
         /// Выключает привязки на объектах из списка (утянул у киану вроде, точно не помню)
         /// </summary>
@@ -148,7 +148,8 @@ namespace BaseFunction
                             ent.XData = rb;
                         }
                     }
-                };
+                }
+                ;
                 tr.Commit();
             }
         }
@@ -182,7 +183,8 @@ namespace BaseFunction
                             }
                         }
                     }
-                };
+                }
+                ;
                 tr.Commit();
             }
         }
@@ -324,7 +326,7 @@ namespace BaseFunction
                 finally
                 {
                     if (transaction == null)
-                    { 
+                    {
                         tr?.Commit();
                         tr?.Dispose();
                     }
@@ -376,7 +378,7 @@ namespace BaseFunction
         }
 
         public static void CheckAndCreateApp(string app)
-        {           
+        {
             //регистрируем приложение если еще не зарегистрировано
             using (RegAppTable rat = HostApplicationServices.WorkingDatabase.RegAppTableId.Open(OpenMode.ForWrite, false, true) as RegAppTable)
             {

@@ -7,8 +7,7 @@ using System.Text;
 using System.Threading.Tasks;
 
 namespace BaseFunction
-{   
-
+{
     /// <summary>
     /// Атомарное математическое ядро для нарезки треугольников.
     /// Не имеет зависимостей от Civil 3D. Оперирует чистой геометрией.
@@ -109,7 +108,7 @@ namespace BaseFunction
 
                 Point3d[] piecePos = { vZero, vPlus, intersect };
                 Point3d[] pieceNeg = { vZero, vMinus, intersect };
-                               
+
                 // Если верхний осколок выродился — отдаем весь исходный треугольник целиком вниз (-)
                 if (IsPointsDegenerate(piecePos))
                 {
@@ -280,7 +279,7 @@ namespace BaseFunction
     /// Полностью изолирован от Civil 3D и адаптирован для работы с внешними прогресс-барами.
     /// </summary>
     public static class RegionTopologyService
-    {      
+    {
         /// <summary>
         /// ШАГ 1: Поштучное контролируемое создание элементарных регионов из сырых полигонов точек.
         /// Изолирует каждый треугольник, гарантируя, что пограничные коллизии ACIS не сломают весь расчет.

@@ -14,12 +14,12 @@ namespace BaseFunction
                 //доворот пск
                 double csr = 0;
                 if (System.Convert.ToInt32(Autodesk.AutoCAD.ApplicationServices.Application.GetSystemVariable("WORLDUCS")) == 0)
-                {     
+                {
                     Vector3d xAxT = Autodesk.AutoCAD.ApplicationServices.Application.
                         DocumentManager.MdiActiveDocument.Editor.CurrentUserCoordinateSystem.
                         CoordinateSystem3d.Xaxis.ProjectTo(new Plane().Normal, Vector3d.ZAxis);
                     Vector3d xAx = Vector3d.XAxis;
-                    csr = Math.Acos((xAx.X * xAxT.X + xAx.Y * xAxT.Y) / ( Math.Sqrt(xAx.X * xAx.X + xAx.Y * xAx.Y) * Math.Sqrt(xAxT.X * xAxT.X + xAxT.Y * xAxT.Y)));
+                    csr = Math.Acos((xAx.X * xAxT.X + xAx.Y * xAxT.Y) / (Math.Sqrt(xAx.X * xAx.X + xAx.Y * xAx.Y) * Math.Sqrt(xAxT.X * xAxT.X + xAxT.Y * xAxT.Y)));
                     if (csr == double.NaN) csr = 0;
                 }
                 double rotation = mText.Rotation + csr;
@@ -61,12 +61,12 @@ namespace BaseFunction
                         break;
                 }
                 return CreatePolyline(new List<Point3d>
-                { 
+                {
                     point,
                     (point + vx * w),
                     (point + vx * w + vy * h),
                     (point + vy * h),
-                });              
+                });
             }
         }
         public static Polyline CreatePolyline(this DBText texta)

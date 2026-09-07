@@ -6,7 +6,7 @@ using static BaseFunction.BaseBlockReferenceClass;
 namespace BaseFunction
 {
     public static class EntityJigInsert
-    {       
+    {
         /// <summary>
         /// вставляет объект в выбранное пользователем место в чертеже
         /// </summary>
@@ -130,7 +130,7 @@ namespace BaseFunction
                     else if (e is Curve cu) { point2 = cu.StartPoint; }
                     else if (e is MLeader ml) { point2 = ml.GetFirstVertex(0); }
                     else if (e is BlockReference br) { point2 = br.Position; }
-              
+
                     //переносим объект 
                     //переменная для определения открыт ли объект на чтение
                     bool read = false;
@@ -148,7 +148,7 @@ namespace BaseFunction
                         ent.DowngradeOpen();
                     }
                     return true;
-                }           
+                }
             }
             catch
             { }

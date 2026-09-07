@@ -5,7 +5,6 @@ using Autodesk.AutoCAD.Runtime;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using agi = Autodesk.AutoCAD.GraphicsInterface;
 
 namespace BaseFunction
 {
@@ -13,89 +12,122 @@ namespace BaseFunction
     {
         #region получение дробного числа
         /// <summary>
-        /// Запрашивает у пользователя дробное число и если пользователь его ввел возвращает
+        /// Запрашивает у пользователя дробное число со значением по умолчанию 0.
         /// </summary>
         public static bool TryGetDoubleFromUser(out double result)
         {
             return TryGetDoubleFromUser(out result, 0, null, null, "Введите число");
         }
+
         /// <summary>
-        /// Запрашивает у пользователя дробное число и если пользователь его ввел возвращает
+        /// Запрашивает у пользователя дробное число со значением по умолчанию 0 и кастомным сообщением.
         /// </summary>
         public static bool TryGetDoubleFromUser(out double result, string message)
         {
             return TryGetDoubleFromUser(out result, 0, null, null, message);
         }
+
         /// <summary>
-        /// Запрашивает у пользователя дробное число и если пользователь его ввел возвращает
-        /// </summary>
-        public static bool TryGetDoubleFromUser(out double result, double baseValue, string message)
-        {
-            return TryGetDoubleFromUser(out result, baseValue, null, null, message);
-        }
-        /// <summary>
-        /// Запрашивает у пользователя дробное число и если пользователь его ввел возвращает
+        /// Запрашивает у пользователя дробное число со значением по умолчанию.
         /// </summary>
         public static bool TryGetDoubleFromUser(out double result, double baseValue)
         {
             return TryGetDoubleFromUser(out result, baseValue, null, null, "Введите число");
         }
+
         /// <summary>
-        /// Запрашивает у пользователя дробное число и если пользователь его ввел возвращает
+        /// Запрашивает у пользователя дробное число со значением по умолчанию и кастомным сообщением.
+        /// </summary>
+        public static bool TryGetDoubleFromUser(out double result, double baseValue, string message)
+        {
+            return TryGetDoubleFromUser(out result, baseValue, null, null, message);
+        }
+
+        /// <summary>
+        /// Запрашивает у пользователя дробное число со значением по умолчанию 0 в заданных диапазонах.
         /// </summary>
         public static bool TryGetDoubleFromUser(out double result, double? minValue, double? maxValue)
         {
             return TryGetDoubleFromUser(out result, 0, minValue, maxValue, "Введите число");
         }
+
         /// <summary>
-        /// Запрашивает у пользователя дробное число и если пользователь его ввел возвращает
+        /// Базовый метод: запрашивает у пользователя дробное число с округлением до 6 знаков и выравниванием по границам.
         /// </summary>
-        /// <param name="result">Вывод полученного числа (0) если пользователь отменил выбор</param>
-        /// <param name="baseValue">Число по умолчанию</param>
-        /// <param name="minValue">Минимальный принимаемый результат</param>
-        /// <param name="maxValue">Максимальный принимаемый результат</param>
-        /// <param name="message">Сообщение для пользователя при выборе числа</param>
-        /// <returns>true если пользователь ввел число, false если произвел отмену</returns>
         public static bool TryGetDoubleFromUser(out double result, double baseValue, double? minValue, double? maxValue, string message)
         {
-            PromptStringOptions pso = new PromptStringOptions("\n" + message + "(" + minValue + " - " + maxValue + ")")
+            // Округляем входящие границы (если они заданы), чтобы избежать шума при сравнении
+            double? roundedMin = minValue.HasValue ? (double?)Math.Round(minValue.Value, 6) : null;
+            double? roundedMax = maxValue.HasValue ? (double?)Math.Round(maxValue.Value, 6) : null;
+
+            // Сначала округляем дефолтное значение
+            baseValue = Math.Round(baseValue, 6);
+
+            // Выравниваем baseValue по округленным границам
+            if (roundedMin.HasValue && baseValue < roundedMin.Value)
+                baseValue = roundedMin.Value;
+            if (roundedMax.HasValue && baseValue > roundedMax.Value)
+                baseValue = roundedMax.Value;
+
+            // Формируем красивую подсказку с точкой
+            string rangeInfo = "";
+            if (roundedMin.HasValue || roundedMax.HasValue)
             {
-                //текст в строке автокада
-                DefaultValue = baseValue.ToString(),
-                //могут ли быть пробелы в тексте от пользователя
+                string minStr = roundedMin.HasValue ? roundedMin.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : null;
+                string maxStr = roundedMax.HasValue ? roundedMax.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : null;
+
+                if (roundedMin.HasValue && roundedMax.HasValue)
+                    rangeInfo = $" [{minStr} - {maxStr}]";
+                else if (roundedMin.HasValue)
+                    rangeInfo = $" [>= {minStr}]";
+                else if (roundedMax.HasValue)
+                    rangeInfo = $" [<= {maxStr}]";
+            }
+
+            string promptText = $"\n{message}{rangeInfo}";
+
+            PromptStringOptions pso = new PromptStringOptions(promptText)
+            {
+                // Переводим в строку строго через InvariantCulture, чтобы в скобках < > была точка
+                DefaultValue = baseValue.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 AllowSpaces = false,
-                //добавление дефолтного значения в строку
                 UseDefaultValue = true
             };
-            //ждем от пользователя результат пока он его не выдаст или не отменит
+
+            var ed = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor;
+
             while (true)
             {
-                PromptResult res = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor.GetString(pso);
-                //если отмена возвращаем null
+                PromptResult res = ed.GetString(pso);
+
                 if (res.Status == PromptStatus.Cancel)
                 {
                     result = 0;
                     return false;
                 }
-                //если результат принят проверяем на допуски
                 else if (res.Status == PromptStatus.OK)
                 {
-                    //если результат пустой то лпять запрашиваем
                     if (string.IsNullOrEmpty(res.StringResult)) continue;
-                    //если результат не парсится то опять запрашиваем
-                    if (!double.TryParse(res.StringResult.Replace(",", "."), out double dRes)) continue;
-                    //если результат не в допуске то опять запрашиваем
-                    if (minValue.HasValue && dRes < minValue)
+
+                    string cleanInput = res.StringResult.Replace(",", ".");
+                    if (!double.TryParse(cleanInput, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out double dRes))
+                        continue;
+
+                    dRes = Math.Round(dRes, 6);
+
+                    if (roundedMin.HasValue && dRes < roundedMin.Value)
                     {
-                        Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor.WriteMessage("\nВведено число ниже допустимого значения - " + minValue);
+                        string minStr = roundedMin.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                        ed.WriteMessage($"\nЧисло ниже допустимого ({minStr}).");
                         continue;
                     }
-                    if (maxValue.HasValue && dRes > maxValue)
+                    if (roundedMax.HasValue && dRes > roundedMax.Value)
                     {
-                        Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor.WriteMessage("\nВведено число выше допустимого значения - " + maxValue);
+                        string maxStr = roundedMax.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                        ed.WriteMessage($"\nЧисло выше допустимого ({maxStr}).");
                         continue;
                     }
-                    //если все нормально возвращаем результат
+
                     result = dRes;
                     return true;
                 }
@@ -105,60 +137,79 @@ namespace BaseFunction
 
         #region получение целого числа
         /// <summary>
-        /// Запрашивает у пользователя дробное число и если пользователь его ввел возвращает
+        /// Запрашивает у пользователя целое число со значением по умолчанию 0.
         /// </summary>
         public static bool TryGetIntFromUser(out int result)
         {
             return TryGetIntFromUser(out result, 0, null, null, "Введите целое число");
         }
+
         /// <summary>
-        /// Запрашивает у пользователя дробное число и если пользователь его ввел возвращает
+        /// Запрашивает у пользователя целое число со значением по умолчанию 0 и кастомным сообщением.
         /// </summary>
         public static bool TryGetIntFromUser(out int result, string message)
         {
             return TryGetIntFromUser(out result, 0, null, null, message);
         }
+
         /// <summary>
-        /// Запрашивает у пользователя дробное число и если пользователь его ввел возвращает
+        /// Запрашивает у пользователя целое число со значением по умолчанию.
         /// </summary>
         public static bool TryGetIntFromUser(out int result, int baseValue)
         {
             return TryGetIntFromUser(out result, baseValue, null, null, "Введите целое число");
         }
+
         /// <summary>
-        /// Запрашивает у пользователя дробное число и если пользователь его ввел возвращает
+        /// Запрашивает у пользователя целое число со значением по умолчанию и кастомным сообщением.
         /// </summary>
         public static bool TryGetIntFromUser(out int result, int baseValue, string message)
         {
             return TryGetIntFromUser(out result, baseValue, null, null, message);
         }
+
         /// <summary>
-        /// Запрашивает у пользователя дробное число и если пользователь его ввел возвращает
+        /// Запрашивает у пользователя целое число со значением по умолчанию 0 в заданных диапазонах.
         /// </summary>
         public static bool TryGetIntFromUser(out int result, int? minValue, int? maxValue)
         {
             return TryGetIntFromUser(out result, 0, minValue, maxValue, "Введите целое число");
         }
+
         /// <summary>
-        /// Запрашивает у пользователя целое число и если пользователь его ввел возвращает
+        /// Базовый метод: запрашивает у пользователя целое число. Автоматически корректирует baseValue под границы.
         /// </summary>
-        /// <param name="result">Вывод полученного числа (0) если пользователь отменил выбор</param>
-        /// <param name="baseValue">Число по умолчанию</param>
-        /// <param name="minValue">Минимальный принимаемый результат</param>
-        /// <param name="maxValue">Максимальный принимаемый результат</param>
-        /// <param name="message">Сообщение для пользователя при выборе числа</param>
-        /// <returns>true если пользователь ввел число, false если произвел отмену</returns>
         public static bool TryGetIntFromUser(out int result, int baseValue, int? minValue, int? maxValue, string message)
         {
-            PromptStringOptions pso = new PromptStringOptions("\n" + message + "(" + minValue + " - " + maxValue + ")")
+            // Совместимое с .NET 4.7.2 выравнивание по границам
+            if (minValue.HasValue && baseValue < minValue.Value)
+                baseValue = minValue.Value;
+            if (maxValue.HasValue && baseValue > maxValue.Value)
+                baseValue = maxValue.Value;
+
+            string rangeInfo = "";
+            if (minValue.HasValue && maxValue.HasValue)
+                rangeInfo = $" [{minValue} - {maxValue}]";
+            else if (minValue.HasValue)
+                rangeInfo = $" [>= {minValue}]";
+            else if (maxValue.HasValue)
+                rangeInfo = $" [<= {maxValue}]";
+
+            string promptText = $"\n{message}{rangeInfo}";
+
+            PromptStringOptions pso = new PromptStringOptions(promptText)
             {
                 DefaultValue = baseValue.ToString(),
                 AllowSpaces = false,
                 UseDefaultValue = true
             };
+
+            var ed = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor;
+
             while (true)
             {
-                PromptResult res = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor.GetString(pso);
+                PromptResult res = ed.GetString(pso);
+
                 if (res.Status == PromptStatus.Cancel)
                 {
                     result = 0;
@@ -166,19 +217,23 @@ namespace BaseFunction
                 }
                 else if (res.Status == PromptStatus.OK)
                 {
-
                     if (string.IsNullOrEmpty(res.StringResult)) continue;
-                    if (!int.TryParse(res.StringResult, out int iRes)) continue;
-                    if (minValue.HasValue && iRes < minValue)
+
+                    string cleanInput = res.StringResult.Trim();
+                    if (!int.TryParse(cleanInput, out int iRes))
+                        continue;
+
+                    if (minValue.HasValue && iRes < minValue.Value)
                     {
-                        Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor.WriteMessage("\nВведено число ниже допустимого значения - " + minValue);
+                        ed.WriteMessage($"\nВведено число ниже допустимого значения - {minValue.Value}");
                         continue;
                     }
-                    if (iRes < minValue || iRes > maxValue)
+                    if (maxValue.HasValue && iRes > maxValue.Value)
                     {
-                        Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor.WriteMessage("\nВведено число выше допустимого значения - " + maxValue);
+                        ed.WriteMessage($"\nВведено число выше допустимого значения - {maxValue.Value}");
                         continue;
                     }
+
                     result = iRes;
                     return true;
                 }
@@ -187,18 +242,44 @@ namespace BaseFunction
         #endregion
 
         #region точки
+        /// <summary>
+        /// Запрашивает у пользователя прямоугольную область на плоскости через две точки.
+        /// Возвращает границы в системе координат WCS со сброшенной координатой Z.
+        /// </summary>
         public static bool TryGetRegion(out Extents3d result)
         {
             result = new Extents3d();
-            if (!TryGetPointFromUser(out Point3d firstCorner, "Выберите первый угол:")) return false;
+            var ed = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor;
 
-            PromptPointResult promptPointResult =
-                Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor.GetCorner("\nВыберите второй угол:", firstCorner);
+            // 1. Запрашиваем первую точку в UCS (передаем false в inWCS!), чтобы GetCorner отработал корректно
+            if (!TryGetPointFromUser(out Point3d firstCornerUcs, false, "Выберите первый угол:", null))
+                return false;
 
-            if (promptPointResult.Status != PromptStatus.OK) return false;
+            // 2. Запрашиваем второй угол через GetCorner (он ожидает и возвращает точку в UCS)
+            PromptPointOptions ppo = new PromptPointOptions("\nВыберите второй угол:")
+            {
+                BasePoint = firstCornerUcs,
+                UseBasePoint = true,
+                UseDashedLine = true // Добавляет пунктирную рамку при выборе, как в стандартных командах
+            };
 
-            result.AddPoint(firstCorner.Z0());
-            result.AddPoint(promptPointResult.Value.Z0());
+            PromptPointResult resCorner = ed.GetCorner(ppo);
+            if (resCorner.Status != PromptStatus.OK) return false;
+
+            Point3d secondCornerUcs = resCorner.Value;
+
+            // 3. Переводим обе точки в WCS только СЕЙЧАС, перед формированием итогового результата
+            Matrix3d ucsToWcs = ed.CurrentUserCoordinateSystem;
+            Point3d firstCornerWcs = firstCornerUcs.TransformBy(ucsToWcs);
+            Point3d secondCornerWcs = secondCornerUcs.TransformBy(ucsToWcs);
+
+            // 4. Сбрасываем Z и формируем Extents3d
+            // (Используем ваш метод .Z0(). Если это ваш кастомный метод расширения, он применится)
+            Point3d p1 = new Point3d(firstCornerWcs.X, firstCornerWcs.Y, 0);
+            Point3d p2 = new Point3d(secondCornerWcs.X, secondCornerWcs.Y, 0);
+
+            result.AddPoint(p1);
+            result.AddPoint(p2);
 
             return true;
         }
@@ -207,39 +288,47 @@ namespace BaseFunction
         {
             return TryGetPointFromUser(out result, true, "Выберите точку", null);
         }
+
         public static bool TryGetPointFromUser(out Point3d result, string message)
         {
             return TryGetPointFromUser(out result, true, message, null);
         }
+
         public static bool TryGetPointFromUser(out Point3d result, string message, Point3d? point)
         {
             return TryGetPointFromUser(out result, true, message, point);
         }
+
+        /// <summary>
+        /// Запрашивает у пользователя точку на чертеже.
+        /// </summary>
         public static bool TryGetPointFromUser(out Point3d result, bool inWCS, string message, Point3d? point)
         {
-            Editor ed = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor;
+            var ed = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor;
             PromptPointOptions ppo = new PromptPointOptions("\n" + message);
+
             if (point.HasValue)
             {
                 ppo.BasePoint = point.Value;
                 ppo.UseBasePoint = true;
             }
-            while (true)
+
+            // В GetPoint бесконечный цикл while(true) обычно избыточен, 
+            // так как GetPoint не падает при неверном вводе (пользователь либо тыкает в экран, либо жмет Esc).
+            PromptPointResult res = ed.GetPoint(ppo);
+
+            if (res.Status == PromptStatus.OK)
             {
-                PromptPointResult res = ed.GetPoint(ppo);
-                if (res.Status == PromptStatus.Cancel)
-                {
-                    result = Point3d.Origin;
-                    return false;
-                }
-                else if (res.Status == PromptStatus.OK)
-                {
-                    result = res.Value;
-                    if (inWCS) result = result.TransformBy(ed.CurrentUserCoordinateSystem);
-                    return true;
-                }
+                result = res.Value;
+                if (inWCS)
+                    result = result.TransformBy(ed.CurrentUserCoordinateSystem);
+                return true;
             }
+
+            result = Point3d.Origin;
+            return false;
         }
+
         #endregion
 
         #region объекты в точке
@@ -251,397 +340,494 @@ namespace BaseFunction
 
         public static bool GetObjectInPoint(out List<ObjectId> result, List<Type> types, string message, List<ObjectId> excludes, Point3d? point = null, double? precision = null)
         {
-            result = new List<ObjectId>();
+            // Создаем локальный список-буфер для обхода ограничения CS1628
+            List<ObjectId> localResult = new List<ObjectId>();
+            double p = precision ?? Tolerance.Global.EqualPoint;
 
-            Point3d clickPoint;
+            var ed = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor;
 
-            if (precision == null) precision = Tolerance.Global.EqualPoint;
+            RXClass proxyClass = RXObject.GetClass(typeof(Autodesk.AutoCAD.DatabaseServices.ProxyEntity));
 
-            string typeString = "";
+            var dxfNames = new List<string>();
             foreach (Type type in types)
             {
-                if (type.Equals(typeof(ProxyEntity)))
+                RXClass currentClass = RXObject.GetClass(type);
+                if (currentClass.IsDerivedFrom(proxyClass))
                 {
-                    typeString += "ACAD_PROXY_ENTITY,";
-                    continue;
+                    dxfNames.Add("ACAD_PROXY_ENTITY");
                 }
-                typeString += RXClass.GetClass(type).DxfName + ",";
+                else
+                {
+                    dxfNames.Add(currentClass.DxfName);
+                }
             }
-            if (typeString.Length > 1) typeString = typeString.Substring(0, typeString.Length - 1);
-            //выбираем типы для множественного выбора
-            TypedValue[] values = new TypedValue[]
+            string typeString = string.Join(",", dxfNames);
+
+            SelectionFilter filter = new SelectionFilter(new[]
             {
-                  new TypedValue((int)DxfCode.Start,typeString)
-            };
+                new TypedValue((int)DxfCode.Start, typeString)
+            });
 
-            //объявляем фильтр
-            SelectionFilter filter = new SelectionFilter(values);
+            HashSet<ObjectId> excludeSet = excludes != null && excludes.Count > 0
+                ? new HashSet<ObjectId>(excludes)
+                : null;
 
+            // Теперь локальная функция безопасно наполняет localResult вместо out result
+            bool ProcessSelection(PromptSelectionResult psr)
+            {
+                if (psr.Status == PromptStatus.OK)
+                {
+                    ObjectId[] ids = psr.Value.GetObjectIds();
+                    if (excludeSet != null)
+                    {
+                        foreach (ObjectId id in ids)
+                        {
+                            if (!excludeSet.Contains(id)) localResult.Add(id);
+                        }
+                    }
+                    else
+                    {
+                        localResult.AddRange(ids);
+                    }
+                }
+                return localResult.Count > 0;
+            }
+
+            // Сценарий 1: Точка передана программно
+            if (point.HasValue)
+            {
+                Point3d clickPoint = point.Value;
+                Point3d pt1 = new Point3d(clickPoint.X - p, clickPoint.Y - p, 0);
+                Point3d pt2 = new Point3d(clickPoint.X + p, clickPoint.Y + p, 0);
+
+                PromptSelectionResult psr = ed.SelectCrossingWindow(pt1, pt2, filter);
+
+                bool hasObjects = ProcessSelection(psr);
+                result = localResult; // Присваиваем out параметр перед выходом
+                return hasObjects;
+            }
+
+            // Сценарий 2: Интерактивный выбор пользователя
             while (true)
             {
-                if (point.HasValue) clickPoint = point.Value;
-                else if (!TryGetPointFromUser(out clickPoint, false, message, null)) return false;
-
-                //создаем точки для выбора объектов в области
-                Point3d pt1 = new Point3d(clickPoint.X - precision.Value, clickPoint.Y - precision.Value, 0);
-                Point3d pt2 = new Point3d(clickPoint.X + precision.Value, clickPoint.Y + precision.Value, 0);
-                //выбираем объекты в области вокруг выбранной точки
-                PromptSelectionResult psr = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager
-                    .MdiActiveDocument.Editor.SelectCrossingWindow(pt1, pt2, filter);
-                // .MdiActiveDocument.Editor.SelectCrossingPolygon(new Point3dCollection 
-                // { pt1, pt1 + Vector3d.XAxis * precision.Value * 2, pt2, pt1 + Vector3d.YAxis * precision.Value * 2}, filter);         
-
-                if (psr.Status == PromptStatus.Error && point.HasValue) return false;
-                else if (psr.Value != null)
+                if (!TryGetPointFromUser(out Point3d clickPoint, false, message, null))
                 {
-                    if (excludes != null) result.AddRange(psr.Value.GetObjectIds().Except(excludes));
-                    else result.AddRange(psr.Value.GetObjectIds());
-                    if (result.Count > 0) return true;
-                    else if (point.HasValue) return false;
+                    result = localResult; // Присваиваем пустой или частичный список при отмене
+                    return false;
+                }
+
+                Point3d pt1 = new Point3d(clickPoint.X - p, clickPoint.Y - p, 0);
+                Point3d pt2 = new Point3d(clickPoint.X + p, clickPoint.Y + p, 0);
+
+                PromptSelectionResult psr = ed.SelectCrossingWindow(pt1, pt2, filter);
+
+                if (ProcessSelection(psr))
+                {
+                    result = localResult; // Присваиваем заполненный список перед успешным выходом
+                    return true;
                 }
             }
-
         }
+
+
 
         #endregion
 
         #region получение ObjectId
 
-        public static List<Type> GetSubclassTypes(this Type type)
-        {
-            try
-            {
-                return System.Reflection.Assembly.GetAssembly(type).GetTypes().Where(t => t.IsSubclassOf(type)).ToList();
-            }
-            catch { return new List<Type>(); }
-        }
-
         /// <summary>
-        /// возвращает ObjectId выбранного элемента
+        /// Возвращает ObjectId выбранного элемента. Значение по умолчанию — любой объект чертежа.
         /// </summary>    
         public static bool TryGetobjectId(out ObjectId id)
         {
-            return TryGetobjectId(out id, new List<string>(), "Выберите объект");
+            return TryGetobjectId(out id, new List<Type>(), "Выберите объект", false);
         }
+
         /// <summary>
-        /// возвращает ObjectId выбранного элемента
+        /// Возвращает ObjectId выбранного элемента с кастомным сообщением.
         /// </summary>    
         public static bool TryGetobjectId(out ObjectId id, string message)
         {
-            return TryGetobjectId(out id, new List<string>(), message);
+            return TryGetobjectId(out id, new List<Type>(), message, false);
         }
+
         /// <summary>
-        /// возвращает ObjectId выбранного элемента
+        /// Возвращает ObjectId выбранного элемента с фильтрацией по одному типу.
         /// </summary>    
         public static bool TryGetobjectId(out ObjectId id, Type type, bool subclassInclude = false)
         {
-            return TryGetobjectId(out id, type, "Выберите объект", subclassInclude);
+            return TryGetobjectId(out id, new List<Type> { type }, "Выберите объект", subclassInclude);
         }
+
         /// <summary>
-        /// возвращает ObjectId выбранного элемента
+        /// Возвращает ObjectId выбранного элемента с фильтрацией по одному типу и кастомным сообщением.
         /// </summary>    
         public static bool TryGetobjectId(out ObjectId id, Type type, string message, bool subclassInclude = false)
         {
             return TryGetobjectId(out id, new List<Type> { type }, message, subclassInclude);
         }
+
         /// <summary>
-        /// возвращает ObjectId выбранного элемента
+        /// Возвращает ObjectId выбранного элемента с фильтрацией по списку типов.
         /// </summary>    
         public static bool TryGetobjectId(out ObjectId id, List<Type> objTypes, bool subclassInclude = false)
         {
-            return TryGetobjectId(out id, objTypes, "Выберите объект", subclassInclude);
+            return TryGetobjectId(out id, objTypes, "Выберите object", subclassInclude);
         }
-        /// <summary>
-        /// возвращает ObjectId выбранного элемента
+
+        // <summary>
+        /// Единственный базовый метод: запрашивает у пользователя объект с нативной фильтрацией типов AutoCAD.
         /// </summary>
-        /// <param name="objTypes">допустимые типы объектов RXObject.GetClass(typeof(Circle)).Name, null или пустой список для выбора любых элементов</param>
-        /// <param name="message">сообщение пользователю при выборе</param>
-        /// <returns>ObjectId объекта или ObjectId.Null если произошла отмена выбора</returns>
+        /// <param name="id">Выходной ObjectId (ObjectId.Null в случае отмены или ошибки).</param>
+        /// <param name="objTypes">Список разрешенных .NET типов. Если пустой или null — разрешен выбор любых объектов чертежа.</param>
+        /// <param name="message">Сообщение для пользователя в командной строке.</param>
+        /// <param name="subclassInclude">true — разрешить выбор классов-наследников (например, Polyline2d при типе Curve).</param>
         public static bool TryGetobjectId(out ObjectId id, List<Type> objTypes, string message, bool subclassInclude = false)
         {
-            List<string> typeString = new List<string>();
+            id = ObjectId.Null;
+            var ed = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor;
 
-            if (subclassInclude)
+            PromptEntityOptions peo = new PromptEntityOptions($"\n{message}");
+
+            // Настраиваем нативный фильтр AutoCAD
+            if (objTypes != null && objTypes.Count > 0)
             {
-                for (int i = objTypes.Count - 1; i >= 0; i--)
+                // ВАЖНО: Сначала устанавливаем системное сообщение об ошибке при неверном выборе
+                peo.SetRejectMessage("\nВыбран недопустимый тип объекта!");
+
+                foreach (Type type in objTypes)
                 {
-                    foreach (Type subclass in objTypes[i].GetSubclassTypes()) if (!objTypes.Contains(subclass)) objTypes.Add(subclass);
+                    if (type == null) continue;
+
+                    // Теперь вызов AddAllowedClass отработает стабильно и без исключений
+                    peo.AddAllowedClass(type, !subclassInclude);
                 }
             }
 
-            foreach (Type type in objTypes)
-            {
-                RXClass rXClass = RXClass.GetClass(type);
-                if (rXClass != null) typeString.Add(rXClass.Name);
-            }
-            if (objTypes.Count > 0 && typeString.Count == 0)
-            {
-                id = ObjectId.Null;
-                return false;
-            }
-            return TryGetobjectId(out id, typeString, message);
-        }
-        /// <summary>
-        /// возвращает ObjectId выбранного элемента
-        /// </summary>
-        /// <param name="objTypes">допустимые типы объектов RXObject.GetClass(typeof(Circle)).Name, null или пустой список для выбора любых элементов</param>
-        /// <param name="message">сообщение пользователю при выборе</param>
-        /// <returns>ObjectId объекта или ObjectId.Null если произошла отмена выбора</returns>
-        public static bool TryGetobjectId(out ObjectId id, List<string> objTypes, string message)
-        {
-            //повторяем пока не выбран нужный объект
             while (true)
             {
-                //Выбираем объект на чертеже
-                PromptEntityResult entRes = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor.GetEntity("\n" + message);
-                //Если объект не выбран то прекращаем программу
+                PromptEntityResult entRes = ed.GetEntity(peo);
+
                 if (entRes.Status == PromptStatus.Cancel)
                 {
-                    id = ObjectId.Null;
                     return false;
                 }
-                //проверка на тип объекта если выбранный объект корректен то выходим из цикла выбора
-                if (objTypes == null || objTypes.Count == 0)
-                {
+
+                if (entRes.Status == PromptStatus.OK)
+                {                   
                     id = entRes.ObjectId;
                     return true;
                 }
-                else
-                {
-                    foreach (string objType in objTypes)
-                    {
-                        if (entRes.ObjectId.ObjectClass.Name.ToLower().Equals(objType.ToLower()))
-                        {
-                            id = entRes.ObjectId;
-                            return true;
-                        }
-                    }
-                }
             }
         }
 
 
+
         /// <summary>
-        /// Запрашивает у пользователя выбор объектов и возвращает их ObjectId
+        /// Запрашивает у пользователя выбор любых объектов чертежа.
         /// </summary>    
         public static bool TryGetObjectsIds(out List<ObjectId> result)
         {
-            return TryGetObjectsIds(out result, new List<string>(), "Выберите объекты");
+            return TryGetObjectsIds(out result, new List<Type>(), "Выберите объекты", false);
         }
+
         /// <summary>
-        /// Запрашивает у пользователя выбор объектов и возвращает их ObjectId
+        /// Запрашивает у пользователя выбор любых объектов с кастомным сообщением.
         /// </summary>    
         public static bool TryGetObjectsIds(out List<ObjectId> result, string message)
         {
-            return TryGetObjectsIds(out result, new List<string>(), message);
+            return TryGetObjectsIds(out result, new List<Type>(), message, false);
         }
+
         /// <summary>
-        /// Запрашивает у пользователя выбор объектов и возвращает их ObjectId
+        /// Запрашивает у пользователя выбор объектов с фильтрацией по одному .NET-типу.
         /// </summary>      
         public static bool TryGetObjectsIds(out List<ObjectId> result, Type type, bool subclassInclude = false)
         {
-            return TryGetObjectsIds(out result, type, "Выберите объекты");
+            return TryGetObjectsIds(out result, new List<Type> { type }, "Выберите объекты", subclassInclude);
         }
+
         /// <summary>
-        /// Запрашивает у пользователя выбор объектов и возвращает их ObjectId
+        /// Запрашивает у пользователя выбор объектов с фильтрацией по одному .NET-типу и кастомным сообщением.
         /// </summary>    
         public static bool TryGetObjectsIds(out List<ObjectId> result, Type type, string message, bool subclassInclude = false)
         {
             return TryGetObjectsIds(out result, new List<Type> { type }, message, subclassInclude);
         }
+
         /// <summary>
-        /// Запрашивает у пользователя выбор объектов и возвращает их ObjectId
-        /// </summary>
-        /// <param name="objectTypes">список типов для возможного выбора пользователя, null или пустой списко для выбора любых объектов</param>
-        /// <returns>список ObjectId объекта или ObjectId.Null если произошла отмена выбора</returns>         
+        /// Запрашивает у пользователя выбор объектов с фильтрацией по списку .NET-типов.
+        /// </summary>         
         public static bool TryGetObjectsIds(out List<ObjectId> result, List<Type> objTypes, bool subclassInclude = false)
         {
             return TryGetObjectsIds(out result, objTypes, "Выберите объекты", subclassInclude);
         }
+
         /// <summary>
-        /// Запрашивает у пользователя выбор объектов и возвращает их ObjectId
+        /// Запрашивает у пользователя выбор объектов с фильтрацией по списку родных классов AutoCAD (RXClass).
         /// </summary>
-        /// <param name="objectTypes">список классов для возможного выбора пользователя, null или пустой списко для выбора любых объектов</param>
-        /// <returns>список ObjectId объекта или ObjectId.Null если произошла отмена выбора</returns>         
-        public static bool TryGetObjectsIds(out List<ObjectId> result, List<RXClass> objTypes, string message, bool subclassInclude = false)
+        public static bool TryGetObjectsIds(out List<ObjectId> result, List<RXClass> rxClasses, string message, bool subclassInclude = false)
         {
-            List<string> typeString = new List<string>();
-
-            if (subclassInclude)
+            // Просто переводим RXClass в системные типы Type и вызываем базовый метод, чтобы не дублировать код
+            var types = new List<Type>();
+            if (rxClasses != null)
             {
-                for (int i = objTypes.Count - 1; i >= 0; i--)
+                foreach (var rxClass in rxClasses)
                 {
-                    List<Type> types = objTypes[i].GetRuntimeType().GetSubclassTypes();
-                    foreach (Type t in types)
-                    {
-                        RXClass rXClass = RXClass.GetClass(t);
-                        if (!objTypes.Contains(rXClass)) objTypes.Add(rXClass);
-                    }
+                    if (rxClass != null && rxClass.GetRuntimeType() != null)
+                        types.Add(rxClass.GetRuntimeType());
                 }
-                ;
             }
-
-            foreach (RXClass xClass in objTypes)
-            {
-                if (xClass == null) continue;
-                if (xClass.GetRuntimeType() == typeof(ProxyEntity)) typeString.Add("ACAD_PROXY_ENTITY");
-                else typeString.Add(xClass.DxfName);
-            }
-
-            if (objTypes.Count > 0 && typeString.Count == 0)
-            {
-                result = new List<ObjectId>();
-                return false;
-            }
-            return TryGetObjectsIds(out result, typeString, message);
+            return TryGetObjectsIds(out result, types, message, subclassInclude);
         }
+
         /// <summary>
-        /// Запрашивает у пользователя выбор объектов и возвращает их ObjectId
+        /// Единый базовый метод: запрашивает множественный выбор объектов с нативным DXF-фильтром и постобработкой наследников.
         /// </summary>
-        /// <param name="objectTypes">список типов для возможного выбора пользователя, null или пустой списко для выбора любых объектов</param>
-        /// <returns>список ObjectId объекта или ObjectId.Null если произошла отмена выбора</returns>         
+        /// <param name="result">Выходной список ObjectId (всегда инициализирован, пустой при отмене).</param>
+        /// <param name="objTypes">Список разрешенных .NET типов (например, typeof(Line)). Если пуст — разрешены все типы.</param>
+        /// <param name="message">Сообщение при добавлении объектов в набор.</param>
+        /// <param name="subclassInclude">true — автоматически выбирать классы-наследники.</param>
         public static bool TryGetObjectsIds(out List<ObjectId> result, List<Type> objTypes, string message, bool subclassInclude = false)
         {
-            List<string> typeString = new List<string>();
-
-            if (subclassInclude)
-            {
-                for (int i = objTypes.Count - 1; i >= 0; i--)
-                {
-                    List<Type> types = objTypes[i].GetSubclassTypes();
-                    foreach (Type t in types)
-                    {
-                        if (!objTypes.Contains(t)) objTypes.Add(t);
-                    }
-                }
-                ;
-            }
-
-            foreach (Type type in objTypes)
-            {
-                if (type.Equals(typeof(ProxyEntity)))
-                {
-                    typeString.Add("ACAD_PROXY_ENTITY");
-                    continue;
-                }
-
-                RXClass rXClass = RXClass.GetClass(type);
-                if (rXClass != null) typeString.Add(rXClass.DxfName);
-            }
-            if (objTypes.Count > 0 && typeString.Count == 0)
-            {
-                result = new List<ObjectId>();
-                return false;
-            }
-            return TryGetObjectsIds(out result, typeString, message);
-        }
-        /// <summary>
-        /// Запрашивает у пользователя выбор объектов и возвращает их ObjectId
-        /// </summary>
-        /// <param name="objectTypes">DXF названия объектов ( RXObject.GetClass(typeof(Circle)).DxfName ) для возможного выбора пользователя, null или пустой списко для выбора любых объектов</param>
-        /// <returns>список ObjectId объекта или ObjectId.Null если произошла отмена выбора</returns>   
-        public static bool TryGetObjectsIds(out List<ObjectId> result, List<string> objectTypes, string message)
-        {
-            //создаем результат выбора
-            PromptSelectionResult pResult;
-            PromptSelectionOptions pOptions = new PromptSelectionOptions();
-            if (!string.IsNullOrEmpty(message)) pOptions.MessageForAdding = message;
-            //создаем список Id
             result = new List<ObjectId>();
-            if (objectTypes != null && objectTypes.Count > 0)
+            var ed = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor;
+
+            PromptSelectionOptions pOptions = new PromptSelectionOptions();
+            if (!string.IsNullOrEmpty(message))
+                pOptions.MessageForAdding = message;
+
+            PromptSelectionResult pResult;
+
+            // 1. Формируем нативный DXF-фильтр, если заданы типы ограничений
+            if (objTypes != null && objTypes.Count > 0)
             {
-                //создаем строку с типами объектов для фильтра
-                string objectTypesAll = string.Empty;
-                foreach (string objectType in objectTypes) objectTypesAll = objectTypesAll + objectType + ",";
-                objectTypesAll = objectTypesAll.Substring(0, objectTypesAll.Length - 1);
-                pResult = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor.GetSelection(pOptions,
-                    new SelectionFilter(new TypedValue[] { new TypedValue((int)DxfCode.Start, objectTypesAll) }));
+                var dxfNames = new List<string>();
+                RXClass proxyClass = RXObject.GetClass(typeof(ProxyEntity));
+
+                foreach (Type type in objTypes)
+                {
+                    if (type == null) continue;
+                    RXClass rxClass = RXObject.GetClass(type);
+                    if (rxClass == null) continue;
+
+                    if (rxClass.IsDerivedFrom(proxyClass))
+                        dxfNames.Add("ACAD_PROXY_ENTITY");
+                    else
+                        dxfNames.Add(rxClass.DxfName);
+                }
+
+                // Если типы передали, но ни один корректный DXF-класс не распознан
+                if (dxfNames.Count == 0) return false;
+
+                // Склеиваем типы через запятую (AutoCAD нативно понимает логику "ИЛИ" для разделителя-запятой в DXF 0)
+                string objectTypesAll = string.Join(",", dxfNames);
+                SelectionFilter filter = new SelectionFilter(new[] { new TypedValue((int)DxfCode.Start, objectTypesAll) });
+
+                pResult = ed.GetSelection(pOptions, filter);
             }
             else
             {
-                pResult = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor.GetSelection(pOptions);
+                // Без фильтра — выбираем вообще всё
+                pResult = ed.GetSelection(pOptions);
             }
-            //записываем Id выбранных объектов в список и возвращаем его
-            if (pResult.Status == PromptStatus.OK)
+
+            // 2. Обрабатываем успешный выбор
+            if (pResult.Status == PromptStatus.OK && pResult.Value != null)
             {
-                result.AddRange(pResult.Value.GetObjectIds());
-                return true;
+                ObjectId[] selectedIds = pResult.Value.GetObjectIds();
+
+                // Если наследники НЕ нужны (subclassInclude = false), то нативный DXF-фильтр уже сделал всю работу идеально
+                if (!subclassInclude || objTypes == null || objTypes.Count == 0)
+                {
+                    result.AddRange(selectedIds);
+                    return result.Count > 0;
+                }
+
+                // Если subclassInclude = true, нам нужно отсеять лишнее, оставив только базовые типы и их наследников
+                // (Так как нативный DXF-фильтр по строке "LINE,ARC" выберет строго Line и Arc, но пропустит кастомные типы-наследники, если они есть)
+                var allowedClasses = new List<RXClass>();
+                foreach (Type type in objTypes)
+                {
+                    if (type != null) allowedClasses.Add(RXObject.GetClass(type));
+                }
+
+                // Создаем буфер-список во избежание ограничений на out параметры
+                List<ObjectId> filteredIds = new List<ObjectId>();
+
+                foreach (ObjectId id in selectedIds)
+                {
+                    RXClass currentClass = id.ObjectClass;
+                    foreach (RXClass allowedClass in allowedClasses)
+                    {
+                        if (currentClass.IsDerivedFrom(allowedClass))
+                        {
+                            filteredIds.Add(id);
+                            break;
+                        }
+                    }
+                }
+
+                result = filteredIds;
+                return result.Count > 0;
             }
+
             return false;
         }
 
+        /// <summary>
+        /// Возвращает список ObjectId из текущего предварительного выбора (Pickfirst), отфильтрованный по одному .NET типу.
+        /// </summary>
         public static List<ObjectId> GetSelectImplied(this Type type)
         {
-            return GetSelectImplied(new List<RXClass> { RXClass.GetClass(type) });
+            if (type == null) return new List<ObjectId>();
+            return GetSelectImplied(new List<Type> { type });
         }
-        public static List<ObjectId> GetSelectImplied(this RXClass type)
-        {
-            return GetSelectImplied(new List<RXClass> { type });
-        }
-        public static List<ObjectId> GetSelectImplied(List<RXClass> types = null)
-        {
-            List<ObjectId> ids = new List<ObjectId>();
-            PromptSelectionResult result = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor.SelectImplied();
-            if (result.Value != null)
-            {
-                if (types == null) return result.Value.GetObjectIds().ToList();
 
-                foreach (ObjectId id in result.Value.GetObjectIds())
+        /// <summary>
+        /// Возвращает список ObjectId из текущего предварительного выбора (Pickfirst), отфильтрованный по одному RXClass.
+        /// </summary>
+        public static List<ObjectId> GetSelectImplied(this RXClass rxClass)
+        {
+            if (rxClass == null) return new List<ObjectId>();
+
+            var runtimeType = rxClass.GetRuntimeType();
+            if (runtimeType == null) return new List<ObjectId>();
+
+            return GetSelectImplied(new List<Type> { runtimeType });
+        }
+
+        /// <summary>
+        /// Возвращает список ObjectId из текущего предварительного выбора (Pickfirst), отфильтрованный по списку RXClass.
+        /// </summary>
+        public static List<ObjectId> GetSelectImplied(List<RXClass> rxClasses)
+        {
+            var types = new List<Type>();
+            if (rxClasses != null)
+            {
+                foreach (var rxClass in rxClasses)
                 {
-                    if (types.Contains(id.ObjectClass)) ids.Add(id);
+                    if (rxClass != null && rxClass.GetRuntimeType() != null)
+                        types.Add(rxClass.GetRuntimeType());
                 }
             }
-            return ids;
+            return GetSelectImplied(types);
         }
+
+        /// <summary>
+        /// Обычный статический метод: возвращает весь текущий предварительный выбор (Pickfirst) без фильтрации.
+        /// </summary>
+        public static List<ObjectId> GetSelectImplied()
+        {
+            // Вызываем базовый метод, передавая null вместо списка типов
+            return GetSelectImpliedInternal(null);
+        }
+
+        /// <summary>
+        /// Метод расширения: возвращает список ObjectId из текущего предварительного выбора (Pickfirst), отфильтрованный по списку .NET типов.
+        /// </summary>
         public static List<ObjectId> GetSelectImplied(this List<Type> types)
         {
-            List<RXClass> classes = new List<RXClass>();
-            if (types != null)
+            return GetSelectImpliedInternal(types);
+        }
+
+        /// <summary>
+        /// Внутренний базовый метод для объединения логики фильтрации.
+        /// </summary>
+        private static List<ObjectId> GetSelectImpliedInternal(List<Type> types)
+        {
+            var ids = new List<ObjectId>();
+            var ed = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor;
+
+            PromptSelectionResult result = ed.SelectImplied();
+
+            if (result.Status != PromptStatus.OK || result.Value == null)
+                return ids;
+
+            ObjectId[] selectedIds = result.Value.GetObjectIds();
+
+            // Если типы не заданы — возвращаем весь выбор
+            if (types == null || types.Count == 0)
             {
-                foreach (Type type in types) classes.Add(RXClass.GetClass(type));
+                ids.AddRange(selectedIds);
+                return ids;
             }
-            return GetSelectImplied(classes);
+
+            var allowedClasses = new HashSet<RXClass>();
+            foreach (Type type in types)
+            {
+                if (type == null) continue;
+                RXClass rxClass = RXObject.GetClass(type);
+                if (rxClass != null) allowedClasses.Add(rxClass);
+            }
+
+            if (allowedClasses.Count == 0) return ids;
+
+            foreach (ObjectId id in selectedIds)
+            {
+                if (allowedClasses.Contains(id.ObjectClass))
+                {
+                    ids.Add(id);
+                }
+            }
+
+            return ids;
         }
         #endregion
 
         #region получение ключевых слов
         /// <summary>
-        /// Возвращает true если пользователь выбрал ключевое слово из списка (само слово возвращается в верхнем регистре)
+        /// Возвращает true, если пользователь выбрал ключевое слово из списка. Введенное слово возвращается в исходном регистре.
         /// </summary>
         public static bool TryGetKeywords(out string result, List<string> variants, string message)
         {
             result = string.Empty;
-            if (variants.Count == 0) return false;
 
-            PromptKeywordOptions pso = new PromptKeywordOptions(message)
+            // Предварительно очищаем список от пустых элементов и пробелов
+            var validVariants = new List<string>();
+            if (variants != null)
+            {
+                foreach (string v in variants)
+                {
+                    if (!string.IsNullOrWhiteSpace(v)) validVariants.Add(v);
+                }
+            }
+
+            if (validVariants.Count == 0) return false;
+
+            // Передаем чистое сообщение. AutoCAD сам нативно добавит скобки [ ] и < >
+            PromptKeywordOptions pso = new PromptKeywordOptions("\n" + message)
             {
                 AllowNone = false
             };
 
-            foreach (string variant in variants)
+            foreach (string variant in validVariants)
             {
-                if (string.IsNullOrEmpty(variant)) continue;
                 pso.Keywords.Add(variant);
             }
 
-            pso.Keywords.Default = variants[0];
+            // Устанавливаем дефолтное значение из первого валидного элемента
+            pso.Keywords.Default = validVariants[0];
 
-            PromptResult pr = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor.GetKeywords(pso);
+            var ed = Autodesk.AutoCAD.ApplicationServices.Application.DocumentManager.MdiActiveDocument.Editor;
+            PromptResult pr = ed.GetKeywords(pso);
 
             if (pr.Status == PromptStatus.OK)
             {
+                // Возвращаем строку в том виде, в котором её отдал AutoCAD
                 result = pr.StringResult;
                 return true;
             }
 
             return false;
         }
+
         #endregion
 
         #region добавление и удаление объектов
         public static bool AddInSpace(Transaction tr, BlockTable bt, List<Entity> entitiesToInsert)
         {
-            // 3. ⚡ ФИНАЛЬНЫЙ АККОРД: Выгружаем все вхождения блоков в текущее активное пространство
+            // 3. ⚡ ФИНАЛЬНЫЙ АККОРД: Выгружаем все в текущее активное пространство
             if (entitiesToInsert.Count > 0)
             {
                 BlockTableRecord btrToJig = new BlockTableRecord { Name = "*U" };
