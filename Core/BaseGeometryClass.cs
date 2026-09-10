@@ -861,6 +861,8 @@ namespace BaseFunction
             Point3d vpoint = (Point3d)Autodesk.AutoCAD.ApplicationServices.Application.GetSystemVariable("VIEWDIR");
             return vpoint.GetAsVector().GetNormal();
         }
+
+        #region curve type
         // Строгий белый список типов ванильного AutoCAD.
         // Проверка через GetType() гарантирует, что наследники из Civil 3D (например, FeatureLine) сюда не попадут.
         public static readonly HashSet<Type> BaseCurveTypes = new HashSet<Type>
@@ -967,6 +969,8 @@ namespace BaseFunction
 
             return result;
         }
+        #endregion
+
         public static bool IsEqualTo(this double d1, double d2)
         {
             return d1.IsEqualTo(d2, 0);
@@ -1109,34 +1113,21 @@ namespace BaseFunction
         }
 
         /// <summary>
-        /// сортирует точки по близости к началу кривой
+        /// Сортирует точки по близости к началу кривой
         /// </summary>
         public static void SortOnCurve(this List<Point3d> points, Curve curve)
         {
-            if (points.Count == 0 || curve.GetLength() == 0) return;
-            for (int i = 0; i < points.Count; i++)
-            {
-                points[i] = curve.GetClosestPointTo(points[i], false);
-            }
-            List<Point3d> result = new List<Point3d>();
-            while (points.Count > 0)
-            {
-                double dist = curve.GetDistAtPoint(points[0]);
-                Point3d closest = points[0];
-                foreach (Point3d point in points)
-                {
-                    double newDist = curve.GetDistAtPoint(point);
-                    if (newDist < dist)
-                    {
-                        dist = newDist;
-                        closest = point;
-                    }
-                }
-                points.Remove(closest);
-                result.Add(closest);
-            }
-            points.AddRange(result);
+            if (points == null || points.Count <= 1 || curve == null || curve.GetLength() == 0) return;
+
+            var sorted = points
+                .Select(p => curve.GetClosestPointTo(p, false))
+                .OrderBy(p => curve.GetDistAtPoint(p))
+                .ToList();
+
+            points.Clear();
+            points.AddRange(sorted);
         }
+
         /// <summary>
         /// сортирует точки по близости к началу кривой
         /// </summary>
@@ -1184,10 +1175,8 @@ namespace BaseFunction
         /// </summary>
         /// <param name="point"></param>
         /// <returns></returns>
-        public static Point3d Z0(this Point3d point)
-        {
-            return new Point3d(point.X, point.Y, 0);
-        }
+        public static Point3d Z0(this Point3d point) => new Point3d(point.X, point.Y, 0);
+        
         public static int? GetFirstPointIndex(this List<Point3d> points, Point3d point)
         {
             for (int i = 0; i < points.Count; i++)
