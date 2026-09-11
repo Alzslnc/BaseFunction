@@ -184,8 +184,7 @@ namespace BaseFunction
                 dim.Normal = coordinate.Zaxis;
                 dim.XLine1Point = curve.StartPoint;
                 dim.XLine2Point = curve.EndPoint;
-                dim.DimLinePoint = point + (curve.EndPoint - curve.StartPoint).TransformBy(Matrix3d.Rotation(Math.PI / 2, Vector3d.ZAxis, point)).GetNormal() * offset;
-                dim.Layer = "!_dimension";
+                dim.DimLinePoint = point + (curve.EndPoint - curve.StartPoint).TransformBy(Matrix3d.Rotation(Math.PI / 2, Vector3d.ZAxis, point)).GetNormal() * offset;          
                 return dim;
             }
 
@@ -196,8 +195,7 @@ namespace BaseFunction
                     DiametricDimension dim = new DiametricDimension();
                     dim.Normal = coordinate.Zaxis;
                     dim.FarChordPoint = circle.StartPoint + (circle.Center - circle.StartPoint) * 2;
-                    dim.ChordPoint = circle.StartPoint;
-                    dim.Layer = "!_dimension";
+                    dim.ChordPoint = circle.StartPoint;               
                     return dim;
                 }
                 else
@@ -205,8 +203,7 @@ namespace BaseFunction
                     RadialDimension dim = new RadialDimension();
                     dim.Normal = coordinate.Zaxis;
                     dim.Center = circle.Center;
-                    dim.ChordPoint = circle.StartPoint;
-                    dim.Layer = "!_dimension";
+                    dim.ChordPoint = circle.StartPoint;                    
                     return dim;
                 }
             }
@@ -220,8 +217,7 @@ namespace BaseFunction
                 {
                     ArcDimension dim = new ArcDimension(arc.Center, arc.StartPoint, arc.EndPoint, point + (point - arc.Center).GetNormal() * offset,
                         "<>", HostApplicationServices.WorkingDatabase.Dimstyle);
-                    dim.Normal = coordinate.Zaxis;
-                    dim.Layer = "!_dimension";
+                    dim.Normal = coordinate.Zaxis;                   
                     return dim;
                 }
 
@@ -232,7 +228,6 @@ namespace BaseFunction
                     dim.Normal = coordinate.Zaxis;
                     dim.FarChordPoint = point + (arc.Center - point) * 2;
                     dim.ChordPoint = point;
-                    dim.Layer = "!_dimension";
                     return dim;
                 }
                 else
@@ -241,7 +236,6 @@ namespace BaseFunction
                     dim.Normal = coordinate.Zaxis;
                     dim.Center = arc.Center;
                     dim.ChordPoint = point;
-                    dim.Layer = "!_dimension";
                     return dim;
                 }
             }
