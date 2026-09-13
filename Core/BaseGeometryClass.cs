@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using TrimObjects.TrimClass.Trim;
 
 namespace BaseFunction
 {
@@ -1176,7 +1177,7 @@ namespace BaseFunction
         /// <param name="point"></param>
         /// <returns></returns>
         public static Point3d Z0(this Point3d point) => new Point3d(point.X, point.Y, 0);
-        
+
         public static int? GetFirstPointIndex(this List<Point3d> points, Point3d point)
         {
             for (int i = 0; i < points.Count; i++)
@@ -1250,6 +1251,125 @@ namespace BaseFunction
             return result;
         }
 
+        #region hatch
+        /// <summary>
+        /// Полностью разбирает геометрию штриховки, разделяя ее на основные контуры и текстовые островки.
+        /// Флаги позволяют управлять выгрузкой в списки и удалением петель прямо из объекта штриховки.
+        /// Все возвращаемые кривые являются новыми non-database-resident объектами и ТРЕБУЮТ Dispose.
+        /// </summary>
+        public static void ExtractHatchGeometry(this Hatch hatch,
+            out List<Curve> mainContours, out List<Curve> textLoops,
+            bool extractMain = true, bool extractText = true,
+            bool removeMain = false, bool removeText = false)
+        {
+            mainContours = new List<Curve>();
+            textLoops = new List<Curve>();
+
+            if (hatch == null) return;
+
+            try
+            {
+                // Идем строго с конца к началу, чтобы индексы петель не съезжали при вызове RemoveLoopAt
+                for (int i = hatch.NumberOfLoops - 1; i >= 0; i--)
+                {
+                    int loopType = (int)hatch.LoopTypeAt(i);
+                    bool isTextLoop = (loopType & (int)HatchLoopTypes.TextIsland) > 0 ||
+                                      (loopType & (int)HatchLoopTypes.Textbox) > 0;
+
+                    // 1. ПРОВЕРКА НЕОБХОДИМОСТИ ИЗВЛЕЧЕНИЯ ГЕОМЕТРИИ
+                    bool needExtract = (isTextLoop && extractText) || (!isTextLoop && extractMain);
+
+                    if (needExtract)
+                    {
+                        List<Curve> targetClosedList = isTextLoop ? textLoops : mainContours;
+                        HatchLoop loop = hatch.GetLoopAt(i);
+                        var localLoopFragments = new List<Curve>();
+
+                        // Разбираем геометрию петли-полилинии
+                        if (loop.IsPolyline)
+                        {
+                            int iVertex = 0;
+                            using (var poly = new Polyline())
+                            {
+                                foreach (BulgeVertex bv in loop.Polyline)
+                                {
+                                    poly.AddVertexAt(iVertex++, bv.Vertex, bv.Bulge, 0.0, 0.0);
+                                }
+                                poly.Normal = hatch.Normal;
+                                poly.Elevation = hatch.Elevation;
+
+                                if (poly.Closed || poly.StartPoint.IsEqualTo(poly.EndPoint))
+                                {
+                                    var closedClone = poly.Clone() as Curve;
+                                    if (closedClone != null) targetClosedList.Add(closedClone);
+                                }
+                                else
+                                {
+                                    using (var pEx = new DBObjectCollection())
+                                    {
+                                        poly.Explode(pEx);
+                                        foreach (DBObject obj in pEx)
+                                        {
+                                            if (obj is Curve segment && !segment.GetLength().IsEqualTo(0))
+                                            {
+                                                localLoopFragments.Add(segment);
+                                            }
+                                            else obj?.Dispose();
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        // Разбираем геометрию петли из набора Curve2d
+                        else
+                        {
+                            foreach (Curve2d c2d in loop.Curves)
+                            {
+                                using (Curve c = c2d.GetCurveFromGe(MainTrimClass.Plane))
+                                {
+                                    if (c != null && !c.GetLength().IsEqualTo(0))
+                                    {
+                                        localLoopFragments.Add(c.GetProjectedCurve(MainTrimClass.Plane, Vector3d.ZAxis));
+                                    }
+                                }
+                            }
+                        }
+
+                        // Сшиваем фрагменты разорванной петли
+                        if (localLoopFragments.Count > 0)
+                        {
+                            if (localLoopFragments.ConnectCurve(out List<Curve> mergedMain, project: true, disposeFragments: true))
+                            {
+                                foreach (Curve c in mergedMain)
+                                {
+                                    if (c.Closed) targetClosedList.Add(c);
+                                    else c.Dispose();
+                                }
+                            }
+                        }
+                    }
+
+                    // 2. УПРАВЛЕНИЕ УДАЛЕНИЕМ ПЕТЕЛЬ ИЗ ИСХОДНОГО ОБЪЕКТА
+                    if (isTextLoop && removeText)
+                    {
+                        hatch.RemoveLoopAt(i);
+                    }
+                    else if (!isTextLoop && removeMain)
+                    {
+                        hatch.RemoveLoopAt(i);
+                    }
+                }
+            }
+            catch
+            {
+                // Зачистка при аварийном сбое
+                foreach (var c in mainContours) c?.Dispose();
+                foreach (var c in textLoops) c?.Dispose();
+                mainContours.Clear();
+                textLoops.Clear();
+            }
+        }
+        #endregion
 
         #region connectCurve
         /// <summary>
@@ -1568,6 +1688,96 @@ namespace BaseFunction
             typeof(Line),
             typeof(Arc)
         };
+        #endregion
+
+        #region boundaryEntity
+        /// <summary>
+        /// Универсальный метод извлечения геометрических контуров для любой сущности AutoCAD.
+        /// Возвращает список новых non-database-resident кривых, которые ТРЕБУЮТ гарантированного Dispose.
+        /// </summary>
+        public static List<Curve> GetBoundaryCurves(this Entity entity, bool explodeComplex = false)
+        {
+            var result = new List<Curve>();
+            if (entity == null) return result;
+
+            try
+            {
+                // 1. Текстовые элементы (используют методы расширения из TextBounds)
+                if (entity is DBText dbText)
+                {
+                    var poly = dbText.CreatePolyline();
+                    if (poly != null) result.Add(poly);
+                    return result;
+                }
+                if (entity is MText mText)
+                {
+                    var poly = mText.CreatePolyline();
+                    if (poly != null) result.Add(poly);
+                    return result;
+                }
+                if (entity is AttributeReference attr)
+                {
+                    Polyline poly = attr.IsMTextAttribute ? attr.MTextAttribute.CreatePolyline() : attr.CreatePolyline();
+                    if (poly != null) result.Add(poly);
+                    return result;
+                }
+
+                // 2. Стандартные геометрические кривые (Line, Polyline, Arc, Circle, Spline и т.д.)
+                if (entity is Curve curve)
+                {
+                    var clone = curve.Clone() as Curve;
+                    if (clone != null) result.Add(clone);
+                    return result;
+                }
+
+                // 3. Сложные составные объекты (Размеры, Таблицы, Выноски, Мультилинии и Блоки)
+                if (explodeComplex && (entity is Dimension || entity is Mline || entity is Leader ||
+                                       entity is ProxyEntity || entity is Table || entity is BlockReference))
+                {
+                    using (var subEntities = new DBObjectCollection())
+                    {
+                        entity.Explode(subEntities);
+                        foreach (DBObject obj in subEntities)
+                        {
+                            if (obj is AttributeDefinition)
+                            {
+                                obj.Dispose();
+                                continue;
+                            }
+
+                            if (obj is Entity subEntity)
+                            {
+                                // Рекурсивно вытаскиваем геометрию из взорванных частей
+                                var subBoundaries = subEntity.GetBoundaryCurves(explodeComplex: true);
+                                result.AddRange(subBoundaries);
+                                subEntity.Dispose();
+                            }
+                            else
+                            {
+                                obj.Dispose();
+                            }
+                        }
+                    }
+                    return result;
+                }
+
+                // 4. Фолбэк по Bounds (для всех остальных трехмерных и нестандартных объектов)
+                if (entity.Bounds.HasValue)
+                {
+                    var poly = BaseCreateClass.CreatePolyline(entity.Bounds.Value);
+                    if (poly != null) result.Add(poly);
+                }
+            }
+            catch
+            {
+                // Точечная защита от утечек памяти: при сбое очищаем всё, что успели создать
+                foreach (var c in result) c?.Dispose();
+                result.Clear();
+            }
+
+            return result;
+        }
+
         #endregion
     }
 

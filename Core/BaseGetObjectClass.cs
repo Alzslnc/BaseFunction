@@ -970,8 +970,25 @@ namespace BaseFunction
             return true;
         }
         #endregion
+
+        #region dispose
+        public static DisposableList<T> ToDisposableList<T>(this IEnumerable<T> source) where T : System.IDisposable
+        {
+            return new DisposableList<T>(source);
+        }
+        #endregion
     }
 
+    public class DisposableList<T> : List<T>, System.IDisposable where T : System.IDisposable
+    {
+        public DisposableList() : base() { }
+        public DisposableList(IEnumerable<T> collection) : base(collection) { }
+        public void Dispose()
+        {
+            foreach (var item in this) item?.Dispose();
+            Clear();
+        }
+    }
 
 
 }

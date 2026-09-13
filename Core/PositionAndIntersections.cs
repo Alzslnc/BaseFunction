@@ -25,10 +25,14 @@ namespace BaseFunction
             // Ищем уровень вложения
             foreach (Curve c in curves)
             {
-                if (curve == c) continue;
+                if (c == null || c.IsDisposed || curve == c || c.GetLength().IsEqualTo(0)) continue;
 
-                // Быстрая отсечка по площади
-                if (curve.Area > c.Area) continue;
+                try
+                {
+                    // Быстрая отсечка по площади
+                    if (curve.Area > c.Area) continue;
+                }
+                catch { continue; }
 
                 // Если мы дошли досюда, значит перед нами реальный кандидат на родителя.
                 // Вот теперь самое время ОДИН РАЗ вычислить тяжелую точку центра, если она еще не создана.
@@ -511,25 +515,23 @@ namespace BaseFunction
             }
             return points;
         }
+        #region split
+
         /// <summary>
-        /// Разделяет замкнутую кривую другой замкнутой кривой и возвращает получившиеся фрагменты (inner и outer).
+        /// Единый мастер-метод разделения кривой. 
+        /// Флаги keep... определяют, нужно ли сохранять элементы. Если флаг равен false, элемент гарантированно уничтожается через Dispose().
+        /// По умолчанию (для обратной совместимости) все элементы СОХРАНЯЮТСЯ (keep... = true).
         /// </summary>
-        /// <param name="poly1">Разрезаемая (базовая) кривая.</param>
-        /// <param name="poly2">Разрезающая кривая (вкладыш/труба).</param>
-        /// <param name="inPlane">Если true, разрезающая кривая проецируется на плоскость базовой кривой для поиска пересечений.</param>
-        /// <param name="inner">Фрагменты базовой кривой, оказавшиеся ВНУТРИ разрезающей кривой.</param>
-        /// <param name="outer">Фрагменты базовой кривой, оказавшиеся СНАРУЖИ разрезающей кривой.</param>
-        /// <param name="result">Все получившиеся открытые фрагменты кривой.</param>
-        /// <returns>True, если разрезание прошло успешно и точки пересечения найдены.</returns>
-        public static bool SplitCurve(this Curve poly1, Curve poly2, bool inPlane, out List<Curve> inner, out List<Curve> outer, out List<Curve> result)
+        public static bool SplitCurveMaster(this Curve poly1, Curve poly2, bool inPlane,
+            out List<Curve> inner, out List<Curve> outer, out List<Curve> onBound,
+            bool keepInner = true, bool keepOuter = true, bool keepOnBound = true)
         {
             inner = new List<Curve>();
             outer = new List<Curve>();
-            result = new List<Curve>();
+            onBound = new List<Curve>();
 
             if (poly1 == null || poly2 == null) return false;
 
-            // 1. ПОДГОТОВКА И ПРОЕЦИРОВАНИЕ ГЕОМЕТРИИ
             Curve intersectCutter = poly2;
             bool planar = poly1.IsPlanar;
             Plane plane = null;
@@ -541,7 +543,7 @@ namespace BaseFunction
                 intersectCutter = poly2.GetProjectedCurve(plane, Vector3d.ZAxis);
             }
 
-            // 2. ПОЛУЧЕНИЕ ТОЧЕК ПЕРЕСЕЧЕНИЯ БЕЗ ЛОЖНЫХ ШВОВ
+            // Находим точки пересечения
             List<Point3d> intersections = poly1.Intersectionts(intersectCutter, includeStartAndEnd: false);
 
             if (intersections.Count == 0)
@@ -550,7 +552,7 @@ namespace BaseFunction
                 return false;
             }
 
-            // 3. РАСПИЛ КРИВОЙ НА ОТКРЫТЫЕ ФРАГМЕНТЫ
+            // Распил кривой на фрагменты
             List<double> params1 = new List<double>();
             foreach (Point3d p in intersections)
             {
@@ -558,42 +560,97 @@ namespace BaseFunction
             }
             params1.Sort();
 
+            var localSplits = new List<Curve>();
+
             using (DBObjectCollection pColl = poly1.GetSplitCurves(new DoubleCollection(params1.ToArray())))
             {
                 foreach (DBObject obj in pColl)
                 {
-                    if (obj is Curve curve) result.Add(curve);
+                    if (obj is Curve curve) localSplits.Add(curve);
                     else obj?.Dispose();
                 }
             }
 
-            // 4. ⚡ КЛАССИФИКАЦИЯ ФРАГМЕНТОВ ПО ЦЕНТРАМ ТЯЖЕСТИ (Твоя матрица)
-            foreach (Curve frag in result)
+            // КЛАССИФИКАЦИЯ С УПРАВЛЕНИЕМ ПАМЯТЬЮ
+            foreach (Curve frag in localSplits)
             {
                 if (frag.GetCentrPoint(out Point3d center))
                 {
-                    // Проверяем положение центра фрагмента относительно разрезающей кривой
-                    PositionType pos = center.GetPositionTypeOptimized(intersectCutter, skipBoundaryCheck: true);
+                    PositionType pos = center.GetPositionTypeOptimized(intersectCutter, skipBoundaryCheck: false);
 
-                    if (pos == PositionType.inner || pos == PositionType.onBound)
+                    if (pos == PositionType.inner)
                     {
-                        inner.Add(frag);
+                        if (keepInner) inner.Add(frag);
+                        else frag.Dispose(); // Безопасное уничтожение unmanaged-памяти по запросу
                     }
                     else if (pos == PositionType.outer)
                     {
-                        outer.Add(frag);
+                        if (keepOuter) outer.Add(frag);
+                        else frag.Dispose();
                     }
+                    else if (pos == PositionType.onBound)
+                    {
+                        if (keepOnBound) onBound.Add(frag);
+                        else frag.Dispose();
+                    }
+                    else
+                    {
+                        frag.Dispose(); // Неопределенный мусор
+                    }
+                }
+                else
+                {
+                    frag.Dispose(); // Фрагменты нулевой длины
                 }
             }
 
-            // Освобождаем спроецированную временную копию из памяти
             if (intersectCutter != poly2)
             {
                 intersectCutter.Dispose();
             }
 
-            return result.Count > 0;
+            return inner.Count > 0 || outer.Count > 0 || onBound.Count > 0;
         }
+        /// <summary>
+        /// ОБРАТНАЯ СОВМЕСТИМОСТЬ: Возвращает все 3 списка (inner, outer, onBound). 
+        /// Ни один фрагмент принудительно не диспозится. Старый код проекта не сломается.
+        /// </summary>
+        public static bool SplitCurve(this Curve poly1, Curve poly2, bool inPlane,
+            out List<Curve> inner, out List<Curve> outer, out List<Curve> onBound)
+        {
+            return poly1.SplitCurveMaster(poly2, inPlane, out inner, out outer, out onBound, true, true, true);
+        }
+
+        /// <summary>
+        /// ТОЛЬКО ВНУТРЕННИЕ: Возвращает список inner. 
+        /// Фрагменты outer и onBound уничтожаются внутри метода, исключая утечки ОЗУ.
+        /// </summary>
+        public static bool SplitCurveInnerOnly(this Curve poly1, Curve poly2, bool inPlane, out List<Curve> inner)
+        {
+            return poly1.SplitCurveMaster(poly2, inPlane, out inner, out var _, out var _, true, false, false);
+        }
+
+        /// <summary>
+        /// ТОЛЬКО ВНЕШНИЕ: Возвращает список outer. 
+        /// Фрагменты inner и onBound гарантированно уничтожаются через Dispose().
+        /// </summary>
+        public static bool SplitCurveOuterOnly(this Curve poly1, Curve poly2, bool inPlane, out List<Curve> outer)
+        {
+            return poly1.SplitCurveMaster(poly2, inPlane, out var _, out outer, out var _, false, true, false);
+        }
+
+        /// <summary>
+        /// ВНУТРЕННИЕ И ВНЕШНИЕ: Возвращает списки inner и outer. 
+        /// Спорные ребра касания onBound уничтожаются на лету, защищая от дубликатов на пустых участках.
+        /// </summary>
+        public static bool SplitCurveInnerAndOuter(this Curve poly1, Curve poly2, bool inPlane,
+            out List<Curve> inner, out List<Curve> outer)
+        {
+            return poly1.SplitCurveMaster(poly2, inPlane, out inner, out outer, out var _, true, true, false);
+        }
+
+        #endregion
+
 
 
         public enum PositionType : int

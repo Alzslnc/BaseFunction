@@ -8,6 +8,39 @@ namespace BaseFunction
     public static class BaseCreateClass
     {
         /// <summary>
+        /// Создает Polyline на основе Extents3d (габаритов объекта).
+        /// </summary>
+        public static Polyline CreatePolyline(Extents3d ex, short colorIndex = 256, LineWeight weight = LineWeight.ByLayer)
+        {
+            var points = new List<Point3d>
+            {
+                ex.MinPoint,
+                new Point3d(ex.MinPoint.X, ex.MaxPoint.Y, ex.MinPoint.Z),
+                ex.MaxPoint,
+                new Point3d(ex.MaxPoint.X, ex.MinPoint.Y, ex.MaxPoint.Z)
+            };
+
+            return CreatePolyline(points, true, colorIndex, weight);
+        }
+        /// <summary>
+        /// Перегрузка для ультра-быстрого создания объекта Polyline по списку трехмерных координат Point3d.
+        /// Координата Z отбрасывается (полилиния создается в плоскости текущей матрицы).
+        /// </summary>
+        public static Polyline CreatePolyline(List<Point3d> points, bool isClosed, short colorIndex = 256, LineWeight weight = LineWeight.ByLayer)
+        {
+            if (points == null || points.Count < 2) return null;
+
+            // Конвертируем Point3d в Point2d
+            var points2d = new List<Point2d>(points.Count);
+            foreach (Point3d pt in points)
+            {
+                points2d.Add(new Point2d(pt.X, pt.Y));
+            }
+
+            // Вызываем твой основной, уже протестированный метод
+            return CreatePolyline(points2d, isClosed, colorIndex, weight);
+        }
+        /// <summary>
         /// Базовый метод-помощник для ультра-быстрого создания объекта Polyline по списку плоских координат.
         /// </summary>
         /// <param name="points">Список плоских координат Point2d (в метрах)</param>
