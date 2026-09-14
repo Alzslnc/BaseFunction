@@ -4,7 +4,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using TrimObjects.TrimClass.Trim;
 
 namespace BaseFunction
 {
@@ -1258,12 +1257,16 @@ namespace BaseFunction
         /// Все возвращаемые кривые являются новыми non-database-resident объектами и ТРЕБУЮТ Dispose.
         /// </summary>
         public static void ExtractHatchGeometry(this Hatch hatch,
-            out List<Curve> mainContours, out List<Curve> textLoops,
+            out List<Curve> mainContours, out List<Curve> textLoops, Plane plane,
             bool extractMain = true, bool extractText = true,
             bool removeMain = false, bool removeText = false)
         {
             mainContours = new List<Curve>();
             textLoops = new List<Curve>();
+
+            bool newPlane = plane == null;
+
+            if (newPlane) plane = new Plane();
 
             if (hatch == null) return;
 
@@ -1325,11 +1328,11 @@ namespace BaseFunction
                         {
                             foreach (Curve2d c2d in loop.Curves)
                             {
-                                using (Curve c = c2d.GetCurveFromGe(MainTrimClass.Plane))
+                                using (Curve c = c2d.GetCurveFromGe(plane))
                                 {
                                     if (c != null && !c.GetLength().IsEqualTo(0))
                                     {
-                                        localLoopFragments.Add(c.GetProjectedCurve(MainTrimClass.Plane, Vector3d.ZAxis));
+                                        localLoopFragments.Add(c.GetProjectedCurve(plane, Vector3d.ZAxis));
                                     }
                                 }
                             }
@@ -1367,6 +1370,10 @@ namespace BaseFunction
                 foreach (var c in textLoops) c?.Dispose();
                 mainContours.Clear();
                 textLoops.Clear();
+            }
+            finally
+            { 
+                if (newPlane) plane?.Dispose();
             }
         }
         #endregion
