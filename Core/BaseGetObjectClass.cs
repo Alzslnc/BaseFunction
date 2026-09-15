@@ -3,6 +3,7 @@ using Autodesk.AutoCAD.EditorInput;
 using Autodesk.AutoCAD.Geometry;
 using Autodesk.AutoCAD.Runtime;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -581,13 +582,7 @@ namespace BaseFunction
             return TryGetObjectsIds(out result, types, message, subclassInclude);
         }
 
-        /// <summary>
-        /// Единый базовый метод: запрашивает множественный выбор объектов с нативным DXF-фильтром и постобработкой наследников.
-        /// </summary>
-        /// <param name="result">Выходной список ObjectId (всегда инициализирован, пустой при отмене).</param>
-        /// <param name="objTypes">Список разрешенных .NET типов (например, typeof(Line)). Если пуст — разрешены все типы.</param>
-        /// <param name="message">Сообщение при добавлении объектов в набор.</param>
-        /// <param name="subclassInclude">true — автоматически выбирать классы-наследники.</param>
+  
         public static bool TryGetObjectsIds(out List<ObjectId> result, List<Type> objTypes, string message, bool subclassInclude = false)
         {
             result = new List<ObjectId>();
@@ -599,28 +594,61 @@ namespace BaseFunction
 
             PromptSelectionResult pResult;
 
-            // 1. Формируем нативный DXF-фильтр, если заданы типы ограничений
+            // 1. Формируем нативный DXF-фильтр
             if (objTypes != null && objTypes.Count > 0)
             {
-                var dxfNames = new List<string>();
+                var dxfNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var allowedClasses = new List<RXClass>();
                 RXClass proxyClass = RXObject.GetClass(typeof(ProxyEntity));
 
+                // Собираем базовые RX-классы
                 foreach (Type type in objTypes)
                 {
                     if (type == null) continue;
                     RXClass rxClass = RXObject.GetClass(type);
                     if (rxClass == null) continue;
 
+                    allowedClasses.Add(rxClass);
+
                     if (rxClass.IsDerivedFrom(proxyClass))
                         dxfNames.Add("ACAD_PROXY_ENTITY");
-                    else
+                    else if (!string.IsNullOrEmpty(rxClass.DxfName))
                         dxfNames.Add(rxClass.DxfName);
                 }
 
-                // Если типы передали, но ни один корректный DXF-класс не распознан
+                if (allowedClasses.Count == 0) return false;
+
+                // Если включен поиск наследников — ищем их внутри runtime-словаря классов самого AutoCAD!
+                // Это заменяет тяжелую и ненадежную .NET-рефлексию.
+                if (subclassInclude)
+                {
+                    using (var dict = SystemObjects.ClassDictionary)
+                    {
+                        foreach (DictionaryEntry entry in dict)
+                        {
+                            RXClass rxClass = entry.Value as RXClass;
+                            if (rxClass == null || string.IsNullOrEmpty(rxClass.DxfName)) continue;
+
+                            // Если этот класс в памяти AutoCAD унаследован от одного из наших базовых
+                            foreach (var baseClass in allowedClasses)
+                            {
+                                if (rxClass.IsDerivedFrom(baseClass))
+                                {
+                                    if (rxClass.IsDerivedFrom(proxyClass))
+                                        dxfNames.Add("ACAD_PROXY_ENTITY");
+                                    else
+                                        dxfNames.Add(rxClass.DxfName);
+
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+
                 if (dxfNames.Count == 0) return false;
 
-                // Склеиваем типы через запятую (AutoCAD нативно понимает логику "ИЛИ" для разделителя-запятой в DXF 0)
+                // Склеиваем все DXF-имена (и базовые, и наследники, которые сейчас загружены в AutoCAD)
                 string objectTypesAll = string.Join(",", dxfNames);
                 SelectionFilter filter = new SelectionFilter(new[] { new TypedValue((int)DxfCode.Start, objectTypesAll) });
 
@@ -628,7 +656,6 @@ namespace BaseFunction
             }
             else
             {
-                // Без фильтра — выбираем вообще всё
                 pResult = ed.GetSelection(pOptions);
             }
 
@@ -637,43 +664,15 @@ namespace BaseFunction
             {
                 ObjectId[] selectedIds = pResult.Value.GetObjectIds();
 
-                // Если наследники НЕ нужны (subclassInclude = false), то нативный DXF-фильтр уже сделал всю работу идеально
-                if (!subclassInclude || objTypes == null || objTypes.Count == 0)
-                {
-                    result.AddRange(selectedIds);
-                    return result.Count > 0;
-                }
-
-                // Если subclassInclude = true, нам нужно отсеять лишнее, оставив только базовые типы и их наследников
-                // (Так как нативный DXF-фильтр по строке "LINE,ARC" выберет строго Line и Arc, но пропустит кастомные типы-наследники, если они есть)
-                var allowedClasses = new List<RXClass>();
-                foreach (Type type in objTypes)
-                {
-                    if (type != null) allowedClasses.Add(RXObject.GetClass(type));
-                }
-
-                // Создаем буфер-список во избежание ограничений на out параметры
-                List<ObjectId> filteredIds = new List<ObjectId>();
-
-                foreach (ObjectId id in selectedIds)
-                {
-                    RXClass currentClass = id.ObjectClass;
-                    foreach (RXClass allowedClass in allowedClasses)
-                    {
-                        if (currentClass.IsDerivedFrom(allowedClass))
-                        {
-                            filteredIds.Add(id);
-                            break;
-                        }
-                    }
-                }
-
-                result = filteredIds;
+                // Так как нативный фильтр теперь учитывает абсолютно все известные AutoCAD типы-наследники,
+                // C#-постобработка больше не нужна! Нативный фильтр отработал идеально.
+                result.AddRange(selectedIds);
                 return result.Count > 0;
             }
 
             return false;
         }
+
 
         /// <summary>
         /// Возвращает список ObjectId из текущего предварительного выбора (Pickfirst), отфильтрованный по одному .NET типу.
