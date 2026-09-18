@@ -3,11 +3,13 @@ using Autodesk.AutoCAD.Geometry;
 using Autodesk.AutoCAD.Runtime;
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 
 namespace BaseFunction
 {
     public static class BaseExplodeClass
     {
+        
         /// <summary>
         /// получает составные элементы объекта и добавляет их в чертеж, возвращает их ObjectId
         /// </summary>
@@ -32,26 +34,42 @@ namespace BaseFunction
             try
             {
                 if (e is MText) result.Add(e.ObjectId);
-                else
+                else if (e is BlockReference reference)
+                {
+                    result.AddRange(ExplodeBlock(tr, HostApplicationServices.WorkingDatabase, ObjectId.Null, true, false, true, true, reference, ms));                   
+                }
+                else if (e is ProxyEntity proxyEntity)
+                {
+                    ProcessProxyEntity(proxyEntity, tr, ms, HostApplicationServices.WorkingDatabase, false, result, null);
+                    if (erase && !proxyEntity.IsErased)
+                    {
+                        proxyEntity.UpgradeOpen();
+                        proxyEntity.Erase();
+                    }
+                }
+                else 
                 {
                     using (DBObjectCollection coll = new DBObjectCollection())
                     {
                         e.Explode(coll);
                         foreach (DBObject obj in coll)
                         {
-                            using (Entity newE = obj as Entity)
+                            if (obj is Entity newE)
                             {
-                                if (newE != null)
-                                {
-                                    result.Add(ms.AppendEntity(newE));
-                                    tr.AddNewlyCreatedDBObject(newE, true);
-                                }
+                                // ПРАВИЛЬНО: добавляем в БД, обертку НЕ уничтожаем через Dispose вручную!
+                                result.Add(ms.AppendEntity(newE));
+                                tr.AddNewlyCreatedDBObject(newE, true);
                             }
-                            obj.Dispose();
+                            else
+                            {
+                                // Объекты, не являющиеся Entity (параметризация), безопасно удаляем из ОЗУ
+                                obj?.Dispose();
+                            }
                         }
-                        if (erase)
+
+                        if (erase && !e.IsErased)
                         {
-                            if (e.IsReadEnabled) e.UpgradeOpen();
+                            e.UpgradeOpen();
                             e.Erase();
                         }
                     }
@@ -62,396 +80,586 @@ namespace BaseFunction
         }
 
         /// <summary>
-        /// Центральный диспетчер расчленения вставки блока. 
-        /// Собирает все примитивы в памяти и добавляет их на чертеж одной пачкой через фреймворк.
+        /// Расчленяет вставку блока и возвращает ObjectId всех полученных элементов.
         /// </summary>
-        public static List<ObjectId> ExplodeBlock(Transaction tr, Database db, ObjectId id, bool erase, bool inLayer, bool recursive, bool explodeProxy, Matrix3d currentTransform, BlockReference br = null)
+        public static List<ObjectId> ExplodeBlock(Transaction tr, Database db, ObjectId id, bool erase, bool inLayer, bool recursive, bool explodeProxy, BlockReference br = null, BlockTableRecord ms = null)
         {
             List<ObjectId> result = new List<ObjectId>();
+            List<ObjectId> toExplode = new List<ObjectId>();
+            List<ObjectId> attrList = new List<ObjectId>();
+            List<ObjectId> dimList = new List<ObjectId>();
+            List<ObjectId> toDelete = new List<ObjectId>();
 
-            if (br == null)
+            try
             {
-                br = tr.GetObject(id, OpenMode.ForRead, false, true) as BlockReference;
-            }
-            if (br == null) return result;
+                if (ms == null) ms = tr.GetObject(HostApplicationServices.WorkingDatabase.CurrentSpaceId, OpenMode.ForWrite) as BlockTableRecord;
 
-            // Накопление матриц трансформации для вложенных структур
-            Matrix3d localMatrix = currentTransform * br.BlockTransform;
-            double scale = Math.Abs(br.ScaleFactors.X).IsEqualTo(Math.Abs(br.ScaleFactors.Y)) ? Math.Abs(br.ScaleFactors.X) : 1.0;
+                if (br == null) br = tr.GetObject(id, OpenMode.ForWrite, false, true) as BlockReference;
+                if (br == null) return result;
+                               
+                // Расчет масштаба для размеров
+                Scale3d scale3D = br.ScaleFactors;
+                double scale = Math.Abs(scale3D.X).IsEqualTo(Math.Abs(scale3D.Y)) ? Math.Abs(scale3D.X) : 1.0;
 
-            // Локальный буфер для сбора всех созданных в ОЗУ примитивов
-            var entitiesToAppend = new List<Entity>();
-
-            // Наполняем буфер примитивами из атрибутов, геометрии и прокси
-            ProcessBlockAttributes(tr, br, inLayer, entitiesToAppend);
-            ProcessBlockGeometry(tr, db, br, localMatrix, scale, inLayer, recursive, explodeProxy, entitiesToAppend);
-
-            if (explodeProxy)
-            {
-                ProcessBlockProxyEntities(tr, br, localMatrix, inLayer, entitiesToAppend);
-            }
-
-            // Добавляем всю пачку объектов на чертеж за один раз через метод фреймворка
-            if (entitiesToAppend.Count > 0)
-            {
-                if (entitiesToAppend.AddEntityInCurrentBTR(out List<ObjectId> appendedIds, db.CurrentSpaceId, tr))
+                // 1. Выносим обработку атрибутов в отдельный метод
+                if (br.AttributeCollection.Count > 0)
                 {
-                    result.AddRange(appendedIds);
+                    ProcessAttributes(tr, ms, br, inLayer, result);
                 }
-            }
+                        
+                // Локальный обработчик для перехвата объектов, созданных методом ExplodeToOwnerSpace
+                void ObjectAppendedHandler(object s, ObjectEventArgs e)
+                {
+                    DBObject obj = e.DBObject;
 
-            // Удаление исходной вставки блока (только на самом верхнем уровне)
-            if (erase && id != ObjectId.Null && !br.IsErased)
-            {
-                br.UpgradeOpen();
-                br.Erase();
-                br.DowngradeOpen();
-            }
+                    if (obj is Entity ent)
+                    {
+                        // 1. Проверяем, нужно ли сразу отправить объект в список на удаление
+                        if (FilterAndCheckIfShouldDelete(ent))
+                        {
+                            toDelete.Add(obj.ObjectId);
+                            return;
+                        }
 
+                        // 2. Стандартная сортировка оставшихся валидных объектов
+                        if (obj is BlockReference && recursive) toExplode.Add(obj.ObjectId);
+                        else if (obj is ProxyEntity proxy) toDelete.Add(obj.ObjectId);
+                        else if (obj is AttributeDefinition) attrList.Add(obj.ObjectId);
+                        else if (obj is Dimension) dimList.Add(obj.ObjectId);
+                        else result.Add(obj.ObjectId);
+                    }
+
+                    else toDelete.Add(obj.ObjectId);
+                }
+
+                // Подписываемся на событие, взрываем в пространство владельца и отписываемся
+                db.ObjectAppended += ObjectAppendedHandler;
+                // 2. Выносим ручную обработку прокси-объектов в отдельный метод
+                try
+                {
+                    if (explodeProxy)
+                    {
+                        ProcessProxyEntities(tr, db, ms, br, inLayer, result);
+                    }
+                }
+                catch { }
+                try
+                {
+                    br.ExplodeToOwnerSpace();
+                    // Удаляем исходный блок
+                    if (erase && !br.IsErased)
+                    {
+                        br.Erase();
+                    }
+                }
+                catch (Autodesk.AutoCAD.Runtime.Exception ex)
+                {
+                    try
+                    {
+                        SecondExplodeType(br, tr, ms);
+                        // Удаляем исходный блок
+                        if (erase && !br.IsErased)
+                        {
+                            br.Erase();
+                        }
+                    }
+                    catch { }
+                }
+                finally
+                {
+                    
+                    db.ObjectAppended -= ObjectAppendedHandler;
+                }
+
+                // Рекурсивный спуск по вложенным блокам
+                foreach (ObjectId bid in toExplode)
+                {
+                    result.AddRange(ExplodeBlock(tr, db, bid, erase, inLayer, recursive, explodeProxy, ms: ms));
+                }
+
+                // Удаляем служебные определения атрибутов (AttributeDefinition), оставшиеся от взрыва
+                foreach (ObjectId attrId in attrList)
+                {
+                    Entity e = tr.GetObject(attrId, OpenMode.ForWrite, false, true) as Entity;
+                    if (e != null && !e.IsErased) e.Erase();
+                }
+
+                // Корректируем масштаб размеров (Dimension)
+                if (scale != 1.0)
+                {
+                    foreach (ObjectId dimId in dimList)
+                    {
+                        // Метод сам разберется: кого клонировать, кого просто перекрасить, 
+                        // и применит Dimscale/Dimlfac ко всем без исключения за один вызов tr.GetObject
+                        ObjectId actualId = ConvertAndScaleDimension(tr, ms, dimId, scale);
+
+                        if (actualId != ObjectId.Null)
+                        {
+                            result.Add(actualId); // Добавляем итоговый размер в финальный результат
+                        }
+                    }
+                }
+
+                // Переносим элементы на слой родительского блока, если требуется
+                foreach (ObjectId objectId in result)
+                {
+                    Entity e = tr.GetObject(objectId, OpenMode.ForWrite, false, true) as Entity;
+                    if (e != null) ResolveEntityProperties(e, br, inLayer);
+                }
+
+                // Физически удаляем объекты, попавшие под фильтр мусора
+                foreach (ObjectId deleteId in toDelete)
+                {
+                    DBObject e = tr.GetObject(deleteId, OpenMode.ForWrite, false, true) as DBObject;
+                    if (e != null && !e.IsErased)
+                        e.Erase();                    
+                }                                
+            }
+            catch { }
             return result;
         }
 
-        /// <summary>
-        /// Вспомогательный метод для правильного наследования слоев и цветов по стандартам AutoCAD (Слой "0" и "ByBlock")
-        /// </summary>
-        private static void ApplyEntityProperties(Entity target, Entity source, BlockReference parentBlock, bool forceLayer)
+        private static void SecondExplodeType(BlockReference br, Transaction tr, BlockTableRecord ms)
         {
-            target.Layer = (source.Layer == "0" || forceLayer) ? parentBlock.Layer : source.Layer;
-
-            if (source.Color.IsByBlock)
+            using (DBObjectCollection collection = new DBObjectCollection())
             {
-                target.Color = parentBlock.Color;
+                br.Explode(collection);
+
+                List<Entity> entities = new List<Entity>();
+
+                foreach (DBObject dBObject in collection)
+                {
+                    if (dBObject is Entity e) entities.Add(e);
+                    else dBObject?.Dispose();                
+                }
+
+                entities.AddEntityInCurrentBTR(out _, ms, tr);                
             }
         }
 
-        /// <summary>
-        /// Извлекает атрибуты из вставки блока и подготавливает их текстовые копии в памяти.
-        /// </summary>
-        private static void ProcessBlockAttributes(Transaction tr, BlockReference br, bool inLayer, List<Entity> outputList)
+        private static bool FilterAndCheckIfShouldDelete(Entity obj)
         {
-            if (br.AttributeCollection.Count == 0) return;
+            if (obj == null) return false;           
 
+            if (!obj.Visible) return true;
+                   
+            string typeName = obj.GetType().Name;
+                        
+            if (obj is DBText dbText && string.IsNullOrWhiteSpace(dbText.TextString))
+            {
+                return true;
+            }
+
+            if (obj is MText mText && string.IsNullOrWhiteSpace(mText.Contents))
+            {
+                return true;
+            }
+
+            if (obj is Curve line && line.GetLength().IsEqualTo(0.0))
+            {
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Извлекает атрибуты блока и преобразует их в текстовые элементы на чертеже.
+        /// </summary>
+        private static void ProcessAttributes(Transaction tr, BlockTableRecord ms, BlockReference br, bool forceLayer, List<ObjectId> resultList)
+        {
             foreach (ObjectId attRefId in br.AttributeCollection)
             {
-                using (var attr = tr.GetObject(attRefId, OpenMode.ForRead, false, true) as AttributeReference)
+                using (AttributeReference attr = tr.GetObject(attRefId, OpenMode.ForRead, false, true) as AttributeReference)
                 {
                     if (attr == null || (!attr.Visible && attr.Invisible)) continue;
 
                     if (attr.IsMTextAttribute)
                     {
-                        using (MText sourceMText = attr.MTextAttribute)
+                        using (MText nText = attr.MTextAttribute)
                         {
-                            MText newMText = sourceMText.Clone() as MText;
-                            if (newMText != null)
-                            {
-                                ApplyEntityProperties(newMText, attr, br, inLayer);
-                                outputList.Add(newMText);
-                            }
+                            ResolveEntityProperties(nText, br, forceLayer);
+                            resultList.Add(ms.AppendEntity(nText));
+                            tr.AddNewlyCreatedDBObject(nText, true);
                         }
                     }
                     else
                     {
-                        var newText = new DBText();
-                        newText.SetPropertiesFrom(attr);
-                        newText.Height = attr.Height;
-                        newText.TextStyleId = attr.TextStyleId;
-                        newText.Position = attr.Position;
-                        newText.TextString = attr.TextString;
-                        newText.Justify = attr.Justify;
-                        newText.WidthFactor = attr.WidthFactor;
-                        newText.Rotation = attr.Rotation;
-
-                        if (attr.Justify != AttachmentPoint.BaseLeft)
+                        using (DBText nText = new DBText())
                         {
-                            newText.AlignmentPoint = attr.AlignmentPoint;
-                        }
+                            nText.SetPropertiesFrom(attr);
+                            nText.Height = attr.Height;
+                            nText.Color = attr.Color;
+                            nText.Layer = attr.Layer;
+                            nText.TextStyleId = attr.TextStyleId;
+                            nText.Linetype = attr.Linetype;
+                            nText.LineWeight = attr.LineWeight;
+                            nText.Position = attr.Position;
+                            nText.TextString = attr.TextString;
+                            nText.Justify = attr.Justify;
+                            nText.WidthFactor = attr.WidthFactor;
+                            nText.Rotation = attr.Rotation;
 
-                        ApplyEntityProperties(newText, attr, br, inLayer);
-                        outputList.Add(newText);
+                            if (attr.Justify != AttachmentPoint.BaseLeft)
+                                nText.AlignmentPoint = attr.AlignmentPoint;
+
+                            ResolveEntityProperties(nText, br, forceLayer);
+
+                            resultList.Add(ms.AppendEntity(nText));
+                            tr.AddNewlyCreatedDBObject(nText, true);
+                        }
                     }
                 }
             }
         }
 
         /// <summary>
-        /// Локально взрывает тело блока и накапливает готовую геометрию (включая рекурсивные вложения) в ОЗУ.
+        /// Извлекает геометрию из Proxy-объектов, находящихся внутри определения блока, с исправлением выравнивания текстов.
         /// </summary>
-        private static void ProcessBlockGeometry(Transaction tr, Database db, BlockReference br, Matrix3d localMatrix,
-            double scale, bool inLayer, bool recursive, bool explodeProxy, List<Entity> outputList)
+        private static void ProcessProxyEntities(Transaction tr, Database db, BlockTableRecord ms, BlockReference br, bool forceLayer, List<ObjectId> resultList)
         {
-            using (var explodedCollection = new DBObjectCollection())
-            {
-                br.Explode(explodedCollection);
-
-                var innersToExplode = new List<BlockReference>();
-
-                foreach (DBObject obj in explodedCollection)
-                {
-                    if (obj is Entity ent)
-                    {
-                        if (!ent.Visible)
-                        {
-                            ent.Dispose();
-                            continue;
-                        }
-
-                        if (recursive && ent is BlockReference innerRef)
-                        {
-                            innerRef.TransformBy(localMatrix);
-                            innersToExplode.Add(innerRef);
-                            continue;
-                        }
-
-                        if (ent is AttributeDefinition)
-                        {
-                            ent.Dispose();
-                            continue;
-                        }
-
-                        if (scale != 1.0 && ent is Dimension dim)
-                        {
-                            try { dim.Dimscale *= scale; } catch { }
-                        }
-
-                        ent.TransformBy(localMatrix);
-                        ApplyEntityProperties(ent, ent, br, inLayer);
-                        outputList.Add(ent);
-                    }
-                    else
-                    {
-                        obj?.Dispose();
-                    }
-                }
-
-                // Рекурсивный спуск: наполняем этот же общий список на всю глубину иерархии
-                foreach (BlockReference innerRef in innersToExplode)
-                {
-                    var innerEntities = new List<Entity>();
-
-                    ProcessBlockAttributes(tr, innerRef, inLayer, innerEntities);
-                    ProcessBlockGeometry(tr, db, innerRef, Matrix3d.Identity, 1.0, inLayer, recursive, explodeProxy, innerEntities);
-
-                    if (explodeProxy)
-                    {
-                        ProcessBlockProxyEntities(tr, innerRef, Matrix3d.Identity, inLayer, innerEntities);
-                    }
-
-                    outputList.AddRange(innerEntities);
-                    innerRef.Dispose();
-                }
-            }
-        }
-        /// <summary>
-        /// Безопасно извлекает графику из Proxy-объектов внутри блока и сохраняет её в ОЗУ-список.
-        /// </summary>
-        private static void ProcessBlockProxyEntities(Transaction tr, BlockReference br, Matrix3d localMatrix, bool inLayer, List<Entity> outputList)
-        {
-            ObjectId btrId = br.IsDynamicBlock && br.DynamicBlockTableRecord != ObjectId.Null
-                ? br.DynamicBlockTableRecord
-                : br.BlockTableRecord;
-
+            // Важно: всегда читаем br.BlockTableRecord, чтобы захватить состояние измененного динамического блока (*X...)
+            ObjectId btrId = br.BlockTableRecord;
             if (btrId == ObjectId.Null) return;
 
-            using (var btr = tr.GetObject(btrId, OpenMode.ForRead, false, true) as BlockTableRecord)
+            BlockTableRecord btr = tr.GetObject(btrId, OpenMode.ForRead, false, true) as BlockTableRecord;
+            foreach (ObjectId entId in btr)
             {
-                foreach (ObjectId prId in btr)
+                DBObject obj = tr.GetObject(entId, OpenMode.ForRead, false, true);
+                if (obj == null) continue;
+
+                if (obj is ProxyEntity proxyEntity)
                 {
-                    using (var obj = tr.GetObject(prId, OpenMode.ForRead, false, true))
+                    ProcessProxyEntity(proxyEntity, tr, ms, db, forceLayer, resultList, br);
+                }
+            }
+        }
+
+        private static void ProcessProxyEntity(ProxyEntity proxyEntity, Transaction tr, BlockTableRecord ms, Database db, bool forceLayer, List<ObjectId> resultList, BlockReference reference = null)
+        {
+            if (proxyEntity.GraphicsMetafileType != GraphicsMetafileType.FullGraphics) return;
+
+            using (DBObjectCollection collection = new DBObjectCollection())
+            {
+                proxyEntity.Explode(collection);
+                foreach (DBObject subObj in collection)
+                {
+                    if (subObj is Entity entity)
                     {
-                        if (obj is ProxyEntity proxy && proxy.GraphicsMetafileType == GraphicsMetafileType.FullGraphics)
+                        // Если из прокси вывалился вложенный прокси — уходим в рекурсию.
+                        // НЕ трансформируем его здесь, чтобы избежать паразитного сдвига координат!
+                        if (entity is ProxyEntity proxy)
                         {
-                            using (var proxyCollection = new DBObjectCollection())
-                            {
-                                proxy.Explode(proxyCollection);
-                                foreach (DBObject pObj in proxyCollection)
-                                {
-                                    if (pObj is Entity pEnt)
-                                    {
-                                        pEnt.TransformBy(localMatrix);
-                                        ApplyEntityProperties(pEnt, pEnt, br, inLayer);
-                                        outputList.Add(pEnt);
-                                    }
-                                    else pObj?.Dispose();
-                                }
-                            }
+                            ProcessProxyEntity(proxy, tr, ms, db, forceLayer, resultList, reference);
+                            proxy?.Dispose();
+                            continue;
                         }
+
+                        // Трансформируем ТОЛЬКО конечные графические примитивы (линии, тексты)
+                        if (reference != null)
+                            entity.TransformBy(reference.BlockTransform);
+
+                        // Фикс для улетающих однострочных текстов
+                        if (entity is DBText dbText && dbText.Justify != AttachmentPoint.BaseLeft)
+                        {
+                            dbText.AdjustAlignment(db);
+                        }
+
+                        // Наследуем свойства ByBlock и слои для конечных примитивов
+                        if (reference != null)
+                            ResolveEntityProperties(entity, reference, forceLayer);
+
+                        resultList.Add(ms.AppendEntity(entity));
+                        tr.AddNewlyCreatedDBObject(entity, true);
+                    }
+                    else
+                    {
+                        subObj?.Dispose();
                     }
                 }
             }
         }
 
+        /// <summary>
+        /// Проверяет размер: если это аннотационная зависимость — клонирует её в чистый размер.
+        /// Параллельно применяет масштабирование (Dimscale/Dimlfac) к ЛЮБОМУ типу размера за один проход.
+        /// </summary>
+        private static ObjectId ConvertAndScaleDimension(Transaction tr, BlockTableRecord ms, ObjectId dimId, double insertScale)
+        {
+            // Если масштаб равен 1.0, нам не нужно модифицировать обычные размеры, 
+            // но зависимости всё равно нужно проверить и клонировать. Поэтому открываем ForRead.
+            bool needScale = (insertScale != 1.0 && insertScale != 0.0);
 
+            using (Dimension srcDim = tr.GetObject(dimId, OpenMode.ForRead, false, true) as Dimension)
+            {
+                if (srcDim == null) return ObjectId.Null;
+
+                // 1. Точная проверка на аннотационную зависимость (Constraints не имеют AcadObject)
+                bool isConstraint = false;
+                try
+                {
+                    object obj = srcDim.AcadObject;
+                    if (obj == null) isConstraint = true;
+                }
+                catch (System.Runtime.InteropServices.COMException)
+                {
+                    isConstraint = true;
+                }
+
+                // --- СЦЕНАРИЙ А: Это ОБЫЧНЫЙ РАЗМЕР чертежа ---
+                if (!isConstraint)
+                {
+                    if (needScale)
+                    {
+                        // Переоткрываем на запись только если реально нужно применить масштаб
+                        srcDim.UpgradeOpen();
+                        try
+                        {
+                            srcDim.Dimscale *= insertScale; // Масштаб стрелок/текста
+                            srcDim.Dimlfac /= insertScale;  // Компенсация линейных измерений
+                        }
+                        catch { }
+                    }
+                    return dimId; // Возвращаем исходный ID
+                }
+
+                // --- СЦЕНАРИЙ Б: Это АННОТАЦИОННАЯ ЗАВИСИМОСТЬ (требуется клон) ---
+                Dimension newDim = srcDim.Clone() as Dimension;
+                if (newDim != null)
+                {
+                    newDim.DimensionText = "";
+
+                    // Масштабируем клон прямо в памяти (ОЗУ) до добавления в базу данных
+                    if (needScale)
+                    {
+                        try
+                        {
+                            newDim.Dimscale *= insertScale;
+                            newDim.Dimlfac /= insertScale;
+                        }
+                        catch { }
+                    }
+
+                    // Добавляем чистый и уже смасштабированный клон на чертеж
+                    ObjectId newId = ms.AppendEntity(newDim);
+                    tr.AddNewlyCreatedDBObject(newDim, true);
+
+                    // Стираем старый объект-зависимость
+                    srcDim.UpgradeOpen();
+                    srcDim.Erase();
+
+                    return newId; // Возвращаем ID нового созданного размера
+                }
+
+                return dimId;
+            }
+        }
+
+
+
+        /// <summary>
+        /// Наследует свойства от родительского блока для элементов со слоя "0" или со свойствами ByBlock
+        /// </summary>
+        private static void ResolveEntityProperties(Entity target, BlockReference parentBlock, bool forceLayer)
+        {
+            // 1. Обработка слоя "0". Если элемент на слое "0" или включен forceLayer, переносим на слой блока
+            if (target.Layer == "0" || forceLayer)
+            {
+                target.Layer = parentBlock.Layer;
+            }
+
+            // 2. Обработка цвета ByBlock
+            if (target.Color.IsByBlock)
+            {
+                target.Color = parentBlock.Color;
+            }
+
+            // 3. Обработка типа линий ByBlock
+            if (string.Equals(target.Linetype, "ByBlock", StringComparison.OrdinalIgnoreCase))
+            {
+                target.Linetype = parentBlock.Linetype;
+            }
+
+            // 4. Обработка веса линий ByBlock
+            if (target.LineWeight == LineWeight.ByBlock)
+            {
+                target.LineWeight = parentBlock.LineWeight;
+            }
+        }
+
+
+        #region old
 
         /// <summary>
         /// расчленияет блок и возвращает ObjectId полученных элементов
         /// </summary>
-        public static List<ObjectId> ExplodeBlockOld(Transaction tr, Database db, ObjectId id, bool erase, bool inLayer, bool recursive, bool explodeProxy, Matrix3d matrix, BlockReference br = null)
-        {
+        //public static List<ObjectId> ExplodeBlock22(Transaction tr, Database db, ObjectId id, bool erase, bool inLayer, bool recursive, bool explodeProxy, Matrix3d matrix, BlockReference br = null)
+        //{
 
-            List<ObjectId> result = new List<ObjectId>();
-            List<ObjectId> attrList = new List<ObjectId>();
-            List<ObjectId> dimList = new List<ObjectId>();
-            List<ObjectId> toExplode = new List<ObjectId>();
-            // Открываем вставку блока – для расчленения достаточно возможности
-            // открыть «для чтения»т.к. эта операция не меняет исходный примитив          
-            if (br == null) br = tr.GetObject(id, OpenMode.ForRead, false, true) as BlockReference;
-            if (br == null) { return result; }
+        //    List<ObjectId> result = new List<ObjectId>();
+        //    List<ObjectId> attrList = new List<ObjectId>();
+        //    List<ObjectId> dimList = new List<ObjectId>();
+        //    List<ObjectId> toExplode = new List<ObjectId>();
+        //    // Открываем вставку блока – для расчленения достаточно возможности
+        //    // открыть «для чтения»т.к. эта операция не меняет исходный примитив          
+        //    if (br == null) br = tr.GetObject(id, OpenMode.ForRead, false, true) as BlockReference;
+        //    if (br == null) { return result; }
 
-            matrix = br.BlockTransform;
+        //    matrix = br.BlockTransform;
 
-            Scale3d scale3D = br.ScaleFactors;
-            double scale = 1;
-            if (Math.Abs(scale3D.X).IsEqualTo(Math.Abs(scale3D.Y))) scale = Math.Abs(scale3D.X);
-            // Отдельно обрабатываем атрибуты блока
-            if (br.AttributeCollection.Count > 0)
-            {
-                using (BlockTableRecord ms = tr.GetObject(db.CurrentSpaceId, OpenMode.ForWrite, false, true) as BlockTableRecord)
-                {
-                    foreach (ObjectId attRefId in br.AttributeCollection)
-                    {
-                        using (AttributeReference attr = tr.GetObject(attRefId, OpenMode.ForRead, false, true) as AttributeReference)
-                        {
-                            if (attr == null || (!attr.Visible && attr.Invisible)) continue;
-                            if (attr.IsMTextAttribute)
-                            {
-                                using (MText nText = attr.MTextAttribute)
-                                {
-                                    result.Add(ms.AppendEntity(nText));
-                                    tr.AddNewlyCreatedDBObject(nText, true);
-                                }
-                            }
-                            else
-                            {
-                                using (DBText nText = new DBText())
-                                {
-                                    nText.SetPropertiesFrom(attr);
-                                    nText.Height = attr.Height;
-                                    nText.Color = attr.Color;
-                                    nText.Layer = attr.Layer;
-                                    nText.TextStyleId = attr.TextStyleId;
-                                    nText.Linetype = attr.Linetype;
-                                    nText.LineWeight = attr.LineWeight;
-                                    nText.Position = attr.Position;
-                                    nText.TextString = attr.TextString;
-                                    nText.Justify = attr.Justify;
-                                    nText.WidthFactor = attr.WidthFactor;
-                                    nText.Rotation = attr.Rotation;
-                                    if (attr.Justify != AttachmentPoint.BaseLeft) nText.AlignmentPoint = attr.AlignmentPoint;
-                                    result.Add(ms.AppendEntity(nText));
-                                    tr.AddNewlyCreatedDBObject(nText, true);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            if (explodeProxy)
-            {
-
-
-                ObjectId btrId = ObjectId.Null;
-
-                if (br.IsDynamicBlock && br.DynamicBlockTableRecord != ObjectId.Null) btrId = br.DynamicBlockTableRecord;
-                else btrId = br.BlockTableRecord;
-
-                if (btrId != ObjectId.Null)
-                {
-                    using (BlockTableRecord ms = tr.GetObject(db.CurrentSpaceId, OpenMode.ForWrite, false, true) as BlockTableRecord)
-                    {
-                        BlockTableRecord btr = tr.GetObject(btrId, OpenMode.ForRead, false, true) as BlockTableRecord;
-                        foreach (ObjectId prId in btr)
-                        {
-                            ProxyEntity proxyEntity = tr.GetObject(prId, OpenMode.ForRead, false, true) as ProxyEntity;
-                            if (proxyEntity != null && proxyEntity.GraphicsMetafileType == GraphicsMetafileType.FullGraphics)
-                            {
-                                using (DBObjectCollection collection = new DBObjectCollection())
-                                {
-                                    proxyEntity.Explode(collection);
-                                    foreach (DBObject obj1 in collection)
-                                    {
-                                        if (obj1 is Entity entity)
-                                        {
-                                            entity.TransformBy(matrix);
-                                            ms.AppendEntity(entity);
-                                            tr.AddNewlyCreatedDBObject(entity, true);
-                                        }
-                                        else obj1?.Dispose();
-                                    }
-                                }
-                            }
-
-                        }
-                    }
-                }
-            }
-            // Создаем обработчик для получения вложенных вставок блока
-            void handler(object s, ObjectEventArgs e)
-            {
-                if (e.DBObject is BlockReference && recursive) toExplode.Add(e.DBObject.ObjectId);
-                else if (e.DBObject is AttributeDefinition) attrList.Add(e.DBObject.ObjectId);
-                else if (e.DBObject is Dimension) dimList.Add(e.DBObject.ObjectId);
-                else result.Add(e.DBObject.ObjectId);
-            }
-            // Добавляем обработчик перед вызовом расчленения
-            //  удаляем сразу после этого
-            db.ObjectAppended += handler;
-            br.ExplodeToOwnerSpace();
-            db.ObjectAppended -= handler;
-            // Проходимся по всем полученным вставкам блока и рекурсивно
-            // расчленяем их если надо
-            foreach (ObjectId bid in toExplode)
-            {
-                result.AddRange(ExplodeBlock(tr, db, bid, erase, inLayer, recursive, explodeProxy, matrix));
-            }
-            //удаляем атрибуты, они уже преобразованы в тексты
-            foreach (ObjectId objectId in attrList)
-            {
-                using (Entity e = tr.GetObject(objectId, OpenMode.ForWrite, false, true) as Entity)
-                {
-                    if (e != null && !e.IsErased) e.Erase();
-                }
-            }
-            //изменяем масштаб размеров
-            if (scale != 1)
-            {
-                foreach (ObjectId objectId in dimList)
-                {
-                    using (Dimension dstr = tr.GetObject(objectId, OpenMode.ForWrite, false, true) as Dimension)
-                    {
-                        if (dstr != null)
-                        {
-                            try
-                            {
-                                dstr.Dimscale *= scale;
-                            }
-                            catch { }
-                            result.Add(objectId);
-                        }
-                    }
-                }
-            }
-            //меняем слой если надо
-            if (inLayer)
-            {
-                foreach (ObjectId objectId in result)
-                {
-                    using (Entity e = tr.GetObject(objectId, OpenMode.ForWrite, false, true) as Entity)
-                    {
-                        if (e != null) e.Layer = br.Layer;
-                    }
-                }
-            }
-            // Чтобы повторить поведение команды РАСЧЛЕНИ
-            // необходимо удалить исходный примитив
-            if (erase && !br.IsErased)
-            {
-                br.UpgradeOpen();
-                br.Erase();
-                br.DowngradeOpen();
-            }
-            return result;
-        }
+        //    Scale3d scale3D = br.ScaleFactors;
+        //    double scale = 1;
+        //    if (Math.Abs(scale3D.X).IsEqualTo(Math.Abs(scale3D.Y))) scale = Math.Abs(scale3D.X);
+        //    // Отдельно обрабатываем атрибуты блока
+        //    if (br.AttributeCollection.Count > 0)
+        //    {
+        //        using (BlockTableRecord ms = tr.GetObject(db.CurrentSpaceId, OpenMode.ForWrite, false, true) as BlockTableRecord)
+        //        {
+        //            foreach (ObjectId attRefId in br.AttributeCollection)
+        //            {
+        //                using (AttributeReference attr = tr.GetObject(attRefId, OpenMode.ForRead, false, true) as AttributeReference)
+        //                {
+        //                    if (attr == null || (!attr.Visible && attr.Invisible)) continue;
+        //                    if (attr.IsMTextAttribute)
+        //                    {
+        //                        using (MText nText = attr.MTextAttribute)
+        //                        {
+        //                            result.Add(ms.AppendEntity(nText));
+        //                            tr.AddNewlyCreatedDBObject(nText, true);
+        //                        }
+        //                    }
+        //                    else
+        //                    {
+        //                        using (DBText nText = new DBText())
+        //                        {
+        //                            nText.SetPropertiesFrom(attr);
+        //                            nText.Height = attr.Height;
+        //                            nText.Color = attr.Color;
+        //                            nText.Layer = attr.Layer;
+        //                            nText.TextStyleId = attr.TextStyleId;
+        //                            nText.Linetype = attr.Linetype;
+        //                            nText.LineWeight = attr.LineWeight;
+        //                            nText.Position = attr.Position;
+        //                            nText.TextString = attr.TextString;
+        //                            nText.Justify = attr.Justify;
+        //                            nText.WidthFactor = attr.WidthFactor;
+        //                            nText.Rotation = attr.Rotation;
+        //                            if (attr.Justify != AttachmentPoint.BaseLeft) nText.AlignmentPoint = attr.AlignmentPoint;
+        //                            result.Add(ms.AppendEntity(nText));
+        //                            tr.AddNewlyCreatedDBObject(nText, true);
+        //                        }
+        //                    }
+        //                }
+        //            }
+        //        }
+        //    }
+        //    if (explodeProxy)
+        //    {
 
 
+        //        ObjectId btrId = ObjectId.Null;
+
+        //        if (br.IsDynamicBlock && br.DynamicBlockTableRecord != ObjectId.Null) btrId = br.DynamicBlockTableRecord;
+        //        else btrId = br.BlockTableRecord;
+
+        //        if (btrId != ObjectId.Null)
+        //        {
+        //            using (BlockTableRecord ms = tr.GetObject(db.CurrentSpaceId, OpenMode.ForWrite, false, true) as BlockTableRecord)
+        //            {
+        //                BlockTableRecord btr = tr.GetObject(btrId, OpenMode.ForRead, false, true) as BlockTableRecord;
+        //                foreach (ObjectId prId in btr)
+        //                {
+        //                    ProxyEntity proxyEntity = tr.GetObject(prId, OpenMode.ForRead, false, true) as ProxyEntity;
+        //                    if (proxyEntity != null && proxyEntity.GraphicsMetafileType == GraphicsMetafileType.FullGraphics)
+        //                    {
+        //                        using (DBObjectCollection collection = new DBObjectCollection())
+        //                        {
+        //                            proxyEntity.Explode(collection);
+        //                            foreach (DBObject obj1 in collection)
+        //                            {
+        //                                if (obj1 is Entity entity)
+        //                                {
+        //                                    entity.TransformBy(matrix);
+        //                                    ms.AppendEntity(entity);
+        //                                    tr.AddNewlyCreatedDBObject(entity, true);
+        //                                }
+        //                                else obj1?.Dispose();
+        //                            }
+        //                        }
+        //                    }
+
+        //                }
+        //            }
+        //        }
+        //    }
+        //    // Создаем обработчик для получения вложенных вставок блока
+        //    void handler(object s, ObjectEventArgs e)
+        //    {
+        //        if (e.DBObject is BlockReference && recursive) toExplode.Add(e.DBObject.ObjectId);
+        //        else if (e.DBObject is AttributeDefinition) attrList.Add(e.DBObject.ObjectId);
+        //        else if (e.DBObject is Dimension) dimList.Add(e.DBObject.ObjectId);
+        //        else result.Add(e.DBObject.ObjectId);
+        //    }
+        //    // Добавляем обработчик перед вызовом расчленения
+        //    //  удаляем сразу после этого
+        //    db.ObjectAppended += handler;
+        //    br.ExplodeToOwnerSpace();
+        //    db.ObjectAppended -= handler;
+        //    // Проходимся по всем полученным вставкам блока и рекурсивно
+        //    // расчленяем их если надо
+        //    foreach (ObjectId bid in toExplode)
+        //    {
+        //        result.AddRange(ExplodeBlock(tr, db, bid, erase, inLayer, recursive, explodeProxy, matrix));
+        //    }
+        //    //удаляем атрибуты, они уже преобразованы в тексты
+        //    foreach (ObjectId objectId in attrList)
+        //    {
+        //        using (Entity e = tr.GetObject(objectId, OpenMode.ForWrite, false, true) as Entity)
+        //        {
+        //            if (e != null && !e.IsErased) e.Erase();
+        //        }
+        //    }
+        //    //изменяем масштаб размеров
+        //    if (scale != 1)
+        //    {
+        //        foreach (ObjectId objectId in dimList)
+        //        {
+        //            using (Dimension dstr = tr.GetObject(objectId, OpenMode.ForWrite, false, true) as Dimension)
+        //            {
+        //                if (dstr != null)
+        //                {
+        //                    try
+        //                    {
+        //                        dstr.Dimscale *= scale;
+        //                    }
+        //                    catch { }
+        //                    result.Add(objectId);
+        //                }
+        //            }
+        //        }
+        //    }
+        //    //меняем слой если надо
+        //    if (inLayer)
+        //    {
+        //        foreach (ObjectId objectId in result)
+        //        {
+        //            using (Entity e = tr.GetObject(objectId, OpenMode.ForWrite, false, true) as Entity)
+        //            {
+        //                if (e != null) e.Layer = br.Layer;
+        //            }
+        //        }
+        //    }
+        //    // Чтобы повторить поведение команды РАСЧЛЕНИ
+        //    // необходимо удалить исходный примитив
+        //    if (erase && !br.IsErased)
+        //    {
+        //        br.UpgradeOpen();
+        //        br.Erase();
+        //        br.DowngradeOpen();
+        //    }
+        //    return result;
+        //}
+
+        #endregion
     }
 }

@@ -876,7 +876,6 @@ namespace BaseFunction
         {
             return entities.AddEntityInCurrentBTR(out _, targetSpaceId, transaction);
         }
-
         public static bool AddEntityInCurrentBTR(this List<Entity> entities, out List<ObjectId> ids, ObjectId targetSpaceId = default, Transaction transaction = null)
         {
             ids = new List<ObjectId>();
@@ -894,12 +893,7 @@ namespace BaseFunction
 
                 BlockTableRecord btr = (BlockTableRecord)transaction.GetObject(actualSpaceId, OpenMode.ForWrite);
 
-                foreach (Entity e in entities)
-                {
-                    if (e == null || e.IsDisposed || !e.IsNewObject) continue;
-                    ids.Add(btr.AppendEntity(e));
-                    transaction.AddNewlyCreatedDBObject(e, true);
-                }
+                entities.AddEntityInCurrentBTR(out ids, btr, transaction);
 
                 return true;
             }
@@ -916,6 +910,20 @@ namespace BaseFunction
                 }
             }
         }
+        public static bool AddEntityInCurrentBTR(this List<Entity> entities, out List<ObjectId> ids, BlockTableRecord btr, Transaction transaction)
+        {
+            ids = new List<ObjectId>();
+            foreach (Entity e in entities)
+            {
+                if (e == null || e.IsDisposed || !e.IsNewObject) continue;
+                ids.Add(btr.AppendEntity(e));
+                transaction.AddNewlyCreatedDBObject(e, true);
+            }
+            return true;
+        }
+
+
+
 
         public static bool DeleteEntity(this ObjectId id, Transaction tr = null)
         {
