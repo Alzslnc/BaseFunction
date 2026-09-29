@@ -544,11 +544,13 @@ namespace BaseFunction
             }
 
             // Находим точки пересечения
-            List<Point3d> intersections = poly1.Intersectionts(intersectCutter, includeStartAndEnd: false);
+            List<Point3d> intersections = poly1.Intersectionts(intersectCutter, includeStartAndEnd: true);
 
-            if (intersections.Count == 0)
+            // Защита: для замкнутых контуров нужно минимум 2 пересечения
+            if (intersections.Count < 2)
             {
-                if (intersectCutter != poly2) intersectCutter.Dispose();
+                // ⚡ ЕСЛИ ЭТО БЫЛА ПРОЕКЦИЯ — УНИЧТОЖАЕМ ЕЁ ПЕРЕД ВЫХОДОМ. Исходную poly2 не трогаем!
+                if (intersectCutter != poly2 && intersectCutter != null) intersectCutter.Dispose();
                 return false;
             }
 
@@ -556,7 +558,9 @@ namespace BaseFunction
             List<double> params1 = new List<double>();
             foreach (Point3d p in intersections)
             {
-                params1.Add(poly1.GetParameterAtPoint(poly1.GetClosestPointTo(p, false)));
+                Point3d point = poly1.GetClosestPointTo(p, false);
+                if (poly1.StartPoint.IsEqualTo(point) || poly1.EndPoint.IsEqualTo(point)) continue;
+                params1.Add(poly1.GetParameterAtPoint(point));
             }
             params1.Sort();
 
@@ -604,7 +608,7 @@ namespace BaseFunction
                 }
             }
 
-            if (intersectCutter != poly2)
+            if (intersectCutter != poly2 && intersectCutter != null)
             {
                 intersectCutter.Dispose();
             }

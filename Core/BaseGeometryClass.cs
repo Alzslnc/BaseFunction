@@ -33,6 +33,40 @@ namespace BaseFunction
 
             return fullContour;
         }
+        public static double AcadTextLength(string str, double height, TextStyleTableRecord txtStyle)
+        {
+            if (string.IsNullOrEmpty(str)) return 0;
+            // Переменная для значения длины
+            using (DBText dbTxt = new DBText
+            {
+                // Задаем стиль тексту
+                TextStyleId = txtStyle.ObjectId,
+
+                // Дополнительные настройки
+                Normal = Vector3d.ZAxis,
+                Rotation = 0.0,
+                Position = Point3d.Origin,
+
+                // Задаем строку тексту
+                TextString = str,
+                Height = height,
+            })
+            {
+                // Помимо назначения стиля, нужно еще дополнительно
+                // назначить угол наклона букв и коэффициент ширины
+
+
+                if (txtStyle != null)
+                {
+                    dbTxt.Oblique = txtStyle.ObliquingAngle;
+                    dbTxt.WidthFactor = txtStyle.XScale;
+                }
+                // Вычисляем длину текста
+                Point3d ptMin = dbTxt.GeometricExtents.MinPoint;
+                Point3d ptMax = dbTxt.GeometricExtents.MaxPoint;
+                return ptMax.X - ptMin.X;
+            }          
+        }
 
         public static double AcadTextLength(string str, ObjectId styleId, double height)
         {
@@ -46,6 +80,9 @@ namespace BaseFunction
                 {
                     styleId = HostApplicationServices.WorkingDatabase.Textstyle;
                 }
+
+                TextStyleTableRecord txtStyle = tr.GetObject(styleId, OpenMode.ForRead) as TextStyleTableRecord;
+
 
                 DBText dbTxt = new DBText
                 {
@@ -65,7 +102,7 @@ namespace BaseFunction
                 // Помимо назначения стиля, нужно еще дополнительно
                 // назначить угол наклона букв и коэффициент ширины
 
-                TextStyleTableRecord txtStyle = tr.GetObject(styleId, OpenMode.ForRead) as TextStyleTableRecord;
+                
                 if (txtStyle != null)
                 {
                     dbTxt.Oblique = txtStyle.ObliquingAngle;
