@@ -257,16 +257,30 @@ namespace Progress
         public void Dispose()
         {
             if (_isDisposed) return;
-            if (_window != null && _window.Dispatcher.HasShutdownStarted == false)
+            if (_window != null)
             {
+                // 1. Мгновенно обновляем финальные значения (можно сделать в текущем потоке)
                 ViewModel.FlushFinalValues();
-                _window.Dispatcher.Invoke(() =>
+
+                // 2. Используем БЕЗОПАСНЫЙ асинхронный BeginInvoke.
+                // Основной поток AutoCAD больше НИКОГДА не зависнет на выходе из using.
+                _window.Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    _window.AllowClose = true;
-                    _window.Close();
-                    Dispatcher.CurrentDispatcher.BeginInvokeShutdown(DispatcherPriority.Background);
-                });
+                    try
+                    {
+                        if (_window.IsLoaded)
+                        {
+                            _window.AllowClose = true;
+                            _window.Close();
+                        }
+
+                        // Правильный и чистый останов Dispatcher.Run() фонового потока
+                        _window.Dispatcher.InvokeShutdown();
+                    }
+                    catch { /* Защита от ObjectDisposedException, если окно уже закрылось */ }
+                }), DispatcherPriority.Normal);
             }
+
             _isDisposed = true;
             GC.SuppressFinalize(this);
         }
