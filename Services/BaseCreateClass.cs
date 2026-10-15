@@ -65,7 +65,15 @@ namespace BaseFunction
 
             return pl;
         }
-
+        public static MLeader CreateMLeader(string text, Point3d point, Vector3d? direction = null, double xShift = 1, double yShift = 1)
+        {
+            using (MText mText = new MText())
+            {
+                mText.SetDatabaseDefaults();
+                mText.Contents = text;
+                return CreateMLeader(mText, point, direction, xShift, yShift);
+            }
+        }
         public static MLeader CreateMLeader(MText mText, Point3d point, Vector3d? direction = null, double xShift = 1, double yShift = 1)
         {
             // Исправляем логику null: теперь значение гарантированно запишется в переменную, если пришел null
