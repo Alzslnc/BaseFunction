@@ -68,10 +68,10 @@ namespace Progress
 
         public void StartLiveUpdate()
         {
-            // Создаем таймер СТРОГО в потоке окна, где вызван этот метод (Loaded окна)
-            _uiRefreshTimer = new DispatcherTimer(DispatcherPriority.Render)
+            // Снижаем приоритет до Background, чтобы UI не штормило при нехватке ресурсов
+            _uiRefreshTimer = new DispatcherTimer(DispatcherPriority.Background)
             {
-                Interval = TimeSpan.FromMilliseconds(33)
+                Interval = TimeSpan.FromMilliseconds(33) // ~30 FPS
             };
             _uiRefreshTimer.Tick += UiRefreshTimer_Tick;
             _uiRefreshTimer.Start();
@@ -134,23 +134,32 @@ namespace Progress
 
         private void UiRefreshTimer_Tick(object sender, EventArgs e)
         {
-            // Тексты обновляем мгновенно
-            MainStatus = RawMainStatus;
-            SubStatus = RawSubStatus;
+            // 1. Тексты обновляем только ЕСЛИ они реально изменились
+            if (_mainStatus != RawMainStatus) MainStatus = RawMainStatus;
+            if (_subStatus != RawSubStatus) SubStatus = RawSubStatus;
 
-            // --- Динамический LERP для основного бара ---
+            // 2. Оптимизация LERP для основного бара
             double mainDiff = RawMainProgress - MainProgress;
             if (Math.Abs(mainDiff) > 0.01)
-                MainProgress += mainDiff * _mainLerpFactor; // Используем динамический коэффициент
-            else
+            {
+                MainProgress += mainDiff * _mainLerpFactor;
+            }
+            // Присваиваем финал ТОЛЬКО один раз, когда дошли до цели, а не каждый тик!
+            else if (MainProgress != RawMainProgress)
+            {
                 MainProgress = RawMainProgress;
+            }
 
-            // --- Динамический LERP для дочернего бара ---
+            // 3. Оптимизация LERP для дочернего бара
             double subDiff = RawSubProgress - SubProgress;
             if (Math.Abs(subDiff) > 0.01)
-                SubProgress += subDiff * _subLerpFactor;    // Используем динамический коэффициент
-            else
+            {
+                SubProgress += subDiff * _subLerpFactor;
+            }
+            else if (SubProgress != RawSubProgress)
+            {
                 SubProgress = RawSubProgress;
+            }
         }
 
         public void FlushFinalValues()
