@@ -9,7 +9,7 @@ namespace BaseFunction
 {
     public static class BaseExplodeClass
     {
-        
+
         /// <summary>
         /// получает составные элементы объекта и добавляет их в чертеж, возвращает их ObjectId
         /// </summary>
@@ -36,7 +36,7 @@ namespace BaseFunction
                 if (e is MText) result.Add(e.ObjectId);
                 else if (e is BlockReference reference)
                 {
-                    result.AddRange(ExplodeBlock(tr, HostApplicationServices.WorkingDatabase, ObjectId.Null, true, false, true, true, reference, ms));                   
+                    result.AddRange(ExplodeBlock(tr, HostApplicationServices.WorkingDatabase, ObjectId.Null, true, false, true, true, reference, ms));
                 }
                 else if (e is ProxyEntity proxyEntity)
                 {
@@ -47,7 +47,7 @@ namespace BaseFunction
                         proxyEntity.Erase();
                     }
                 }
-                else 
+                else
                 {
                     using (DBObjectCollection coll = new DBObjectCollection())
                     {
@@ -96,7 +96,7 @@ namespace BaseFunction
 
                 if (br == null) br = tr.GetObject(id, OpenMode.ForWrite, false, true) as BlockReference;
                 if (br == null) return result;
-                               
+
                 // Расчет масштаба для размеров
                 Scale3d scale3D = br.ScaleFactors;
                 double scale = Math.Abs(scale3D.X).IsEqualTo(Math.Abs(scale3D.Y)) ? Math.Abs(scale3D.X) : 1.0;
@@ -106,7 +106,7 @@ namespace BaseFunction
                 {
                     ProcessAttributes(tr, ms, br, inLayer, result);
                 }
-                        
+
                 // Локальный обработчик для перехвата объектов, созданных методом ExplodeToOwnerSpace
                 void ObjectAppendedHandler(object s, ObjectEventArgs e)
                 {
@@ -167,7 +167,7 @@ namespace BaseFunction
                 }
                 finally
                 {
-                    
+
                     db.ObjectAppended -= ObjectAppendedHandler;
                 }
 
@@ -212,8 +212,8 @@ namespace BaseFunction
                 {
                     DBObject e = tr.GetObject(deleteId, OpenMode.ForWrite, false, true) as DBObject;
                     if (e != null && !e.IsErased)
-                        e.Erase();                    
-                }                                
+                        e.Erase();
+                }
             }
             catch { }
             return result;
@@ -230,21 +230,21 @@ namespace BaseFunction
                 foreach (DBObject dBObject in collection)
                 {
                     if (dBObject is Entity e) entities.Add(e);
-                    else dBObject?.Dispose();                
+                    else dBObject?.Dispose();
                 }
 
-                entities.AddEntityInCurrentBTR(out _, ms, tr);                
+                entities.AddEntityInCurrentBTR(out _, ms, tr);
             }
         }
 
         private static bool FilterAndCheckIfShouldDelete(Entity obj)
         {
-            if (obj == null) return false;           
+            if (obj == null) return false;
 
             if (!obj.Visible) return true;
-                   
+
             string typeName = obj.GetType().Name;
-                        
+
             if (obj is DBText dbText && string.IsNullOrWhiteSpace(dbText.TextString))
             {
                 return true;

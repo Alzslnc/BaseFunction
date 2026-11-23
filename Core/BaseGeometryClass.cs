@@ -65,7 +65,7 @@ namespace BaseFunction
                 Point3d ptMin = dbTxt.GeometricExtents.MinPoint;
                 Point3d ptMax = dbTxt.GeometricExtents.MaxPoint;
                 return ptMax.X - ptMin.X;
-            }          
+            }
         }
 
         public static double AcadTextLength(string str, ObjectId styleId, double height)
@@ -102,7 +102,7 @@ namespace BaseFunction
                 // Помимо назначения стиля, нужно еще дополнительно
                 // назначить угол наклона букв и коэффициент ширины
 
-                
+
                 if (txtStyle != null)
                 {
                     dbTxt.Oblique = txtStyle.ObliquingAngle;
@@ -1409,7 +1409,7 @@ namespace BaseFunction
                 textLoops.Clear();
             }
             finally
-            { 
+            {
                 if (newPlane) plane?.Dispose();
             }
         }

@@ -58,7 +58,8 @@ namespace Progress
             if (e.NewSize.Height > MainStatusContainer.MinHeight && Math.Abs(e.NewSize.Height - MainStatusContainer.MinHeight) > 1)
             {
                 // Асинхронно обновляем размер, чтобы дать WPF завершить текущую отрисовку
-                Dispatcher.BeginInvoke(new Action(() => {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
                     MainStatusContainer.MinHeight = e.NewSize.Height;
                 }), System.Windows.Threading.DispatcherPriority.Loaded);
             }
@@ -68,7 +69,8 @@ namespace Progress
         {
             if (e.NewSize.Height > SubStatusContainer.MinHeight && Math.Abs(e.NewSize.Height - SubStatusContainer.MinHeight) > 1)
             {
-                Dispatcher.BeginInvoke(new Action(() => {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
                     SubStatusContainer.MinHeight = e.NewSize.Height;
                 }), System.Windows.Threading.DispatcherPriority.Loaded);
             }

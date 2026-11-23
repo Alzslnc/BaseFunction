@@ -515,7 +515,7 @@ namespace BaseFunction
                 }
 
                 if (entRes.Status == PromptStatus.OK)
-                {                   
+                {
                     id = entRes.ObjectId;
                     return true;
                 }
@@ -582,7 +582,7 @@ namespace BaseFunction
             return TryGetObjectsIds(out result, types, message, subclassInclude);
         }
 
-  
+
         public static bool TryGetObjectsIds(out List<ObjectId> result, List<Type> objTypes, string message, bool subclassInclude = false)
         {
             result = new List<ObjectId>();
